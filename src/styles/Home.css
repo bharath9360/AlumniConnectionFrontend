@@ -1,0 +1,50 @@
+/* src/styles/Home.css */
+/* Vision Section */
+.vision-section {
+  background-color: #c84022;
+}
+
+.vision-section h2 {
+  font-size: 3rem;
+  margin-bottom: 0;
+}
+
+/* Benefit Cards */
+.benefit-card {
+  transition: transform 0.3s ease;
+  border-radius: 10px;
+}
+
+.benefit-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+
+/* Gallery Section (Circular Images) */
+.gallery-img {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%; /* வட்டமான படங்கள் */
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+/* Success Story Avatar */
+.story-avatar {
+  width: 80px;
+  height: 80px;
+  background-color: #ccc;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  margin-top: -40px;
+  border: 4px solid #fff;
+}

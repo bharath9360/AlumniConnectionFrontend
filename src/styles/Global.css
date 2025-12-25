@@ -1,0 +1,29 @@
+/* src/styles/Global.css */
+:root {
+  --custom-red: #c84022;
+  --custom-red-dark: #a1331b;
+  --text-dark: #333;
+  --bg-light: #f8f9fa;
+}
+
+body {
+  margin: 0;
+  font-family: 'Poppins', sans-serif;
+  background-color: white;
+  color: var(--text-dark);
+}
+
+.btn-custom-red {
+  background-color: var(--custom-red);
+  color: white;
+  padding: 10px 25px;
+  border-radius: 5px;
+  font-weight: 600;
+  transition: 0.3s;
+  border: none;
+}
+
+.btn-custom-red:hover {
+  background-color: var(--custom-red-dark);
+  color: white;
+}
