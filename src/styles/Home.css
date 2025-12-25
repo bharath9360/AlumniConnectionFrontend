@@ -1,102 +1,256 @@
 /* src/styles/Home.css */
-.hero-section {
+:root {
+  --brand-red: #c84022;
+}
+
+/* Hero Styles */
+.hero-container {
   position: relative;
-  height: 70vh;
+  height: 80vh;
   background: url('https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/alumni_linked_in_background_image_sgla6a.jpg') no-repeat center center/cover;
+  background-attachment: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.hero-overlay {
+
+.hero-dark-overlay {
   position: absolute;
-  top:0; left:0; width:100%; height:100%;
-  background: rgba(0,0,0,0.4);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
 }
-.vision-section {
-  background-color: var(--custom-red);
+
+.hero-main-title {
+  position: relative;
+  color: #fff;
+  font-size: 3.8rem;
+  font-weight: 800;
+  z-index: 10;
 }
-.benefit-card {
-  transition: 0.3s;
+
+/* Vision Bar with Dividers */
+.vision-highlight-bar {
+  background-color: var(--brand-red);
+  padding: 60px 0;
 }
-.benefit-card:hover {
+
+.stats-divider-top, .stats-divider-bottom {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.4);
+  width: 80%;
+  margin: 0 auto;
+}
+
+.tracking-wide {
+  letter-spacing: 2px;
+}
+
+/* Key Benefits */
+.section-heading-main {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.brand-red-text {
+  color: var(--brand-red);
+}
+
+.benefit-hover-effect {
+  transition: transform 0.3s ease;
+}
+
+.benefit-hover-effect:hover {
   transform: translateY(-10px);
 }
-.event-img-placeholder {
-    height: 150px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 1.5rem;
-    font-weight: 600;
+
+/* Event Cards */
+.event-card-banner {
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.8rem;
+  font-weight: 600;
 }
-.blue-bg { background-color: #a2d2ff; }
 
-/* src/styles/Home.css */
+.extra-small {
+  font-size: 0.8rem;
+}
 
-/* Gallery Circle Components */
-.gallery-circle {
-  width: 180px;
-  height: 180px;
+/* Gallery Circular Styles */
+.gallery-circle-item {
+  width: 170px;
+  height: 170px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto;
-  color: #ffffff;
-  font-weight: 700;
+  color: #fff;
+  font-weight: 600;
   font-size: 1.2rem;
   transition: transform 0.3s ease;
 }
 
-.gallery-circle:hover {
+.gallery-circle-item:hover {
   transform: scale(1.05);
 }
 
-/* Success Story Card Component */
-.story-card {
+/* Success Story Card styling */
+.testimonial-card-main {
   max-width: 800px;
-  border-radius: 20px;
+  border-radius: 15px;
   position: relative;
+  border: 1px solid #eee;
 }
 
-.story-avatar-top {
-  width: 70px;
-  height: 70px;
-  background-color: #e0e0e0;
+.testimonial-avatar-float {
+  width: 65px;
+  height: 65px;
+  background-color: #d1d1d1;
+  color: #444;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: -65px auto 10px;
-  border: 5px solid #ffffff;
   font-weight: 700;
-  color: #333;
   font-size: 1.5rem;
+  position: absolute;
+  top: -32.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid #fff;
 }
 
-.testimonial-text {
-  font-size: 1.1rem;
-  line-height: 1.8;
+.testimonial-quote {
+  font-size: 1.05rem;
+  line-height: 1.7;
 }
 
-/* Footer & Brand Links */
-.footer-area {
+/* src/styles/Home.css */
+
+/* Hero Section Styles */
+.hero-landing {
+  position: relative;
+  height: 85vh;
+  background: url('https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/alumni_linked_in_background_image_sgla6a.jpg') no-repeat center center/cover;
+  background-attachment: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.hero-main-headline {
+  position: relative;
+  color: #fff;
+  font-size: 4rem;
+  font-weight: 800;
+  z-index: 5;
+  text-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}
+
+/* Vision Bar with Dividers */
+.vision-highlight-section {
+  background-color: #c84022;
+}
+
+.stats-border-top, .stats-border-bottom {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.35);
+  width: 90%;
+  margin: 0 auto;
+}
+
+/* Common Section Styling */
+.section-title-main {
+  font-size: 2.3rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.brand-primary-color {
+  color: #c84022;
+}
+
+/* Event Cards */
+.event-color-header {
+  height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.9rem;
+  font-weight: 600;
+}
+
+/* Gallery Circle Components */
+.gallery-circle-box {
+  width: 175px;
+  height: 175px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.3rem;
+  transition: transform 0.3s ease;
+}
+
+.gallery-circle-box:hover {
+  transform: scale(1.08);
+}
+
+/* Success Story Styling */
+.testimonial-profile-card {
+  max-width: 820px;
+  border-radius: 12px;
+  position: relative;
+  border: 1px solid #f0f0f0;
+}
+
+.profile-avatar-floating {
+  width: 65px;
+  height: 65px;
+  background-color: #d8d8d8;
+  color: #333;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.6rem;
+  position: absolute;
+  top: -32.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid #fff;
+}
+
+/* Footer & Links */
+.footer-site-main {
   background-color: #1a1a1a !important;
 }
 
-.brand-link {
+.brand-red-link {
   color: #c84022;
   text-decoration: none;
   font-weight: 600;
 }
 
-.brand-link:hover {
+.brand-red-link:hover {
   text-decoration: underline;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .gallery-circle {
-    width: 130px;
-    height: 130px;
-    font-size: 1rem;
-  }
+.extra-small {
+  font-size: 0.85rem;
 }
