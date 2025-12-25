@@ -1,29 +1,28 @@
-/* src/styles/Global.css */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
 :root {
   --custom-red: #c84022;
   --custom-red-dark: #a1331b;
-  --text-dark: #333;
   --bg-light: #f8f9fa;
+  --text-dark: #333;
 }
 
 body {
   margin: 0;
   font-family: 'Poppins', sans-serif;
-  background-color: white;
-  color: var(--text-dark);
+  -webkit-font-smoothing: antialiased;
+  background-color: #fff;
 }
 
 .btn-custom-red {
   background-color: var(--custom-red);
-  color: white;
-  padding: 10px 25px;
-  border-radius: 5px;
+  color: white !important;
   font-weight: 600;
-  transition: 0.3s;
   border: none;
+  padding: 8px 20px;
+  transition: 0.3s;
 }
 
 .btn-custom-red:hover {
   background-color: var(--custom-red-dark);
-  color: white;
 }

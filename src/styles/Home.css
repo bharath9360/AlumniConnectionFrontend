@@ -1,50 +1,102 @@
 /* src/styles/Home.css */
-/* Vision Section */
+.hero-section {
+  position: relative;
+  height: 70vh;
+  background: url('https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/alumni_linked_in_background_image_sgla6a.jpg') no-repeat center center/cover;
+}
+.hero-overlay {
+  position: absolute;
+  top:0; left:0; width:100%; height:100%;
+  background: rgba(0,0,0,0.4);
+}
 .vision-section {
-  background-color: #c84022;
+  background-color: var(--custom-red);
 }
-
-.vision-section h2 {
-  font-size: 3rem;
-  margin-bottom: 0;
-}
-
-/* Benefit Cards */
 .benefit-card {
-  transition: transform 0.3s ease;
-  border-radius: 10px;
+  transition: 0.3s;
 }
-
 .benefit-card:hover {
   transform: translateY(-10px);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
 }
+.event-img-placeholder {
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+.blue-bg { background-color: #a2d2ff; }
 
-/* Gallery Section (Circular Images) */
-.gallery-img {
+/* src/styles/Home.css */
+
+/* Gallery Circle Components */
+.gallery-circle {
   width: 180px;
   height: 180px;
-  border-radius: 50%; /* வட்டமான படங்கள் */
-  object-fit: cover;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  font-weight: bold;
-  font-size: 1.2rem;
-  color: #fff;
-}
-
-/* Success Story Avatar */
-.story-avatar {
-  width: 80px;
-  height: 80px;
-  background-color: #ccc;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  margin-top: -40px;
-  border: 4px solid #fff;
+  margin: 0 auto;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.2rem;
+  transition: transform 0.3s ease;
+}
+
+.gallery-circle:hover {
+  transform: scale(1.05);
+}
+
+/* Success Story Card Component */
+.story-card {
+  max-width: 800px;
+  border-radius: 20px;
+  position: relative;
+}
+
+.story-avatar-top {
+  width: 70px;
+  height: 70px;
+  background-color: #e0e0e0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -65px auto 10px;
+  border: 5px solid #ffffff;
+  font-weight: 700;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.testimonial-text {
+  font-size: 1.1rem;
+  line-height: 1.8;
+}
+
+/* Footer & Brand Links */
+.footer-area {
+  background-color: #1a1a1a !important;
+}
+
+.brand-link {
+  color: #c84022;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.brand-link:hover {
+  text-decoration: underline;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .gallery-circle {
+    width: 130px;
+    height: 130px;
+    font-size: 1rem;
+  }
 }
