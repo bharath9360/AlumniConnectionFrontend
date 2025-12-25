@@ -1,0 +1,152 @@
+/* src/styles/Auth.css */
+.auth-body {
+  background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), 
+              url('https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/alumni_linked_in_background_image_sgla6a.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.auth-card {
+  background-color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 450px;
+}
+
+.btn-role-select {
+  background-color: white;
+  border: 1px solid #ddd;
+  padding: 15px;
+  font-weight: 600;
+  text-align: left;
+  transition: 0.3s;
+}
+
+.btn-role-select:hover {
+  background-color: #c84022;
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* Signup Styles */
+.signup-background {
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), 
+              url('https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/alumni_linked_in_background_image_sgla6a.jpg');
+  background-size: cover;
+  min-height: 100vh;
+}
+
+.form-glass-container {
+  max-width: 850px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.brand-name-red {
+  color: #c84022;
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+
+.btn-mamcet-red {
+  background-color: #c84022;
+  color: white;
+  font-weight: 600;
+}
+
+.btn-mamcet-red:hover {
+  background-color: #a1331b;
+  color: white;
+}
+
+.back-btn-circle {
+  position: fixed;
+  top: 30px;
+  left: 30px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  text-decoration: none;
+  z-index: 100;
+}
+/* Update your Auth.css with these specific styles */
+/* src/styles/Auth.css */
+
+/* Compact Container Size */
+.form-glass-container {
+  width: 100%;
+  max-width: 750px; /* Reduced width for better compact look */
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.auth-logo {
+  width: 45px;
+  height: auto;
+}
+
+/* Tightening the form inputs */
+/* src/styles/Auth.css refinement */
+
+.form-glass-container {
+  width: 100%;
+  max-width: 750px; /* Compact width as requested */
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  margin-bottom: 2rem;
+}
+
+.auth-logo {
+  width: 42px;
+  height: auto;
+}
+
+.brand-name-red {
+  color: #c84022;
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+
+/* Compact input styling */
+.form-control-sm, .form-select-sm {
+  border: 1px solid #d1d5db;
+  padding: 5px 10px;
+  font-size: 0.875rem;
+}
+
+.form-label {
+  margin-bottom: 0.15rem;
+  color: #374151;
+}
+
+.btn-mamcet-red {
+  background-color: #c84022;
+  color: #ffffff;
+  border: none;
+  padding: 10px;
+  letter-spacing: 0.5px;
+}
+
+.btn-mamcet-red:hover {
+  background-color: #a1331b;
+  transform: translateY(-1px);
+}
+
+.signup-background {
+  background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+              url('https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/alumni_linked_in_background_image_sgla6a.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  min-height: 100vh;
+}

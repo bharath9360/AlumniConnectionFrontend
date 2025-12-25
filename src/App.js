@@ -10,6 +10,17 @@ import HomeScreen from './pages/Home/HomeScreen';
 import AboutUs from './pages/Static/AboutUs';
 import ContactUs from './pages/Static/ContactUs';
 import ResponseSubmitted from './pages/Static/ResponseSubmitted';
+// Add these imports at the top of src/App.js
+import RoleSelection from './pages/Auth/RoleSelection';
+import StudentSignUp from './pages/Auth/StudentSignUp';
+// Step 1: Add these imports at the top
+import AlumniSignUp from './pages/Auth/AlumniSignUp';
+import AdminSignUp from './pages/Auth/AdminSignUp';
+
+// Step 2: Add these routes inside <Routes>
+
+
+// Inside your <Routes> block
 
 // Global Styles
 import './styles/Global.css';
@@ -29,6 +40,10 @@ function App() {
             <Route path="/about" element={<AboutUs />} />
             <Route path="/contact" element={<ContactUs />} />
             <Route path="/success" element={<ResponseSubmitted />} />
+            <Route path="/register" element={<RoleSelection />} />
+            <Route path="/signup/student" element={<StudentSignUp />} />
+            <Route path="/signup/alumni" element={<AlumniSignUp />} />
+            <Route path="/signup/admin" element={<AdminSignUp />} />
           </Routes>
         </main>
       </div>
