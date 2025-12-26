@@ -7,6 +7,7 @@ import Navbar from './components/layout/Navbar';
 
 // Page Components
 import HomeScreen from './pages/Home/HomeScreen';
+import AlumniDashboard from './pages/Home/AlumniDashboard';
 import AboutUs from './pages/Static/AboutUs';
 import ContactUs from './pages/Static/ContactUs';
 import ResponseSubmitted from './pages/Static/ResponseSubmitted';
@@ -16,6 +17,15 @@ import StudentSignUp from './pages/Auth/StudentSignUp';
 // Step 1: Add these imports at the top
 import AlumniSignUp from './pages/Auth/AlumniSignUp';
 import AdminSignUp from './pages/Auth/AdminSignUp';
+import LoginRoleSelection from './pages/Auth/LoginRoleSelection';
+import StudentLogin from './pages/Auth/StudentLogin';
+import AlumniLogin from './pages/Auth/AlumniLogin';
+import AdminLogin from './pages/Auth/AdminLogin';
+// Add Import
+import JobPostings from './pages/Home/JobPostings';
+
+// Inside <Routes>
+
 
 // Step 2: Add these routes inside <Routes>
 
@@ -44,6 +54,12 @@ function App() {
             <Route path="/signup/student" element={<StudentSignUp />} />
             <Route path="/signup/alumni" element={<AlumniSignUp />} />
             <Route path="/signup/admin" element={<AdminSignUp />} />
+            <Route path="/login" element={<LoginRoleSelection />} />
+            <Route path="/login/student" element={<StudentLogin />} />
+            <Route path="/login/alumni" element={<AlumniLogin />} />
+            <Route path="/login/admin" element={<AdminLogin />} />
+            <Route path="/alumni/home" element={<AlumniDashboard />} />
+            <Route path="/jobs" element={<JobPostings />} />
           </Routes>
         </main>
       </div>

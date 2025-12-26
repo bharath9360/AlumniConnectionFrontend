@@ -150,3 +150,183 @@
   background-attachment: fixed;
   min-height: 100vh;
 }
+
+/* src/styles/Auth.css - Add these at the bottom */
+
+/* --- NEW SPLIT-SCREEN LOGIN DESIGN --- */
+
+.split-screen-container {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background-color: #fff;
+}
+
+/* Left Panel - Image Section */
+.left-panel-image {
+  flex: 1.2; /* Takes slightly more space than form */
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  display: none; /* Hidden on small screens */
+}
+
+/* Show left panel on larger screens */
+@media (min-width: 992px) {
+  .left-panel-image {
+    display: block;
+  }
+}
+
+/* Right Panel - Form Section */
+.right-panel-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px 60px;
+  background-color: #ffffff;
+}
+
+/* Role Title with Accent Underline */
+.login-role-title {
+  font-weight: 900;
+  font-size: 2rem;
+  color: var(--theme-color);
+  position: relative;
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  text-transform: uppercase;
+}
+
+.login-role-title::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 60px;
+  height: 4px;
+  background-color: var(--theme-color);
+  border-radius: 2px;
+}
+
+/* Input fields with icons */
+.input-group-text-plain {
+  background: transparent;
+  border: none;
+  color: #999;
+  padding-right: 5px;
+}
+
+.form-control-plain {
+  border: none;
+  border-bottom: 2px solid #eee;
+  border-radius: 0;
+  padding-left: 0;
+}
+
+.form-control-plain:focus {
+  box-shadow: none;
+  border-color: var(--theme-color);
+}
+
+/* Theme based buttons and links */
+.btn-theme-login {
+  background-color: var(--theme-color);
+  color: white;
+  font-weight: 700;
+  border: none;
+  padding: 12px;
+  letter-spacing: 1px;
+  transition: 0.3s;
+}
+
+.btn-theme-login:hover {
+  opacity: 0.9;
+  color: white;
+}
+
+.text-theme {
+  color: var(--theme-color) !important;
+  text-decoration: none;
+  font-weight: 600;
+}
+/* src/styles/Auth.css - Refined for Professionalism */
+
+.signup-background {
+  background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
+              url('https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/alumni_linked_in_background_image_sgla6a.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+.form-glass-container {
+  width: 100%;
+  max-width: 420px; /* Professional compact width */
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Professional Typography */
+.brand-name-red {
+  color: #c84022;
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: 0.5px;
+}
+
+.login-title {
+  font-size: 1.6rem; /* Reduced from large font */
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-top: 10px;
+}
+
+/* Professional Input Fields */
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-bottom: 5px;
+}
+
+.form-control {
+  border: 1px solid #d1d5db;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus {
+  border-color: #c84022;
+  box-shadow: 0 0 0 3px rgba(200, 64, 34, 0.1);
+  outline: none;
+}
+
+.btn-mamcet-red {
+  background-color: #c84022;
+  color: #ffffff;
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.btn-mamcet-red:hover {
+  background-color: #a1331b;
+  transform: translateY(-1px);
+}
+
+/* Footer Link Adjustment */
+.auth-footer-text {
+  font-size: 0.85rem;
+  margin-top: 20px;
+}
