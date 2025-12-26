@@ -23,6 +23,12 @@ import AlumniLogin from './pages/Auth/AlumniLogin';
 import AdminLogin from './pages/Auth/AdminLogin';
 // Add Import
 import JobPostings from './pages/Home/JobPostings';
+// Add Imports
+import CreateEvent from './pages/Admin/CreateEvent';
+import Events from './pages/Home/Events';
+
+// Inside <Routes>
+
 
 // Inside <Routes>
 
@@ -60,6 +66,8 @@ function App() {
             <Route path="/login/admin" element={<AdminLogin />} />
             <Route path="/alumni/home" element={<AlumniDashboard />} />
             <Route path="/jobs" element={<JobPostings />} />
+            <Route path="/admin/create-event" element={<CreateEvent />} />
+            <Route path="/events" element={<Events />} />
           </Routes>
         </main>
       </div>

@@ -101,3 +101,151 @@
     border-color: #c84022;
     box-shadow: 0 0 0 0.25rem rgba(200, 64, 34, 0.1);
 }
+/* src/styles/Dashboard.css - Professional Refinement */
+
+.job-card-professional {
+    border: 1px solid #eef2f6;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+
+.job-card-professional:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05) !important;
+    border-color: #d1d9e2;
+}
+
+/* Replaced thick red border with a subtle top accent or kept it clean */
+.job-title-text {
+    font-weight: 700;
+    color: #1a202c;
+    font-size: 1.15rem;
+}
+
+.company-name-text {
+    font-weight: 600;
+    color: #4a5568;
+    font-size: 0.95rem;
+}
+
+.company-logo-box {
+    width: 48px;
+    height: 48px;
+    background-color: #f7fafc;
+    border: 1px solid #edf2f7;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.salary-badge {
+    background-color: #f0fff4;
+    color: #2f855a;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid #c6f6d5;
+}
+
+.btn-apply-professional {
+    background-color: #c84022; /* Branding kept only in CTA */
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 8px 24px;
+    border-radius: 6px;
+    border: none;
+    transition: background 0.2s;
+}
+
+.btn-apply-professional:hover {
+    background-color: #a1331b;
+    color: white;
+}
+
+.job-description-short {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.6;
+}
+
+/* Job Postings Professional Card Layout */
+.job-card-professional {
+    border: 1px solid #eef2f6;
+    border-radius: 10px;
+    transition: all 0.2s ease-in-out;
+}
+
+.job-card-professional:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.06) !important;
+}
+
+.job-title-text {
+    font-weight: 700;
+    color: #1a202c;
+    font-size: 1.2rem;
+}
+
+.company-name-text {
+    font-weight: 600;
+    color: #4a5568;
+    font-size: 1rem;
+}
+
+/* Salary Badge - Professional Green */
+.salary-badge-pro {
+    background-color: #f0fff4;
+    color: #276749;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border: 1px solid #c6f6d5;
+}
+
+/* Skills Tag Styling */
+.skill-tag-item {
+    background-color: #f7fafc;
+    color: #4a5568;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+}
+
+.job-desc-text {
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Primary Action Button */
+.btn-apply-professional {
+    background-color: #c84022;
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    padding: 8px 20px;
+    border-radius: 6px;
+    border: none;
+    transition: background 0.3s;
+}
+
+.btn-apply-professional:hover {
+    background-color: #a1331b;
+    color: white;
+}
+
+.extra-small {
+    font-size: 0.8rem;
+}
