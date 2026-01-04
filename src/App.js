@@ -11,40 +11,24 @@ import AlumniDashboard from './pages/Home/AlumniDashboard';
 import AboutUs from './pages/Static/AboutUs';
 import ContactUs from './pages/Static/ContactUs';
 import ResponseSubmitted from './pages/Static/ResponseSubmitted';
-// Add these imports at the top of src/App.js
 import RoleSelection from './pages/Auth/RoleSelection';
 import StudentSignUp from './pages/Auth/StudentSignUp';
-// Step 1: Add these imports at the top
 import AlumniSignUp from './pages/Auth/AlumniSignUp';
 import AdminSignUp from './pages/Auth/AdminSignUp';
 import LoginRoleSelection from './pages/Auth/LoginRoleSelection';
 import StudentLogin from './pages/Auth/StudentLogin';
 import AlumniLogin from './pages/Auth/AlumniLogin';
 import AdminLogin from './pages/Auth/AdminLogin';
-// Add Import
 import JobPostings from './pages/Home/JobPostings';
-// Add Imports
 import CreateEvent from './pages/Admin/CreateEvent';
 import Events from './pages/Home/Events';
 
-// Inside <Routes>
+// அட்மின் டேஷ்போர்டை இங்கே இம்போர்ட் செய்கிறோம்
+import AdminDashboard from './pages/Admin/AdminDashboard'; 
 
-
-// Inside <Routes>
-
-
-// Step 2: Add these routes inside <Routes>
-
-
-// Inside your <Routes> block
-
-// Global Styles
+// Global Styles (இது கடைசியாக இருக்க வேண்டும்)
 import './styles/Global.css';
 
-/**
- * Main Application Component
- * Managing routes for Home, About, and Contact pages as per design requirements.
- */
 function App() {
   return (
     <Router>
@@ -68,6 +52,9 @@ function App() {
             <Route path="/jobs" element={<JobPostings />} />
             <Route path="/admin/create-event" element={<CreateEvent />} />
             <Route path="/events" element={<Events />} />
+
+            
+            <Route path="/admin/home" element={<AdminDashboard />} />
           </Routes>
         </main>
       </div>

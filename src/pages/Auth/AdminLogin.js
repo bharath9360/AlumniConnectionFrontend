@@ -1,30 +1,36 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import '../../styles/Auth.css';
 
 const AdminLogin = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (email === "admin@gmail.com" && password === "admin123") {
+      navigate('/admin/home'); 
+    } else {
+      alert("Invalid Admin Credentials!");
+    }
+  };
+
   return (
     <div className="signup-background d-flex align-items-center justify-content-center">
       <Link to="/login" className="back-btn-circle"><i className="fas fa-arrow-left"></i></Link>
       <div className="form-glass-container p-4 p-md-5">
-        <div className="text-center mb-4">
-          <img src="https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/ALUMINI_CONNECT_LOGO_hwlrpw.png" width="45" alt="MAMCET" />
-          <h2 className="login-title">Admin Login</h2>
-        </div>
-        <form>
+        <h2 className="login-title text-center">Admin Login</h2>
+        <form onSubmit={handleLogin}>
           <div className="mb-3">
-            <label className="form-label">Admin ID</label>
-            <input type="text" className="form-control" placeholder="Enter admin id" required />
+            <label className="form-label">Email</label>
+            <input type="email" className="form-control" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div className="mb-3">
             <label className="form-label">Password</label>
-            <input type="password" className="form-control" placeholder="••••••••" required />
+            <input type="password" className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
-          <div className="mb-4">
-            <label className="form-label">Secret Key</label>
-            <input type="password" className="form-control" placeholder="Verification key" required />
-          </div>
-          <button type="submit" className="btn-mamcet-red">Login</button>
+          <button type="submit" className="btn-mamcet-red w-100">Login</button>
         </form>
       </div>
     </div>
