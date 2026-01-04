@@ -2,15 +2,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-// Layout Components
+// Layout & Styles
 import Navbar from './components/layout/Navbar';
+import './styles/Global.css';
 
-// Page Components
-import HomeScreen from './pages/Home/HomeScreen';
-import AlumniDashboard from './pages/Home/AlumniDashboard';
-import AboutUs from './pages/Static/AboutUs';
-import ContactUs from './pages/Static/ContactUs';
-import ResponseSubmitted from './pages/Static/ResponseSubmitted';
+// Auth Pages
 import RoleSelection from './pages/Auth/RoleSelection';
 import StudentSignUp from './pages/Auth/StudentSignUp';
 import AlumniSignUp from './pages/Auth/AlumniSignUp';
@@ -19,15 +15,21 @@ import LoginRoleSelection from './pages/Auth/LoginRoleSelection';
 import StudentLogin from './pages/Auth/StudentLogin';
 import AlumniLogin from './pages/Auth/AlumniLogin';
 import AdminLogin from './pages/Auth/AdminLogin';
-import JobPostings from './pages/Home/JobPostings';
-import CreateEvent from './pages/Admin/CreateEvent';
-import Events from './pages/Home/Events';
 
-// அட்மின் டேஷ்போர்டை இங்கே இம்போர்ட் செய்கிறோம்
+// Home & Feature Pages
+import HomeScreen from './pages/Home/HomeScreen';
+import AlumniDashboard from './pages/Home/AlumniDashboard';
+import JobPostings from './pages/Home/JobPostings';
+import Events from './pages/Home/Events';
+import CreateEvent from './pages/Admin/CreateEvent';
+
+// அட்மின் டேஷ்போர்டு (இதை நாம் உருவாக்கப் போகிறோம்)
 import AdminDashboard from './pages/Admin/AdminDashboard'; 
 
-// Global Styles (இது கடைசியாக இருக்க வேண்டும்)
-import './styles/Global.css';
+// Static Pages
+import AboutUs from './pages/Static/AboutUs';
+import ContactUs from './pages/Static/ContactUs';
+import ResponseSubmitted from './pages/Static/ResponseSubmitted';
 
 function App() {
   return (
@@ -52,8 +54,8 @@ function App() {
             <Route path="/jobs" element={<JobPostings />} />
             <Route path="/admin/create-event" element={<CreateEvent />} />
             <Route path="/events" element={<Events />} />
-
             
+            {/* அட்மின் ஹோம் ரூட் */}
             <Route path="/admin/home" element={<AdminDashboard />} />
           </Routes>
         </main>
