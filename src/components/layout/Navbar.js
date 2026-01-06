@@ -1,37 +1,24 @@
+// src/components/layout/Navbar.js
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import '../../styles/Navbar.css';
 
-/**
- * Updated Navbar Component
- * 1. Landing Page: Public links (About, Contact, Login, Register)
- * 2. Auth Pages: Brand Only (No buttons)
- * 3. Logged-in Dashboard: Professional Icons (Home, Jobs, Events, Gallery)
- */
 const Navbar = () => {
   const location = useLocation();
   const path = location.pathname;
 
-  // Conditions for different views
   const isLandingPage = path === '/';
   const isAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/signup');
-  const isDashboard = path.startsWith('/alumni') || path.startsWith('/jobs') || path.startsWith('/events');
+  const isDashboard = path.startsWith('/alumni') || path.startsWith('/jobs') || path.startsWith('/events') || path.startsWith('/messaging') || path.startsWith('/notifications');
 
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm">
       <div className="container">
-        {/* Left Side: Brand Identity (Always Visible) */}
         <Link className="navbar-brand d-flex align-items-center" to={isDashboard ? "/alumni/home" : "/"}>
-          <img 
-            src="https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/ALUMINI_CONNECT_LOGO_hwlrpw.png" 
-            alt="MAMCET Logo" 
-            className="logo-img me-2" 
-            style={{ width: '45px' }}
-          />
+          <img src="https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/ALUMINI_CONNECT_LOGO_hwlrpw.png" alt="Logo" style={{ width: '45px' }} className="me-2" />
           <span className="fw-bold brand-name-red" style={{ color: '#c84022' }}>ALUMNI CONNECT</span>
         </Link>
 
-        {/* 1. Landing Page Menu */}
         {isLandingPage && (
           <div className="collapse navbar-collapse" id="navbarNav">
             <ul className="navbar-nav ms-auto align-items-center">
@@ -43,9 +30,8 @@ const Navbar = () => {
           </div>
         )}
 
-        {/* 2. Dashboard Menu (Visible after Login) */}
         {isDashboard && !isAuthPage && (
-          <div className="collapse navbar-collapse d-flex justify-content-end" id="dashboardNav">
+          <div className="collapse navbar-collapse d-flex justify-content-end">
             <ul className="navbar-nav align-items-center flex-row">
               <li className="nav-item mx-3 text-center">
                 <Link className="nav-link p-0" to="/alumni/home">
@@ -54,8 +40,8 @@ const Navbar = () => {
                 </Link>
               </li>
               <li className="nav-item mx-3 text-center">
-                <Link className="nav-link p-0 active" to="/jobs">
-                  <i className="fas fa-briefcase d-block mb-1 fs-5" style={{color: '#c84022'}}></i>
+                <Link className="nav-link p-0" to="/jobs">
+                  <i className="fas fa-briefcase d-block mb-1 fs-5"></i>
                   <span className="extra-small fw-bold">Jobs</span>
                 </Link>
               </li>
@@ -65,10 +51,18 @@ const Navbar = () => {
                   <span className="extra-small fw-bold">Events</span>
                 </Link>
               </li>
+              {/* Notifications instead of Gallery */}
               <li className="nav-item mx-3 text-center">
-                <Link className="nav-link p-0" to="/gallery">
-                  <i className="fas fa-images d-block mb-1 fs-5"></i>
-                  <span className="extra-small fw-bold">Gallery</span>
+                <Link className="nav-link p-0" to="/notifications">
+                  <i className="fas fa-bell d-block mb-1 fs-5"></i>
+                  <span className="extra-small fw-bold">Notifications</span>
+                </Link>
+              </li>
+              {/* New Messaging/Chatting Icon */}
+              <li className="nav-item mx-3 text-center">
+                <Link className="nav-link p-0" to="/messaging">
+                  <i className="fas fa-comment-dots d-block mb-1 fs-5"></i>
+                  <span className="extra-small fw-bold">Messaging</span>
                 </Link>
               </li>
               <li className="nav-item ms-4">
@@ -77,8 +71,6 @@ const Navbar = () => {
             </ul>
           </div>
         )}
-
-        {/* Note: If isAuthPage is true, nothing will be rendered here (Just Brand) */}
       </div>
     </nav>
   );

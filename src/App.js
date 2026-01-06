@@ -26,6 +26,7 @@ import JobPostings from './pages/Home/JobPostings';
 // Add Imports
 import CreateEvent from './pages/Admin/CreateEvent';
 import Events from './pages/Home/Events';
+import Messaging from './pages/Home/Messaging';
 
 // Inside <Routes>
 
@@ -68,6 +69,8 @@ function App() {
             <Route path="/jobs" element={<JobPostings />} />
             <Route path="/admin/create-event" element={<CreateEvent />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/messaging" element={<Messaging />} />
+            <Route path="/notifications" element={<div className="container py-5"><h4>Notifications coming soon...</h4></div>} />
           </Routes>
         </main>
       </div>

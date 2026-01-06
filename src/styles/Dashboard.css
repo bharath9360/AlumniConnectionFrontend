@@ -249,3 +249,37 @@
 .extra-small {
     font-size: 0.8rem;
 }
+
+/* Messaging UI Styling */
+.chat-item-hover:hover {
+    background-color: #f8f9fa;
+}
+
+.text-truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-list-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+.chat-list-scroll::-webkit-scrollbar-thumb {
+    background: #e0e0e0;
+    border-radius: 10px;
+}
+
+.avatar-sm {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.extra-small {
+    font-size: 0.75rem;
+}
