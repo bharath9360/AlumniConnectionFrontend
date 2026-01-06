@@ -27,6 +27,7 @@ import JobPostings from './pages/Home/JobPostings';
 import CreateEvent from './pages/Admin/CreateEvent';
 import Events from './pages/Home/Events';
 import Messaging from './pages/Home/Messaging';
+import AdminDashboard from './pages/Admin/AdminDashboardHome';
 
 // Inside <Routes>
 
@@ -71,6 +72,8 @@ function App() {
             <Route path="/events" element={<Events />} />
             <Route path="/messaging" element={<Messaging />} />
             <Route path="/notifications" element={<div className="container py-5"><h4>Notifications coming soon...</h4></div>} />
+            <Route path="/admin/create-event" element={<CreateEvent />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
           </Routes>
         </main>
       </div>

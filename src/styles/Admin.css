@@ -1,0 +1,77 @@
+/* src/styles/Admin.css */
+
+.admin-wrapper {
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Sidebar Styles */
+.admin-sidebar {
+    width: 260px;
+    min-height: 100vh;
+    background-color: #1a1a1a !important; /* Dark Theme */
+    flex-shrink: 0;
+    transition: all 0.3s;
+}
+
+.brand-section {
+    padding-left: 10px;
+}
+
+.admin-sidebar .nav-link {
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 5px;
+    transition: all 0.2s;
+    font-weight: 500;
+    color: #b3b3b3 !important;
+}
+
+.admin-sidebar .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff !important;
+}
+
+/* Active link state using NavLink */
+.admin-sidebar .nav-link.active {
+    background-color: #c84022; /* MAMCET Red */
+    color: white !important;
+}
+
+.width-20 {
+    width: 20px;
+    text-align: center;
+}
+
+/* Content Area Styles */
+.admin-content {
+    overflow-y: auto;
+    height: 100vh;
+}
+
+/* Stats Card Icons */
+.icon-box {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bg-primary-soft { background-color: rgba(13, 110, 253, 0.15); }
+.bg-success-soft { background-color: rgba(25, 135, 84, 0.15); }
+.bg-warning-soft { background-color: rgba(255, 193, 7, 0.15); }
+.bg-danger-soft { background-color: rgba(220, 53, 69, 0.15); }
+.brand-red-text { color: #c84022; }
+
+/* Avatar Sm reused */
+.avatar-sm {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
