@@ -1,4 +1,3 @@
-// src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
@@ -11,42 +10,30 @@ import AlumniDashboard from './pages/Home/AlumniDashboard';
 import AboutUs from './pages/Static/AboutUs';
 import ContactUs from './pages/Static/ContactUs';
 import ResponseSubmitted from './pages/Static/ResponseSubmitted';
-// Add these imports at the top of src/App.js
 import RoleSelection from './pages/Auth/RoleSelection';
 import StudentSignUp from './pages/Auth/StudentSignUp';
-// Step 1: Add these imports at the top
 import AlumniSignUp from './pages/Auth/AlumniSignUp';
 import AdminSignUp from './pages/Auth/AdminSignUp';
 import LoginRoleSelection from './pages/Auth/LoginRoleSelection';
 import StudentLogin from './pages/Auth/StudentLogin';
 import AlumniLogin from './pages/Auth/AlumniLogin';
 import AdminLogin from './pages/Auth/AdminLogin';
-// Add Import
 import JobPostings from './pages/Home/JobPostings';
-// Add Imports
 import CreateEvent from './pages/Admin/CreateEvent';
 import Events from './pages/Home/Events';
 import Messaging from './pages/Home/Messaging';
-import AdminDashboard from './pages/Admin/AdminDashboardHome';
 
-// Inside <Routes>
-
-
-// Inside <Routes>
-
-
-// Step 2: Add these routes inside <Routes>
-
-
-// Inside your <Routes> block
+// --- அட்மின் பேஜஸ் இம்போர்ட் ---
+import AdminHome from './pages/Admin/AdminHome';
+import AdminPost from './pages/Admin/AdminPost';
+// இங்க பாருங்க ஷாலினி, இந்த இம்போர்ட் ரொம்ப முக்கியம்!
+import UpcomingEventsList from './pages/Admin/UpcomingEventsList'; 
+import JobVacancyList from './pages/Admin/JobVacancyList';
+import CreateJob from './pages/Admin/CreateJob'
 
 // Global Styles
 import './styles/Global.css';
 
-/**
- * Main Application Component
- * Managing routes for Home, About, and Contact pages as per design requirements.
- */
 function App() {
   return (
     <Router>
@@ -68,12 +55,18 @@ function App() {
             <Route path="/login/admin" element={<AdminLogin />} />
             <Route path="/alumni/home" element={<AlumniDashboard />} />
             <Route path="/jobs" element={<JobPostings />} />
-            <Route path="/admin/create-event" element={<CreateEvent />} />
             <Route path="/events" element={<Events />} />
             <Route path="/messaging" element={<Messaging />} />
             <Route path="/notifications" element={<div className="container py-5"><h4>Notifications coming soon...</h4></div>} />
+            
+            {/* அட்மின் ரூட்கள் */}
+            <Route path="/admin/home" element={<AdminHome />} />
+            <Route path="/admin/post" element={<AdminPost />} />
+            <Route path="/admin/dashboard" element={<AdminHome />} /> 
+            <Route path="/admin/upcoming-events-list" element={<UpcomingEventsList />} />
             <Route path="/admin/create-event" element={<CreateEvent />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/job-vacancies" element={<JobVacancyList />} />
+            <Route path="/admin/create-job" element={<CreateJob />} />
           </Routes>
         </main>
       </div>
