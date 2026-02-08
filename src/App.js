@@ -36,7 +36,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard'; // டேஷ்போ
 import AlumniManagement from './pages/Admin/AlumniManagement';
 import ReviewApplication from './pages/Admin/ReviewApplication';
 import VerificationSuccess from './pages/Admin/VerificationSuccess';
-
+import JobDetailsView from './pages/Admin/JobDetailsView';
 // Global Styles
 import './styles/Global.css';
 
@@ -78,6 +78,7 @@ function App() {
             <Route path="/admin/review-application" element={<ReviewApplication />} />
             <Route path="/admin/verify-success" element={<VerificationSuccess />} />
             <Route path="/admin/view-profile" element={<ViewProfile />} />
+            <Route path="/admin/job-details" element={<JobDetailsView />} />
           </Routes>
         </main>
       </div>
