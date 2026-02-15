@@ -37,6 +37,8 @@ import AlumniManagement from './pages/Admin/AlumniManagement';
 import ReviewApplication from './pages/Admin/ReviewApplication';
 import VerificationSuccess from './pages/Admin/VerificationSuccess';
 import JobDetailsView from './pages/Admin/JobDetailsView';
+import AddAlumni from './pages/Admin/AddAlumni';
+import ViewEventDetail from './pages/Admin/ViewEventDetail';
 // Global Styles
 import './styles/Global.css';
 
@@ -79,6 +81,8 @@ function App() {
             <Route path="/admin/verify-success" element={<VerificationSuccess />} />
             <Route path="/admin/view-profile" element={<ViewProfile />} />
             <Route path="/admin/job-details" element={<JobDetailsView />} />
+            <Route path="/admin/add-alumni" element={<AddAlumni />} />
+            <Route path="/admin/view-event" element={<ViewEventDetail />} />
           </Routes>
         </main>
       </div>

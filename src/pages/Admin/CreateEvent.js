@@ -21,13 +21,23 @@ const CreateEvent = () => {
     };
 
     const handlePostEvent = () => {
-        // LocalStorage-ல் சேமிக்கும் முறை
+        // --- Validation Check Starts ---
+        if (!eventData.title.trim() || !eventData.date || !eventData.description.trim() || !eventData.location.trim()) {
+            alert("Please fill in all the required fields (Title, Date, Description, and Location)!");
+            return; // காலியாக இருந்தால் இங்கேயே நின்றுவிடும்
+        }
+        // --- Validation Check Ends ---
+
         const existingEvents = JSON.parse(localStorage.getItem('adminEvents')) || [];
+        
+        // லிங்க் காலியாக இருந்தால் அதை நீக்கிவிட (Clean up empty links)
+        const filteredLinks = links.filter(link => link.trim() !== "");
+
         const newEvent = {
             ...eventData,
             id: Date.now(),
             type: 'Upcoming Event',
-            regLinks: links
+            regLinks: filteredLinks
         };
         
         localStorage.setItem('adminEvents', JSON.stringify([newEvent, ...existingEvents]));
@@ -43,22 +53,22 @@ const CreateEvent = () => {
                 
                 <div className="row g-4 px-lg-5 justify-content-center">
                     <div className="col-md-5">
-                        <label className="fw-bold small mb-2">EVENT TITLE</label>
+                        <label className="fw-bold small mb-2">EVENT TITLE <span className="text-danger">*</span></label>
                         <input type="text" className="form-control bg-light border-0 p-3 shadow-sm" 
                             onChange={(e) => setEventData({...eventData, title: e.target.value})} placeholder="ENTER EVENT TITLE" />
                     </div>
                     <div className="col-md-5">
-                        <label className="fw-bold small mb-2">DATE</label>
+                        <label className="fw-bold small mb-2">DATE <span className="text-danger">*</span></label>
                         <input type="date" className="form-control bg-light border-0 p-3 shadow-sm" 
                             onChange={(e) => setEventData({...eventData, date: e.target.value})} />
                     </div>
                     <div className="col-md-5">
-                        <label className="fw-bold small mb-2">DESCRIPTION</label>
+                        <label className="fw-bold small mb-2">DESCRIPTION <span className="text-danger">*</span></label>
                         <textarea className="form-control bg-light border-0 p-3 shadow-sm" rows="4" 
                             onChange={(e) => setEventData({...eventData, description: e.target.value})} placeholder="ENTER DESCRIPTION"></textarea>
                     </div>
                     <div className="col-md-5">
-                        <label className="fw-bold small mb-2">LOCATION</label>
+                        <label className="fw-bold small mb-2">LOCATION <span className="text-danger">*</span></label>
                         <input type="text" className="form-control bg-light border-0 p-3 shadow-sm" 
                             onChange={(e) => setEventData({...eventData, location: e.target.value})} placeholder="ENTER LOCATION" />
                     </div>

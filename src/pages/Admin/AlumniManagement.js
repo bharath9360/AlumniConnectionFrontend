@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminNavbar from '../../components/admin/AdminNavbar';
+import * as XLSX from 'xlsx'; // சரியான இம்போர்ட் முறை
 
 const AlumniManagement = () => {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState("");
     const [alumniList, setAlumniList] = useState([]);
+    
+    // Filters State
+    const [filterBatch, setFilterBatch] = useState("");
+    const [filterDept, setFilterDept] = useState("");
 
     useEffect(() => {
         const savedData = JSON.parse(localStorage.getItem('alumniData'));
-        
-        // டேட்டா ஏற்கனவே இருந்தாலோ அல்லது புதுசாக உருவாக்கினாலோ 6 ஃபைல்ஸ் இருக்குமாறு உறுதி செய்கிறோம்
-        if (savedData && savedData.length === 6) {
+        if (savedData && savedData.length > 0) {
             setAlumniList(savedData);
         } else {
             const initialData = [
@@ -27,6 +30,13 @@ const AlumniManagement = () => {
         }
     }, []);
 
+    const handleExport = () => {
+        const worksheet = XLSX.utils.json_to_sheet(filteredAlumni);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "AlumniData");
+        XLSX.writeFile(workbook, "Alumni_Details.xlsx");
+    };
+
     const handleAction = (alumni) => {
         if (alumni.status === 'Pending') {
             navigate('/admin/review-application', { state: { alumni } });
@@ -35,13 +45,24 @@ const AlumniManagement = () => {
         }
     };
 
+    // Dynamic Filter Logic
+    const filteredAlumni = alumniList.filter(al => {
+        const matchesSearch = al.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              al.email.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesBatch = filterBatch === "" || al.batch === filterBatch;
+        const matchesDept = filterDept === "" || al.dept === filterDept;
+        return matchesSearch && matchesBatch && matchesDept;
+    });
+
+    const batches = [...new Set(alumniList.map(item => item.batch))].sort();
+    const depts = [...new Set(alumniList.map(item => item.dept))].sort();
+
     return (
         <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
             <AdminNavbar />
             <div className="container py-5 text-center">
                 <h3 className="fw-bold mb-4" style={{ color: '#b22222' }}>Alumni Management</h3>
                 
-                {/* Search Bar */}
                 <div className="d-flex justify-content-center mb-3">
                     <div className="input-group w-75 shadow-sm border rounded-pill overflow-hidden bg-white">
                         <span className="input-group-text bg-white border-0 ps-3">
@@ -50,20 +71,23 @@ const AlumniManagement = () => {
                         <input 
                             type="text" 
                             className="form-control border-0 shadow-none px-2 py-2" 
-                            placeholder="Search ......" 
+                            placeholder="Search by Name or Email..." 
                             onChange={(e) => setSearchTerm(e.target.value)} 
                         />
                     </div>
                 </div>
 
-                {/* Filters */}
                 <div className="d-flex justify-content-center gap-2 mb-4">
-                    <select className="form-select w-auto rounded shadow-sm small text-muted"><option>Batch</option></select>
-                    <select className="form-select w-auto rounded shadow-sm small text-muted"><option>Department</option></select>
-                    <select className="form-select w-auto rounded shadow-sm small text-muted"><option>Year</option></select>
+                    <select className="form-select w-auto rounded shadow-sm small text-muted" onChange={(e) => setFilterBatch(e.target.value)}>
+                        <option value="">All Batches</option>
+                        {batches.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                    <select className="form-select w-auto rounded shadow-sm small text-muted" onChange={(e) => setFilterDept(e.target.value)}>
+                        <option value="">All Departments</option>
+                        {depts.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
                 </div>
 
-                {/* Table */}
                 <div className="table-responsive shadow-sm border rounded bg-white">
                     <table className="table table-hover align-middle mb-0">
                         <thead className="bg-light">
@@ -77,9 +101,7 @@ const AlumniManagement = () => {
                             </tr>
                         </thead>
                         <tbody style={{ fontSize: '14px' }}>
-                            {alumniList
-                                .filter(al => al.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                                .map((al) => (
+                            {filteredAlumni.map((al) => (
                                 <tr key={al.id}>
                                     <td className="fw-bold">{al.name}</td>
                                     <td className="text-muted">{al.email}</td>
@@ -92,8 +114,7 @@ const AlumniManagement = () => {
                                         </span>
                                     </td>
                                     <td>
-                                        <button className="btn btn-link text-decoration-none fw-bold p-0" 
-                                                onClick={() => handleAction(al)}>
+                                        <button className="btn btn-link text-decoration-none fw-bold p-0" onClick={() => handleAction(al)}>
                                             {al.status === 'Verified' ? 'View' : 'Verify'}
                                         </button>
                                     </td>
@@ -103,14 +124,13 @@ const AlumniManagement = () => {
                     </table>
                 </div>
 
-                {/* Footer Buttons */}
                 <div className="mt-4 d-flex justify-content-center gap-3">
-                    <button className="btn btn-outline-dark rounded shadow-sm px-4 fw-bold">Export</button>
-                    <button className="btn btn-danger rounded shadow-sm px-4 fw-bold">Add Alumni</button>
+                    <button className="btn btn-outline-dark rounded shadow-sm px-4 fw-bold" onClick={handleExport}>Export</button>
+                    <button className="btn btn-danger rounded shadow-sm px-4 fw-bold" onClick={() => navigate('/admin/add-alumni')}>Add Alumni</button>
                 </div>
             </div>
         </div>
     );
 };
 
-export default AlumniManagement;
+export default AlumniManagement; // Default Export
