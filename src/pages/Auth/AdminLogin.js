@@ -19,7 +19,8 @@ const AdminLogin = () => {
       credentials.secretKey === '12345'
     ) {
       // Successful login
-      navigate('/admin/dashboard');
+      // லாகின் வெற்றி அடைந்ததும்
+navigate('/admin/home'); // இதுதான் ஸ்ட்ரைட்டா ஹோம் பக்கத்துக்கு கூட்டிட்டு போகும்
     } else {
       alert('Invalid Admin Credentials or Secret Key!');
     }
