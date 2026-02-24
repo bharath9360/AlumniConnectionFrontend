@@ -16,21 +16,21 @@ const AdminNavbar = () => {
     });
 
     return (
-        <div style={{ 
-            position: 'fixed', 
-            top: 0, 
-            left: 0, 
-            width: '100%', 
-            zIndex: 1100, 
-            pointerEvents: 'none' 
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            zIndex: 1100,
+            pointerEvents: 'none'
         }}>
-            {/* d-flex மற்றும் justify-content-between எல்லாத்தையும் வரிசைப்படுத்தும் */}
+            {/* d-flex and justify-content-between aligns everything */}
             <div className="container-fluid d-flex align-items-center justify-content-between px-4" style={{ height: '70px', pointerEvents: 'auto' }}>
-                
-                {/* 1. இடது பக்கம்: மெயின் நேவ்பார் லோகோவுக்கான இடம் (Empty Space) */}
+
+                {/* 1. Left Side: Space for Main Navbar Logo (Empty Space) */}
                 <div style={{ flex: 1 }}></div>
 
-                {/* 2. நடுப்பகுதி: மெனுக்கள் சென்டர்ல வர (Center Section) */}
+                {/* 2. Middle Section: Menus centered (Center Section) */}
                 <div style={{ flex: 2, display: 'flex', justifyContent: 'center' }}>
                     <ul className="navbar-nav flex-row align-items-center gap-5">
                         <li className="nav-item"><Link to="/admin/home" style={navLinkStyle('/admin/home')}>HOME</Link></li>
@@ -40,14 +40,14 @@ const AdminNavbar = () => {
                     </ul>
                 </div>
 
-                {/* 3. வலது பக்கம்: சர்ச் மற்றும் அட்மின் ப்ரொபைல் (Right Section) */}
+                {/* 3. Right Side: Search and Admin Profile (Right Section) */}
                 <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }} className="gap-3">
                     <div className="input-group border rounded-pill bg-light px-3 py-1" style={{ width: '200px' }}>
                         <span className="bg-transparent border-0 mt-1"><i className="fas fa-search text-muted small"></i></span>
-                        <input 
-                            type="text" 
-                            className="form-control border-0 bg-transparent shadow-none" 
-                            placeholder="SEARCH MESSAGES..." 
+                        <input
+                            type="text"
+                            className="form-control border-0 bg-transparent shadow-none"
+                            placeholder="SEARCH MESSAGES..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             style={{ fontSize: '11px' }}
@@ -57,10 +57,10 @@ const AdminNavbar = () => {
                     <div className="d-flex align-items-center border-start ps-3">
                         <span className="fw-bold me-2" style={{ color: '#b22222', fontSize: '13px' }}>ADMIN</span>
                         <div className="rounded-circle overflow-hidden border" style={{ width: '35px', height: '35px' }}>
-                            <img 
-                                src="https://img.freepik.com/free-vector/businessman-character-avatar-isolated_24877-60111.jpg" 
-                                alt="AdminAvatar" 
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            <img
+                                src="https://img.freepik.com/free-vector/businessman-character-avatar-isolated_24877-60111.jpg"
+                                alt="AdminAvatar"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
                         </div>
                     </div>

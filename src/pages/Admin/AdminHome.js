@@ -5,7 +5,7 @@ const AdminHome = () => {
     return (
         <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
             <AdminNavbar />
-            {/* marginTop-ஐ 150px-லிருந்து 60px-ஆக குறைத்துள்ளேன், அதனால் கன்டென்ட் மேலே ஏறும் */}
+            {/* Reduced marginTop from 150px to 60px to move content up */}
             <div className="container" style={{ marginTop: '60px' }}>
                 <div className="text-center">
                     <h1 className="fw-bold" style={{ color: '#b22222', fontSize: '2.5rem', marginBottom: '10px' }}>

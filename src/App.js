@@ -23,16 +23,16 @@ import CreateEvent from './pages/Admin/CreateEvent';
 import Events from './pages/Home/Events';
 import Messaging from './pages/Home/Messaging';
 
-// --- அட்மின் பேஜஸ் இம்போர்ட் ---
+// --- Admin Pages Import ---
 import AdminHome from './pages/Admin/AdminHome';
 import AdminPost from './pages/Admin/AdminPost';
-import UpcomingEventsList from './pages/Admin/UpcomingEventsList'; 
+import UpcomingEventsList from './pages/Admin/UpcomingEventsList';
 import JobVacancyList from './pages/Admin/JobVacancyList';
 import CreateJob from './pages/Admin/CreateJob';
 import ViewProfile from './pages/Admin/ViewProfile';
-import AdminDashboard from './pages/Admin/AdminDashboard'; // டேஷ்போர்டு இம்போர்ட்
+import AdminDashboard from './pages/Admin/AdminDashboard'; // Dashboard Import
 
-// --- அலுமினி மேனேஜ்மென்ட் இம்போர்ட் ---
+// --- Alumni Management Import ---
 import AlumniManagement from './pages/Admin/AlumniManagement';
 import ReviewApplication from './pages/Admin/ReviewApplication';
 import VerificationSuccess from './pages/Admin/VerificationSuccess';
@@ -49,7 +49,7 @@ function App() {
         <Navbar />
         <main className="main-content">
           <Routes>
-            {/* பொதுவான ரூட்கள் */}
+            {/* Public Routes */}
             <Route path="/" element={<HomeScreen />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/contact" element={<ContactUs />} />
@@ -67,10 +67,10 @@ function App() {
             <Route path="/events" element={<Events />} />
             <Route path="/messaging" element={<Messaging />} />
             <Route path="/notifications" element={<div className="container py-5"><h4>Notifications coming soon...</h4></div>} />
-            
-            {/* அட்மின் ரூட்கள் - வரிசைப்படுத்தப்பட்டுள்ளது */}
+
+            {/* Admin Routes - Sorted */}
             <Route path="/admin/home" element={<AdminHome />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} /> 
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/post" element={<AdminPost />} />
             <Route path="/admin/upcoming-events-list" element={<UpcomingEventsList />} />
             <Route path="/admin/create-event" element={<CreateEvent />} />

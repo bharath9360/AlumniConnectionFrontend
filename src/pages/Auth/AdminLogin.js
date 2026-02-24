@@ -19,8 +19,8 @@ const AdminLogin = () => {
       credentials.secretKey === '12345'
     ) {
       // Successful login
-      // லாகின் வெற்றி அடைந்ததும்
-navigate('/admin/home'); // இதுதான் ஸ்ட்ரைட்டா ஹோம் பக்கத்துக்கு கூட்டிட்டு போகும்
+      // After successful login
+      navigate('/admin/home'); // This will directly take you to the home page
     } else {
       alert('Invalid Admin Credentials or Secret Key!');
     }
@@ -37,22 +37,22 @@ navigate('/admin/home'); // இதுதான் ஸ்ட்ரைட்டா
         <form onSubmit={handleLogin}>
           <div className="mb-3">
             <label className="form-label">Admin ID</label>
-            <input 
-              type="text" name="adminId" className="form-control" placeholder="Enter admin id" required 
+            <input
+              type="text" name="adminId" className="form-control" placeholder="Enter admin id" required
               onChange={handleChange}
             />
           </div>
           <div className="mb-3">
             <label className="form-label">Password</label>
-            <input 
-              type="password" name="password" className="form-control" placeholder="••••••••" required 
+            <input
+              type="password" name="password" className="form-control" placeholder="••••••••" required
               onChange={handleChange}
             />
           </div>
           <div className="mb-4">
             <label className="form-label">Secret Key</label>
-            <input 
-              type="password" name="secretKey" className="form-control" placeholder="Verification key" required 
+            <input
+              type="password" name="secretKey" className="form-control" placeholder="Verification key" required
               onChange={handleChange}
             />
           </div>

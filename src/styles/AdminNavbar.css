@@ -8,7 +8,7 @@
   background: white;
   border-bottom: 1px solid #ddd;
 
-  /* ✅ Important: கீழ போக கூடாது */
+  /* ✅ Important: Should not go below */
   flex-wrap: nowrap;
 }
 
