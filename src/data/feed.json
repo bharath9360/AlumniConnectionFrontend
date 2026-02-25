@@ -1,0 +1,46 @@
+[
+    {
+        "id": 1,
+        "userId": "admin_1",
+        "userName": "MAMCET Placement Cell",
+        "userRole": "Official Account",
+        "userPic": "",
+        "timestamp": "2026-02-25T08:30:00Z",
+        "content": "We are thrilled to announce that TCS is visited our campus for the 2025/26 batch placement drive. Registration is now open on the portal!",
+        "media": "https://images.unsplash.com/photo-1521737711867-e3b97375f902?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+        "likes": 45,
+        "liked": false,
+        "shares": 12,
+        "comments": [
+            {
+                "id": "c1",
+                "userName": "Dr. S. Kumar",
+                "content": "Great opportunity for our students! Looking forward to seeing high participation.",
+                "timestamp": "1 hour ago",
+                "likes": 5
+            }
+        ]
+    },
+    {
+        "id": 2,
+        "userId": "alumni_2",
+        "userName": "Priya Sharma",
+        "userRole": "SDE-II at Google",
+        "userPic": "",
+        "timestamp": "2026-02-24T15:45:00Z",
+        "content": "Just completed my 2nd year at Google. Grateful for the foundation MAMCET provided. If anyone needs tips for Big Tech interviews, feel free to reach out!",
+        "media": "",
+        "likes": 128,
+        "liked": true,
+        "shares": 8,
+        "comments": [
+            {
+                "id": "c2",
+                "userName": "Bharath K",
+                "content": "Congratulations Priya! Proud of your achievements.",
+                "timestamp": "2 hours ago",
+                "likes": 2
+            }
+        ]
+    }
+]

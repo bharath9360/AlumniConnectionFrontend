@@ -1,0 +1,38 @@
+[
+    {
+        "id": 1,
+        "title": "Senior Frontend Developer",
+        "company": "Amazon",
+        "location": "Bangalore, KA",
+        "type": "Full-time",
+        "experience": "3+ Years",
+        "salary": "₹25,00,000 - ₹40,00,000 PA",
+        "postedBy": "Alumni Connection",
+        "timestamp": "2 days ago",
+        "description": "Looking for a React expert to help us build the next generation of AWS console features.",
+        "skills": [
+            "React",
+            "TypeScript",
+            "Micro-frontends"
+        ],
+        "applied": false
+    },
+    {
+        "id": 2,
+        "title": "Graduate Trainee Engineer",
+        "company": "Zoho",
+        "location": "Chennai, TN",
+        "type": "Full-time",
+        "experience": "Freshers (2025 Batch)",
+        "salary": "₹5,00,000 - ₹8,00,000 PA",
+        "postedBy": "HILIFE AI",
+        "timestamp": "5 hours ago",
+        "description": "Zoho is hiring for its core engineering team. Strong problem-solving skills required.",
+        "skills": [
+            "Java",
+            "Data Structures",
+            "Problem Solving"
+        ],
+        "applied": true
+    }
+]

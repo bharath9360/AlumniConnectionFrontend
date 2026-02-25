@@ -1,0 +1,45 @@
+[
+    {
+        "id": "alumni_1",
+        "name": "Bharath K",
+        "role": "Senior Software Engineer",
+        "company": "HILIFE AI",
+        "batch": "2020-2024",
+        "bio": "Building scalable AI solutions and passionate about mentoring the next generation of engineers. Expert in React, Node.js, and Cloud Architecture.",
+        "profilePic": "",
+        "coverPic": "https://images.unsplash.com/photo-1557683316-973673baf926?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+        "connections": "500+",
+        "views": 1240,
+        "experience": [
+            {
+                "id": 1,
+                "title": "Senior Software Engineer",
+                "company": "HILIFE AI",
+                "duration": "2024 - Present",
+                "desc": "Leading the development of core AI integration modules."
+            },
+            {
+                "id": 2,
+                "title": "Full Stack Developer",
+                "company": "TechInnovate Solutions",
+                "duration": "2022 - 2024",
+                "desc": "Worked on enterprise-level SaaS products using MERN stack."
+            }
+        ],
+        "education": [
+            {
+                "id": 1,
+                "school": "MAMCET",
+                "degree": "B.E. Computer Science and Engineering",
+                "duration": "2020 - 2024"
+            }
+        ],
+        "skills": [
+            "React.js",
+            "Node.js",
+            "System Design",
+            "Cloud Computing",
+            "AI Integration"
+        ]
+    }
+]

@@ -1,0 +1,24 @@
+[
+    {
+        "id": 1,
+        "title": "Annual Alumni Meet '26",
+        "category": "Networking",
+        "date": "2026-03-15",
+        "time": "10:00 AM",
+        "venue": "MAMCET Grand Hall",
+        "desc": "Join us for our biggest annual gathering to reconnect with batchmates and explore networking opportunities.",
+        "image": "https://images.unsplash.com/photo-1540575861501-7ad0582373f2?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+        "registered": false
+    },
+    {
+        "id": 2,
+        "title": "Expert Talk: Industry 5.0",
+        "category": "Webinar",
+        "date": "2026-04-05",
+        "time": "02:00 PM",
+        "venue": "Virtual (Google Meet)",
+        "desc": "A masterclass by our distinguished alumni on the upcoming trends in Industry 5.0 and AI.",
+        "image": "https://images.unsplash.com/photo-1505373633519-21516fcf648a?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
+        "registered": true
+    }
+]

@@ -1,0 +1,46 @@
+[
+    {
+        "id": 1,
+        "participants": [
+            "alumni_1",
+            "alumni_2"
+        ],
+        "userName": "Priya Sharma",
+        "userRole": "SDE-II at Google",
+        "userInitial": "P",
+        "status": "online",
+        "messages": [
+            {
+                "id": "m1",
+                "senderId": "alumni_2",
+                "text": "Hi Bharath, I saw your post. I'd be happy to refer you!",
+                "timestamp": "10:30 AM"
+            },
+            {
+                "id": "m2",
+                "senderId": "alumni_1",
+                "text": "That's great, Priya! Thank you so much. I'll share my resume shortly.",
+                "timestamp": "10:35 AM"
+            }
+        ]
+    },
+    {
+        "id": 2,
+        "participants": [
+            "alumni_1",
+            "admin_1"
+        ],
+        "userName": "MAMCET Admin",
+        "userRole": "Campus Support",
+        "userInitial": "A",
+        "status": "offline",
+        "messages": [
+            {
+                "id": "m3",
+                "senderId": "admin_1",
+                "text": "Welcome to the alumni platform! Let us know if you need any assistance.",
+                "timestamp": "Yesterday"
+            }
+        ]
+    }
+]

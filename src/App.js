@@ -3,10 +3,11 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Layout Components
 import Navbar from './components/layout/Navbar';
+import BottomNav from './components/layout/BottomNav';
 
 // Page Components
 import HomeScreen from './pages/Home/HomeScreen';
-import AlumniDashboard from './pages/Home/AlumniDashboard';
+import AlumniDashboard from './pages/Alumni/AlumniDashboard';
 import AboutUs from './pages/Static/AboutUs';
 import ContactUs from './pages/Static/ContactUs';
 import ResponseSubmitted from './pages/Static/ResponseSubmitted';
@@ -22,6 +23,8 @@ import JobPostings from './pages/Home/JobPostings';
 import CreateEvent from './pages/Admin/CreateEvent';
 import Events from './pages/Home/Events';
 import Messaging from './pages/Home/Messaging';
+import AdminDashboard from './pages/Admin/AdminDashboardHome';
+import Profile from './pages/Alumni/Profile';
 
 // --- Admin Pages Import ---
 import AdminHome from './pages/Admin/AdminHome';
@@ -40,14 +43,19 @@ import JobDetailsView from './pages/Admin/JobDetailsView';
 import AddAlumni from './pages/Admin/AddAlumni';
 import ViewEventDetail from './pages/Admin/ViewEventDetail';
 // Global Styles
+import { storage } from './utils/storage';
 import './styles/Global.css';
+import './styles/Dashboard.css';
+
+// Initialize persistent storage
+storage.init();
 
 function App() {
   return (
     <Router>
-      <div className="app-container">
+      <div className="App d-flex flex-column min-vh-100">
         <Navbar />
-        <main className="main-content">
+        <main className="flex-grow-1 pb-lg-0 pb-5 mb-3 mb-lg-0">
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<HomeScreen />} />
@@ -63,6 +71,7 @@ function App() {
             <Route path="/login/alumni" element={<AlumniLogin />} />
             <Route path="/login/admin" element={<AdminLogin />} />
             <Route path="/alumni/home" element={<AlumniDashboard />} />
+            <Route path="/alumni/profile" element={<Profile />} />
             <Route path="/jobs" element={<JobPostings />} />
             <Route path="/events" element={<Events />} />
             <Route path="/messaging" element={<Messaging />} />
@@ -85,6 +94,7 @@ function App() {
             <Route path="/admin/view-event" element={<ViewEventDetail />} />
           </Routes>
         </main>
+        <BottomNav />
       </div>
     </Router>
   );

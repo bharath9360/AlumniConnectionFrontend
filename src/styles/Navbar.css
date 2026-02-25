@@ -32,3 +32,36 @@
   background-color: #a1331b;
   color: white;
 }
+
+/* Bottom Nav Styling */
+.bottom-nav {
+  height: 60px;
+  z-index: 1050;
+}
+
+.bottom-nav .nav-item {
+  flex: 1;
+  transition: color 0.2s;
+}
+
+/* Mobile Profile Avatar in Navbar */
+.nav-profile-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.navbar-mobile-profile {
+  margin-right: 15px;
+}
+
+@media (max-width: 991px) {
+  .navbar-brand {
+    font-size: 1rem;
+  }
+
+  .brand-name-red {
+    font-size: 0.9rem;
+  }
+}

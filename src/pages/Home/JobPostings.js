@@ -1,98 +1,197 @@
-import React from 'react';
-import '../../styles/Dashboard.css';
-
-/**
- * JobPostings Component
- * Updated with all fields from the design: Title, Company, Experience, Salary, Location, and Skills.
- */
+import React, { useState, useEffect } from 'react';
+import { storage } from '../../utils/storage';
+import Modal from '../../components/common/Modal';
+import Toast from '../../components/common/Toast';
 const JobPostings = () => {
-  const JOBS_DATA = [
-    {
-      id: 1,
-      title: "Software Development Engineer",
-      company: "HILIFE AI",
-      experience: "0 - 2 Years",
-      salary: "₹6,00,000 - ₹10,00,000 PA",
-      location: "Trichy, Tamil Nadu",
-      skills: ["React.js", "Node.js", "MongoDB", "Express"],
-      postedDate: "2 days ago",
-      description: "We are looking for a skilled developer to join our product team. Candidates with internship experience in MERN stack will be preferred."
-    },
-    {
-      id: 2,
-      title: "Associate Systems Engineer",
-      company: "TCS",
-      experience: "Freshers (2025 Batch)",
-      salary: "₹3,50,000 - ₹4,50,000 PA",
-      location: "Chennai / Bangalore",
-      skills: ["Java", "Python", "SQL", "Aptitude"],
-      postedDate: "5 hours ago",
-      description: "TCS is hiring for the next-gen engineering roles. Strong logical reasoning and coding fundamentals are expected."
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  // New Job state
+  const [newJob, setNewJob] = useState({
+    title: "",
+    company: "",
+    location: "",
+    type: "Full-time",
+    experience: "",
+    salary: "",
+    description: "",
+    skills: ""
+  });
+
+  useEffect(() => {
+    setJobs(storage.getJobs());
+    setLoading(false);
+  }, []);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
+
+  const handleApply = (jobId) => {
+    const updatedJobs = jobs.map(job => {
+      if (job.id === jobId) return { ...job, applied: true };
+      return job;
+    });
+    setJobs(updatedJobs);
+    storage.saveJobs(updatedJobs);
+    setIsApplyModalOpen(false);
+    showToast("Application submitted successfully!", "success");
+  };
+
+  const handlePostJob = () => {
+    if (!newJob.title || !newJob.company) {
+      showToast("Please fill in the title and company name.", "error");
+      return;
     }
-  ];
+    const jobToAdd = {
+      ...newJob,
+      id: Date.now(),
+      applied: false,
+      timestamp: "Just now",
+      postedBy: "You",
+      skills: newJob.skills.split(',').map(s => s.trim())
+    };
+    const updatedJobs = [jobToAdd, ...jobs];
+    setJobs(updatedJobs);
+    storage.saveJobs(updatedJobs);
+    setIsPostModalOpen(false);
+    showToast("Job posted successfully!", "success");
+    setNewJob({ title: "", company: "", location: "", type: "Full-time", experience: "", salary: "", description: "", skills: "" });
+  };
+
+  if (loading) return <div className="p-5 text-center">Loading Job Openings...</div>;
 
   return (
-    <div className="dashboard-main-bg py-5">
+    <div className="dashboard-main-bg py-5 min-vh-100">
       <div className="container">
-        <div className="row g-4 justify-content-center">
-          
-          <div className="col-lg-8">
-            {/* Header Section */}
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="fw-bold text-dark">Job Opportunities for Alumni & Students</h4>
-              <button className="btn btn-dark btn-sm rounded-pill px-4 fw-bold">
-                <i className="fas fa-plus me-2"></i>Post a Job
-              </button>
-            </div>
+        <div className="d-flex justify-content-between align-items-center mb-5">
+          <div>
+            <h2 className="fw-bold mb-0 text-dark">Job Opportunities</h2>
+            <p className="text-muted small">Explore roles shared by your alumni network.</p>
+          </div>
+          <button className="btn btn-mamcet-red px-4 fw-bold rounded-pill" onClick={() => setIsPostModalOpen(true)}>
+            <i className="fas fa-plus me-2"></i>Post a Job
+          </button>
+        </div>
 
-            {/* Job Cards Area */}
-            <div className="job-list-wrapper">
-              {JOBS_DATA.map(job => (
-                <div key={job.id} className="job-card-professional mb-4 shadow-sm bg-white">
-                  <div className="p-4">
-                    {/* Top Row: Title & Salary */}
-                    <div className="d-flex justify-content-between align-items-start mb-2">
-                      <div>
-                        <h5 className="job-title-text mb-1">{job.title}</h5>
-                        <h6 className="company-name-text">{job.company}</h6>
-                      </div>
-                      <span className="salary-badge-pro">{job.salary}</span>
-                    </div>
+        <div className="row g-4">
+          <div className="col-lg-8 mx-auto">
+            {jobs.map(job => (
+              <div key={job.id} className="dashboard-card bg-white shadow-sm border-0 rounded-3 p-4 mb-3 d-flex flex-column flex-md-row gap-4 align-items-start border-hover-red transition">
+                <div className="job-logo bg-light rounded d-flex align-items-center justify-content-center" style={{ minWidth: '80px', height: '80px' }}>
+                  <i className="fas fa-building text-secondary fs-2"></i>
+                </div>
+                <div className="flex-grow-1">
+                  <div className="d-flex justify-content-between">
+                    <h5 className="fw-bold text-mamcet-red mb-1">{job.title}</h5>
+                    <span className="extra-small text-muted fw-bold">{job.timestamp}</span>
+                  </div>
+                  <h6 className="fw-bold text-dark mb-1">{job.company}</h6>
+                  <p className="extra-small text-muted mb-3">
+                    <i className="fas fa-map-marker-alt me-1"></i> {job.location} &bull; <i className="fas fa-briefcase me-1"></i> {job.type}
+                  </p>
 
-                    {/* Middle Row: Meta Info (Exp & Location) */}
-                    <div className="d-flex gap-4 text-muted extra-small mb-3 mt-3">
-                      <span><i className="fas fa-briefcase me-2"></i><b>Exp:</b> {job.experience}</span>
-                      <span><i className="fas fa-map-marker-alt me-2"></i><b>Location:</b> {job.location}</span>
-                    </div>
+                  <div className="d-flex flex-wrap gap-2 mb-3">
+                    {job.skills?.map((skill, idx) => (
+                      <span key={idx} className="badge bg-light text-dark extra-small border fw-normal">{skill}</span>
+                    ))}
+                  </div>
 
-                    {/* Skills Section */}
-                    <div className="skills-tag-wrapper mb-3 d-flex flex-wrap gap-2">
-                      {job.skills.map((skill, index) => (
-                        <span key={index} className="skill-tag-item">{skill}</span>
-                      ))}
-                    </div>
-
-                    {/* Description Section */}
-                    <p className="job-desc-text text-muted small">
-                      {job.description}
-                    </p>
-
-                    {/* Footer Row: Meta & Actions */}
-                    <div className="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
-                      <span className="extra-small text-muted italic">Posted: {job.postedDate}</span>
-                      <div className="d-flex gap-2">
-                        <button className="btn btn-outline-secondary btn-sm px-3 fw-bold">View Details</button>
-                        <button className="btn btn-apply-professional px-4">Apply Now</button>
-                      </div>
+                  <div className="p-3 bg-light rounded-3 mb-3 border">
+                    <div className="row g-2 extra-small mb-0">
+                      <div className="col-6"><strong>Exp:</strong> {job.experience}</div>
+                      <div className="col-6"><strong>Salary:</strong> {job.salary}</div>
+                      <div className="col-12 mt-2"><strong>Posted by:</strong> {job.postedBy}</div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
+                  <div className="d-flex gap-2">
+                    <button
+                      className={`btn btn-pro ${job.applied ? 'btn-success' : 'btn-pro-primary'} btn-pro-sm px-4`}
+                      onClick={() => { setSelectedJob(job); setIsApplyModalOpen(true); }}
+                      disabled={job.applied}
+                    >
+                      {job.applied ? 'Already Applied' : 'Apply Now'}
+                    </button>
+                    <button className="btn btn-pro btn-pro-outline btn-pro-sm px-4">Save Job</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* MODALS */}
+      <Modal
+        isOpen={isApplyModalOpen}
+        onClose={() => setIsApplyModalOpen(false)}
+        title="Apply for Position"
+        footer={<button className="btn btn-mamcet-red px-4 rounded-pill fw-bold" onClick={() => handleApply(selectedJob.id)}>Submit Application</button>}
+      >
+        <div className="p-3 bg-light rounded-3 mb-4">
+          <h6 className="fw-bold mb-1">{selectedJob?.title}</h6>
+          <p className="extra-small text-muted mb-0">{selectedJob?.company} &bull; {selectedJob?.location}</p>
+        </div>
+        <div className="mb-3">
+          <label className="form-label extra-small fw-bold">Cover Letter / Note</label>
+          <textarea className="form-control" rows="4" placeholder="Briefly mention why you are a good fit..."></textarea>
+        </div>
+        <p className="extra-small text-muted">Your MAMCET alumni profile will be shared with the recruiter automatically.</p>
+      </Modal>
+
+      <Modal
+        isOpen={isPostModalOpen}
+        onClose={() => setIsPostModalOpen(false)}
+        title="Post a New Job Opening"
+        footer={<button className="btn btn-mamcet-red px-4 rounded-pill fw-bold" onClick={handlePostJob}>Publish Job</button>}
+      >
+        <div className="row g-3">
+          <div className="col-md-7">
+            <label className="form-label extra-small fw-bold">Job Title</label>
+            <input type="text" className="form-control" value={newJob.title} onChange={(e) => setNewJob({ ...newJob, title: e.target.value })} />
+          </div>
+          <div className="col-md-5">
+            <label className="form-label extra-small fw-bold">Company Name</label>
+            <input type="text" className="form-control" value={newJob.company} onChange={(e) => setNewJob({ ...newJob, company: e.target.value })} />
+          </div>
+          <div className="col-md-6">
+            <label className="form-label extra-small fw-bold">Location</label>
+            <input type="text" className="form-control" placeholder="e.g. Bangalore, Remote" value={newJob.location} onChange={(e) => setNewJob({ ...newJob, location: e.target.value })} />
+          </div>
+          <div className="col-md-6">
+            <label className="form-label extra-small fw-bold">Job Type</label>
+            <select className="form-select" value={newJob.type} onChange={(e) => setNewJob({ ...newJob, type: e.target.value })}>
+              <option>Full-time</option>
+              <option>Contract</option>
+              <option>Internship</option>
+            </select>
+          </div>
+          <div className="col-md-6">
+            <label className="form-label extra-small fw-bold">Exp. Required</label>
+            <input type="text" className="form-control" placeholder="e.g. 2-5 Years" value={newJob.experience} onChange={(e) => setNewJob({ ...newJob, experience: e.target.value })} />
+          </div>
+          <div className="col-md-6">
+            <label className="form-label extra-small fw-bold">Salary Range (Optional)</label>
+            <input type="text" className="form-control" placeholder="e.g. 10-15 LPA" value={newJob.salary} onChange={(e) => setNewJob({ ...newJob, salary: e.target.value })} />
+          </div>
+          <div className="col-12">
+            <label className="form-label extra-small fw-bold">Skills (Comma separated)</label>
+            <input type="text" className="form-control" placeholder="React, Node.js, AI" value={newJob.skills} onChange={(e) => setNewJob({ ...newJob, skills: e.target.value })} />
+          </div>
+          <div className="col-12">
+            <label className="form-label extra-small fw-bold">Description</label>
+            <textarea className="form-control" rows="3" value={newJob.description} onChange={(e) => setNewJob({ ...newJob, description: e.target.value })}></textarea>
+          </div>
+        </div>
+      </Modal>
+
+      {/* TOAST NOTIFICATION */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 };
