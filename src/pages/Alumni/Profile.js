@@ -40,7 +40,15 @@ const Profile = () => {
         setToast({ message, type });
     };
 
-    if (loading || !userData) return <div className="p-5 text-center">Loading Profile...</div>;
+    if (loading) return <div className="p-5 text-center">Loading Profile...</div>;
+
+    if (!userData) return (
+        <div className="p-5 text-center min-vh-100 d-flex flex-column align-items-center justify-content-center">
+            <h4>No Profile Data Found</h4>
+            <p className="text-muted">Please login to view your profile.</p>
+            <a href="/login" className="btn btn-mamcet-red px-4 mt-2">Go to Login</a>
+        </div>
+    );
 
     return (
         <div className="dashboard-main-bg py-4 min-vh-100">

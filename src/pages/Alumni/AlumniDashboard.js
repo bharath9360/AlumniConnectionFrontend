@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+
 import { storage } from '../../utils/storage';
 import ProfileCard from './components/ProfileCard';
 import FeedItem from './components/FeedItem';
@@ -7,6 +7,7 @@ import { NewsWidget, EventsWidget } from './components/SidebarWidgets';
 import Toast from '../../components/common/Toast';
 
 const AlumniDashboard = () => {
+
   const [userData, setUserData] = useState(null);
   const [feedData, setFeedData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +16,17 @@ const AlumniDashboard = () => {
 
   useEffect(() => {
     const initDashboard = () => {
-      setUserData(storage.getCurrentUser());
+      console.log('Initializing Alumni Dashboard...');
+      let user = storage.getCurrentUser();
+
+      if (!user) {
+        console.warn('No user session found. Loading with dummy guest data.');
+        // Fallback to alumni_1 data if no session exists, to prevent infinite loading
+        const users = storage.getUsers();
+        user = users.find(u => u.id === 'alumni_1') || { name: 'Guest', profilePic: '' };
+      }
+
+      setUserData(user);
       setFeedData(storage.getFeed());
       setLoading(false);
     };

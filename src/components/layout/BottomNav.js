@@ -14,7 +14,7 @@ const BottomNav = () => {
 
     const isDashboard = path.startsWith('/alumni') || path.startsWith('/jobs') || path.startsWith('/events') || path.startsWith('/messaging') || path.startsWith('/notifications') || path.startsWith('/profile');
 
-    if (!isDashboard || !userData) return null;
+    if (!isDashboard || !userData || path.startsWith('/admin')) return null;
 
     const navItems = [
         { path: '/alumni/home', icon: 'fa-home', label: 'Home' },

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { storage } from '../../utils/storage';
 import '../../styles/Auth.css';
 
 const AlumniLogin = () => {
@@ -9,12 +10,14 @@ const AlumniLogin = () => {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    // Professional hardcoded authentication for testing
-    if (email === 'alumni@mamcet.com' && password === 'alumni@123') {
-      navigate('/alumni/home'); // Redirect to Alumni Dashboard
-    } else {
-      alert('Invalid Credentials! Use alumni@mamcet.com / alumni@123');
+    console.log('Attempting simplified alumni login...');
+    const users = storage.getUsers();
+    const alumniUser = users.find(u => u.id === 'alumni_1');
+    if (alumniUser) {
+      storage.updateCurrentUser(alumniUser);
+      console.log('Successfully set alumni user session');
     }
+    navigate('/alumni/home');
   };
 
   return (
@@ -28,29 +31,29 @@ const AlumniLogin = () => {
         <form onSubmit={handleLogin}>
           <div className="mb-3">
             <label className="form-label">Alumni Email ID</label>
-            <input 
-              type="email" 
-              className="form-control" 
-              placeholder="alumni@mamcet.com" 
+            <input
+              type="email"
+              className="form-control"
+              placeholder="alumni@mamcet.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required 
+              required
             />
           </div>
           <div className="mb-4">
             <label className="form-label">Password</label>
-            <input 
-              type="password" 
-              className="form-control" 
-              placeholder="alumni@123" 
+            <input
+              type="password"
+              className="form-control"
+              placeholder="alumni@123"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required 
+              required
             />
           </div>
           <button type="submit" className="btn-mamcet-red">Login</button>
           <div className="auth-footer-text text-center text-muted">
-            New here? <Link to="/signup/alumni" className="text-decoration-none fw-bold" style={{color: '#c84022'}}>Create Account</Link>
+            New here? <Link to="/signup/alumni" className="text-decoration-none fw-bold" style={{ color: '#c84022' }}>Create Account</Link>
           </div>
         </form>
       </div>

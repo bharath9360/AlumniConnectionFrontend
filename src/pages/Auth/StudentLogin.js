@@ -1,8 +1,23 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { storage } from '../../utils/storage';
 import '../../styles/Auth.css';
 
 const StudentLogin = () => {
+  const navigate = useNavigate();
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    // Simplified login for development testing
+    const studentUser = {
+      id: 'student_1',
+      name: 'Student User',
+      role: 'student',
+      profilePic: ''
+    };
+    storage.updateCurrentUser(studentUser);
+    navigate('/alumni/home');
+  };
   return (
     <div className="signup-background d-flex align-items-center justify-content-center">
       <Link to="/login" className="back-btn-circle"><i className="fas fa-arrow-left"></i></Link>
@@ -11,7 +26,7 @@ const StudentLogin = () => {
           <img src="https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/ALUMINI_CONNECT_LOGO_hwlrpw.png" width="45" alt="MAMCET" />
           <h2 className="login-title">Student Login</h2>
         </div>
-        <form>
+        <form onSubmit={handleLogin}>
           <div className="mb-3">
             <label className="form-label">Student Roll Number</label>
             <input type="text" className="form-control" placeholder="Enter your roll no" required />
@@ -22,7 +37,7 @@ const StudentLogin = () => {
           </div>
           <button type="submit" className="btn-mamcet-red">Login</button>
           <div className="auth-footer-text text-center text-muted">
-            Not registered? <Link to="/signup/student" className="text-decoration-none fw-bold" style={{color: '#c84022'}}>Create Account</Link>
+            Not registered? <Link to="/signup/student" className="text-decoration-none fw-bold" style={{ color: '#c84022' }}>Create Account</Link>
           </div>
         </form>
       </div>

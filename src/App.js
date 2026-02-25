@@ -23,7 +23,6 @@ import JobPostings from './pages/Home/JobPostings';
 import CreateEvent from './pages/Admin/CreateEvent';
 import Events from './pages/Home/Events';
 import Messaging from './pages/Home/Messaging';
-import AdminDashboard from './pages/Admin/AdminDashboardHome';
 import Profile from './pages/Alumni/Profile';
 
 // --- Admin Pages Import ---
@@ -48,7 +47,11 @@ import './styles/Global.css';
 import './styles/Dashboard.css';
 
 // Initialize persistent storage
-storage.init();
+try {
+  storage.init();
+} catch (e) {
+  console.error('Failed to initialize storage:', e);
+}
 
 function App() {
   return (

@@ -19,33 +19,53 @@ const STORAGE_KEYS = {
     CURRENT_USER: 'alumni_current_user'
 };
 
+// Memory fallback in case localStorage is blocked
+let memoryStorage = {};
+
 const initializeStorage = () => {
-    if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersData));
+    try {
+        if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
+            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersData));
+        }
+        if (!localStorage.getItem(STORAGE_KEYS.FEED)) {
+            localStorage.setItem(STORAGE_KEYS.FEED, JSON.stringify(feedData));
+        }
+        if (!localStorage.getItem(STORAGE_KEYS.JOBS)) {
+            localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(jobsData));
+        }
+        if (!localStorage.getItem(STORAGE_KEYS.EVENTS)) {
+            localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(eventsData));
+        }
+        if (!localStorage.getItem(STORAGE_KEYS.CHATS)) {
+            localStorage.setItem(STORAGE_KEYS.CHATS, JSON.stringify(chatsData));
+        }
+    } catch (e) {
+        console.warn('LocalStorage access blocked or failed. Using memory storage.', e);
+        // Pre-fill memory storage with initial data if localStorage fails
+        memoryStorage[STORAGE_KEYS.USERS] = JSON.stringify(usersData);
+        memoryStorage[STORAGE_KEYS.FEED] = JSON.stringify(feedData);
+        memoryStorage[STORAGE_KEYS.JOBS] = JSON.stringify(jobsData);
+        memoryStorage[STORAGE_KEYS.EVENTS] = JSON.stringify(eventsData);
+        memoryStorage[STORAGE_KEYS.CHATS] = JSON.stringify(chatsData);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.FEED)) {
-        localStorage.setItem(STORAGE_KEYS.FEED, JSON.stringify(feedData));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.JOBS)) {
-        localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(jobsData));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.EVENTS)) {
-        localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(eventsData));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.CHATS)) {
-        localStorage.setItem(STORAGE_KEYS.CHATS, JSON.stringify(chatsData));
-    }
-    // Do not auto-login during initialization
-    // The user must log in through the login page
 };
 
 const getCollection = (key) => {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
+    try {
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : (memoryStorage[key] ? JSON.parse(memoryStorage[key]) : []);
+    } catch (e) {
+        const data = memoryStorage[key];
+        return data ? JSON.parse(data) : [];
+    }
 };
 
 const saveCollection = (key, data) => {
-    localStorage.setItem(key, JSON.stringify(data));
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+        memoryStorage[key] = JSON.stringify(data);
+    }
 };
 
 export const storage = {
@@ -53,7 +73,15 @@ export const storage = {
 
     // Users
     getUsers: () => getCollection(STORAGE_KEYS.USERS),
-    getCurrentUser: () => getCollection(STORAGE_KEYS.CURRENT_USER),
+    getCurrentUser: () => {
+        try {
+            const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || memoryStorage[STORAGE_KEYS.CURRENT_USER];
+            return data ? JSON.parse(data) : null;
+        } catch (e) {
+            const data = memoryStorage[STORAGE_KEYS.CURRENT_USER];
+            return data ? JSON.parse(data) : null;
+        }
+    },
     updateCurrentUser: (userData) => {
         saveCollection(STORAGE_KEYS.CURRENT_USER, userData);
         // Also update in users collection
@@ -66,7 +94,11 @@ export const storage = {
     },
 
     logout: () => {
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        try {
+            localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        } catch (e) {
+            delete memoryStorage[STORAGE_KEYS.CURRENT_USER];
+        }
     },
 
     // Feed

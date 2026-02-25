@@ -23,6 +23,8 @@ const Navbar = () => {
     window.location.href = '/';
   };
 
+  if (path.startsWith('/admin')) return null;
+
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm px-2 px-md-0">
       <div className="container d-flex align-items-center">
@@ -31,7 +33,7 @@ const Navbar = () => {
         {isDashboard && userData && (
           <Link to="/alumni/profile" className="d-lg-none navbar-mobile-profile">
             <div className="avatar-xs bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
-              {userData.profilePic ? <img src={userData.profilePic} alt="Me" className="nav-profile-img" /> : (userData.name?.[0] || "?")}
+              {userData?.profilePic ? <img src={userData.profilePic} alt="Me" className="nav-profile-img" /> : (userData?.name?.[0] || "?")}
             </div>
           </Link>
         )}
