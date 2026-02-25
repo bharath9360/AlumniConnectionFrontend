@@ -12,7 +12,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.4); /* படத்தின் மேல் லேசான கருப்பு நிறம் */
+  background: rgba(0, 0, 0, 0.4); /* Light black overlay on image */
 }
 
 .hero-section h1 {
