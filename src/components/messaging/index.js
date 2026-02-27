@@ -116,7 +116,20 @@ export const ChatWindow = ({ children }) => (
     </div>
 );
 
-ChatWindow.Header = function ChatWindowHeader({ chat, onBack }) {
+ChatWindow.Header = function ChatWindowHeader({ chat, onBack, onClearChat, onDeleteChat }) {
+    const [showMenu, setShowMenu] = React.useState(false);
+    const menuRef = React.useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setShowMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     return (
         <div className="px-4 py-3 bg-white border-bottom d-flex justify-content-between align-items-center flex-shrink-0">
             <div className="d-flex align-items-center gap-3">
@@ -140,9 +153,39 @@ ChatWindow.Header = function ChatWindowHeader({ chat, onBack }) {
                     </div>
                 </div>
             </div>
-            <div className="d-flex gap-3 text-muted">
+            <div className="d-flex gap-3 text-muted position-relative" ref={menuRef}>
                 <button className="btn btn-link text-muted p-1" title="Video call"><i className="fas fa-video"></i></button>
-                <button className="btn btn-link text-muted p-1" title="More options"><i className="fas fa-ellipsis-h"></i></button>
+                <button
+                    className="btn btn-link text-muted p-1"
+                    title="More options"
+                    onClick={() => setShowMenu(!showMenu)}
+                >
+                    <i className="fas fa-ellipsis-h"></i>
+                </button>
+
+                {showMenu && (
+                    <div
+                        className="position-absolute bg-white border rounded shadow-sm py-1"
+                        style={{ top: '100%', right: 0, zIndex: 1000, minWidth: '180px' }}
+                    >
+                        <button
+                            className="dropdown-item px-3 py-2 text-dark d-flex align-items-center gap-2 border-0 bg-transparent w-100 text-start"
+                            style={{ fontSize: '0.85rem' }}
+                            onClick={() => { onClearChat(); setShowMenu(false); }}
+                        >
+                            <i className="fas fa-eraser text-muted" style={{ width: '16px' }}></i>
+                            Clear Chat
+                        </button>
+                        <button
+                            className="dropdown-item px-3 py-2 text-danger d-flex align-items-center gap-2 border-0 bg-transparent w-100 text-start"
+                            style={{ fontSize: '0.85rem' }}
+                            onClick={() => { onDeleteChat(); setShowMenu(false); }}
+                        >
+                            <i className="fas fa-trash-alt" style={{ width: '16px' }}></i>
+                            Delete Conversation
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

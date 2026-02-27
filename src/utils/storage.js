@@ -9,6 +9,7 @@ import feedData from '../data/feed.json';
 import jobsData from '../data/jobs.json';
 import eventsData from '../data/events.json';
 import chatsData from '../data/chats.json';
+import notificationsData from '../data/notifications.json';
 
 const STORAGE_KEYS = {
     USERS: 'alumni_users',
@@ -16,6 +17,7 @@ const STORAGE_KEYS = {
     JOBS: 'alumni_jobs',
     EVENTS: 'alumni_events',
     CHATS: 'alumni_chats',
+    NOTIFICATIONS: 'alumni_notifications',
     CURRENT_USER: 'alumni_current_user'
 };
 
@@ -49,6 +51,7 @@ const initializeStorage = () => {
     ensureData(STORAGE_KEYS.JOBS, jobsData);
     ensureData(STORAGE_KEYS.EVENTS, eventsData);
     ensureData(STORAGE_KEYS.CHATS, chatsData);
+    ensureData(STORAGE_KEYS.NOTIFICATIONS, notificationsData);
 };
 
 const getCollection = (key) => {
@@ -108,5 +111,22 @@ export const storage = {
             chats[index].messages = messages;
             saveCollection(STORAGE_KEYS.CHATS, chats);
         }
-    }
+    },
+    clearConversation: (chatId) => {
+        const chats = getCollection(STORAGE_KEYS.CHATS);
+        const index = chats.findIndex(c => c.id === chatId);
+        if (index !== -1) {
+            chats[index].messages = [];
+            saveCollection(STORAGE_KEYS.CHATS, chats);
+        }
+    },
+    deleteConversation: (chatId) => {
+        const chats = getCollection(STORAGE_KEYS.CHATS);
+        const updatedChats = chats.filter(c => c.id !== chatId);
+        saveCollection(STORAGE_KEYS.CHATS, updatedChats);
+    },
+
+    // Notifications
+    getNotifications: () => getCollection(STORAGE_KEYS.NOTIFICATIONS),
+    saveNotifications: (notifications) => saveCollection(STORAGE_KEYS.NOTIFICATIONS, notifications)
 };

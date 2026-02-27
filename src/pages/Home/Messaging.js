@@ -65,6 +65,27 @@ const Messaging = () => {
     setMsgInput('');
   };
 
+  const handleClearChat = () => {
+    if (!activeChat) return;
+    if (window.confirm('Are you sure you want to clear all messages in this chat?')) {
+      storage.clearConversation(activeChat.id);
+      const updatedChat = { ...activeChat, messages: [] };
+      setActiveChat(updatedChat);
+      setChats(chats.map(c => c.id === activeChat.id ? updatedChat : c));
+    }
+  };
+
+  const handleDeleteChat = () => {
+    if (!activeChat) return;
+    if (window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+      storage.deleteConversation(activeChat.id);
+      const remainingChats = chats.filter(c => c.id !== activeChat.id);
+      setChats(remainingChats);
+      setActiveChat(remainingChats.length > 0 ? remainingChats[0] : null);
+      if (remainingChats.length === 0) setMobileView('list');
+    }
+  };
+
   const filteredChats = chats.filter(c =>
     c.userName.toLowerCase().includes(search.toLowerCase())
   );
@@ -112,6 +133,8 @@ const Messaging = () => {
                 <ChatWindow.Header
                   chat={activeChat}
                   onBack={() => setMobileView('list')}
+                  onClearChat={handleClearChat}
+                  onDeleteChat={handleDeleteChat}
                 />
                 <ChatWindow.Messages messages={activeChat.messages} />
                 <ChatWindow.Input

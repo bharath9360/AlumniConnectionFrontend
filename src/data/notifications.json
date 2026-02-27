@@ -1,0 +1,72 @@
+{
+    "events": [
+        {
+            "id": 1,
+            "title": "Pongal Celebration",
+            "description": "Join us for a vibrant Pongal Celebration event. Celebrate the harvest season with our alumni community!",
+            "date": "March 15, 2026",
+            "isRead": false,
+            "icon": "🎉"
+        },
+        {
+            "id": 2,
+            "title": "Annual Alumni Meet",
+            "description": "Network with fellow alumni and celebrate our shared memories at the annual reunion.",
+            "date": "April 20, 2026",
+            "isRead": false,
+            "icon": "👥"
+        }
+    ],
+    "jobs": [
+        {
+            "id": 3,
+            "title": "Administrative Assistant",
+            "company": "Tech Innovations Inc.",
+            "description": "Join our administrative team! Responsibilities include managing schedules, coordinating meetings, and supporting multiple departments.",
+            "posted": "2 days ago",
+            "isRead": false,
+            "icon": "💼"
+        },
+        {
+            "id": 4,
+            "title": "Marketing Specialist",
+            "company": "Digital Solutions Ltd.",
+            "description": "We're looking for a creative marketing professional to drive our digital campaigns and brand growth.",
+            "posted": "1 week ago",
+            "isRead": false,
+            "icon": "📊"
+        }
+    ],
+    "messages": [
+        {
+            "id": 5,
+            "chatId": 3,
+            "sender": "Sophia Carter",
+            "lastMessage": "Hey! How have you been? Let's catch up soon!",
+            "unreadCount": 3,
+            "timestamp": "15 mins ago",
+            "isRead": false,
+            "avatar": "SC"
+        },
+        {
+            "id": 6,
+            "chatId": 4,
+            "sender": "Ethan Bennett",
+            "lastMessage": "The project looks great. I'll review it tonight.",
+            "unreadCount": 1,
+            "timestamp": "1 hour ago",
+            "isRead": false,
+            "avatar": "EB"
+        },
+        {
+            "id": 7,
+            "chatId": 1,
+            "sender": "Priya Sharma",
+            "lastMessage": "Thanks for the referral! The interview went well.",
+            "unreadCount": 0,
+            "timestamp": "3 hours ago",
+            "isRead": true,
+            "avatar": "PS"
+        }
+    ]
+}

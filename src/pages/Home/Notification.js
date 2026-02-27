@@ -1,81 +1,24 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { storage } from '../../utils/storage';
 
 const Notification = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [notifications, setNotifications] = useState({
-    events: [
-      {
-        id: 1,
-        title: "Pongal Celebration",
-        description: "Join us for a vibrant Pongal Celebration event. Celebrate the harvest season with our alumni community!",
-        date: "March 15, 2026",
-        isRead: false,
-        icon: "🎉"
-      },
-      {
-        id: 2,
-        title: "Annual Alumni Meet",
-        description: "Network with fellow alumni and celebrate our shared memories at the annual reunion.",
-        date: "April 20, 2026",
-        isRead: false,
-        icon: "👥"
-      }
-    ],
-    jobs: [
-      {
-        id: 3,
-        title: "Administrative Assistant",
-        company: "Tech Innovations Inc.",
-        description: "Join our administrative team! Responsibilities include managing schedules, coordinating meetings, and supporting multiple departments.",
-        posted: "2 days ago",
-        isRead: false,
-        icon: "💼"
-      },
-      {
-        id: 4,
-        title: "Marketing Specialist",
-        company: "Digital Solutions Ltd.",
-        description: "We're looking for a creative marketing professional to drive our digital campaigns and brand growth.",
-        posted: "1 week ago",
-        isRead: false,
-        icon: "📊"
-      }
-    ],
-    messages: [
-      {
-        id: 5,
-        chatId: 3,
-        sender: "Sophia Carter",
-        lastMessage: "Hey! How have you been? Let's catch up soon!",
-        unreadCount: 3,
-        timestamp: "15 mins ago",
-        isRead: false,
-        avatar: "SC"
-      },
-      {
-        id: 6,
-        chatId: 4,
-        sender: "Ethan Bennett",
-        lastMessage: "The project looks great. I'll review it tonight.",
-        unreadCount: 1,
-        timestamp: "1 hour ago",
-        isRead: false,
-        avatar: "EB"
-      },
-      {
-        id: 7,
-        chatId: 1,
-        sender: "Priya Sharma",
-        lastMessage: "Thanks for the referral! The interview went well.",
-        unreadCount: 0,
-        timestamp: "3 hours ago",
-        isRead: true,
-        avatar: "PS"
-      }
-    ]
+    events: [],
+    jobs: [],
+    messages: []
   });
+
+  React.useEffect(() => {
+    setNotifications(storage.getNotifications());
+  }, []);
+
+  const updateNotifications = (newNotifications) => {
+    setNotifications(newNotifications);
+    storage.saveNotifications(newNotifications);
+  };
 
   const filteredNotifications = useMemo(() => {
     const s = searchTerm.toLowerCase();
@@ -93,11 +36,30 @@ const Notification = () => {
   }, [searchTerm, notifications]);
 
   const handleMarkAsRead = () => {
-    setNotifications(prev => ({
-      events: prev.events.map(e => ({ ...e, isRead: true })),
-      jobs: prev.jobs.map(j => ({ ...j, isRead: true })),
-      messages: prev.messages.map(m => ({ ...m, isRead: true }))
-    }));
+    const updated = {
+      events: notifications.events.map(e => ({ ...e, isRead: true })),
+      jobs: notifications.jobs.map(j => ({ ...j, isRead: true })),
+      messages: notifications.messages.map(m => ({ ...m, isRead: true }))
+    };
+    updateNotifications(updated);
+  };
+
+  const handleDeleteNotification = (type, id, e) => {
+    e.stopPropagation(); // Prevent navigation
+    const updated = {
+      ...notifications,
+      [type]: notifications[type].filter(item => item.id !== id)
+    };
+    updateNotifications(updated);
+  };
+
+  const handleClearAll = () => {
+    const updated = {
+      events: [],
+      jobs: [],
+      messages: []
+    };
+    updateNotifications(updated);
   };
 
   const unreadCount = [
@@ -118,15 +80,26 @@ const Notification = () => {
         {/* Page Header */}
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h2 className="fw-bold mb-0" style={{ color: '#c84022' }}>Notifications</h2>
-          {unreadCount > 0 && (
-            <button
-              className="btn rounded-pill px-4 flex-shrink-0"
-              style={{ border: '1.5px solid #333', color: '#333', backgroundColor: 'transparent', fontWeight: 600, fontSize: '0.9rem' }}
-              onClick={handleMarkAsRead}
-            >
-              Mark as Read
-            </button>
-          )}
+          <div className="d-flex gap-2">
+            {unreadCount > 0 && (
+              <button
+                className="btn rounded-pill px-4 flex-shrink-0"
+                style={{ border: '1.5px solid #333', color: '#333', backgroundColor: 'transparent', fontWeight: 600, fontSize: '0.9rem' }}
+                onClick={handleMarkAsRead}
+              >
+                Mark as Read
+              </button>
+            )}
+            {(notifications.events.length > 0 || notifications.jobs.length > 0 || notifications.messages.length > 0) && (
+              <button
+                className="btn btn-outline-danger rounded-pill px-4 flex-shrink-0"
+                style={{ fontWeight: 600, fontSize: '0.9rem' }}
+                onClick={handleClearAll}
+              >
+                <i className="fas fa-trash-alt me-2"></i>Clear All
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -164,30 +137,33 @@ const Notification = () => {
                 <div className="d-flex align-items-center mb-3">
                   <span className="me-2" style={{ fontSize: '1.2rem' }}>📅</span>
                   <h5 className="fw-bold mb-0 text-dark">College Events</h5>
-                  <span
-                    className="badge ms-2 fw-bold"
-                    style={{ backgroundColor: '#c84022', borderRadius: '12px', fontSize: '0.7rem' }}
-                  >
-                    {filteredNotifications.events.length}
-                  </span>
+                  {filteredNotifications.events.filter(e => !e.isRead).length > 0 && (
+                    <span
+                      className="badge ms-2 fw-bold"
+                      style={{ backgroundColor: '#c84022', borderRadius: '12px', fontSize: '0.7rem' }}
+                    >
+                      {filteredNotifications.events.filter(e => !e.isRead).length}
+                    </span>
+                  )}
                 </div>
                 <div className="d-flex flex-column gap-2">
                   {filteredNotifications.events.map(event => (
                     <div
                       key={event.id}
-                      className={`dashboard-card bg-white rounded-3 p-3 d-flex align-items-start gap-3 ${!event.isRead ? 'border-start border-danger border-3' : ''}`}
+                      className="dashboard-card bg-white rounded-3 p-3 d-flex align-items-start gap-3"
                       style={{
                         cursor: 'pointer',
                         borderLeft: !event.isRead ? '4px solid #c84022' : '4px solid transparent',
                         transition: 'box-shadow 0.15s, transform 0.15s'
                       }}
                       onClick={() => {
-                        setNotifications(prev => ({
-                          ...prev,
-                          events: prev.events.map(e =>
+                        const updated = {
+                          ...notifications,
+                          events: notifications.events.map(e =>
                             e.id === event.id ? { ...e, isRead: true } : e
                           )
-                        }));
+                        };
+                        updateNotifications(updated);
                         navigate('/events');
                       }}
                       onMouseEnter={e => {
@@ -217,7 +193,16 @@ const Notification = () => {
                           <i className="fas fa-calendar-alt me-1 text-mamcet-red"></i>{event.date}
                         </span>
                       </div>
-                      <i className="fas fa-chevron-right text-muted align-self-center"></i>
+                      <div className="d-flex flex-column align-items-center gap-2">
+                        <i className="fas fa-chevron-right text-muted"></i>
+                        <button
+                          className="btn btn-link text-danger p-0 delete-btn"
+                          title="Delete notification"
+                          onClick={(e) => handleDeleteNotification('events', event.id, e)}
+                        >
+                          <i className="fas fa-trash-alt"></i>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -230,12 +215,14 @@ const Notification = () => {
                 <div className="d-flex align-items-center mb-3">
                   <span className="me-2" style={{ fontSize: '1.2rem' }}>💼</span>
                   <h5 className="fw-bold mb-0 text-dark">Job Postings</h5>
-                  <span
-                    className="badge ms-2 fw-bold"
-                    style={{ backgroundColor: '#c84022', borderRadius: '12px', fontSize: '0.7rem' }}
-                  >
-                    {filteredNotifications.jobs.length}
-                  </span>
+                  {filteredNotifications.jobs.filter(j => !j.isRead).length > 0 && (
+                    <span
+                      className="badge ms-2 fw-bold"
+                      style={{ backgroundColor: '#c84022', borderRadius: '12px', fontSize: '0.7rem' }}
+                    >
+                      {filteredNotifications.jobs.filter(j => !j.isRead).length}
+                    </span>
+                  )}
                 </div>
                 <div className="d-flex flex-column gap-2">
                   {filteredNotifications.jobs.map(job => (
@@ -248,12 +235,13 @@ const Notification = () => {
                         transition: 'box-shadow 0.15s, transform 0.15s'
                       }}
                       onClick={() => {
-                        setNotifications(prev => ({
-                          ...prev,
-                          jobs: prev.jobs.map(j =>
+                        const updated = {
+                          ...notifications,
+                          jobs: notifications.jobs.map(j =>
                             j.id === job.id ? { ...j, isRead: true } : j
                           )
-                        }));
+                        };
+                        updateNotifications(updated);
                         navigate('/jobs');
                       }}
                       onMouseEnter={e => {
@@ -286,7 +274,16 @@ const Notification = () => {
                           <i className="fas fa-clock me-1 text-mamcet-red"></i>Posted {job.posted}
                         </span>
                       </div>
-                      <i className="fas fa-chevron-right text-muted align-self-center"></i>
+                      <div className="d-flex flex-column align-items-center gap-2">
+                        <i className="fas fa-chevron-right text-muted"></i>
+                        <button
+                          className="btn btn-link text-danger p-0 delete-btn"
+                          title="Delete notification"
+                          onClick={(e) => handleDeleteNotification('jobs', job.id, e)}
+                        >
+                          <i className="fas fa-trash-alt"></i>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -299,12 +296,14 @@ const Notification = () => {
                 <div className="d-flex align-items-center mb-3">
                   <span className="me-2" style={{ fontSize: '1.2rem' }}>💬</span>
                   <h5 className="fw-bold mb-0 text-dark">Direct Messages</h5>
-                  <span
-                    className="badge ms-2 fw-bold"
-                    style={{ backgroundColor: '#c84022', borderRadius: '12px', fontSize: '0.7rem' }}
-                  >
-                    {filteredNotifications.messages.length}
-                  </span>
+                  {filteredNotifications.messages.filter(m => !m.isRead).length > 0 && (
+                    <span
+                      className="badge ms-2 fw-bold"
+                      style={{ backgroundColor: '#c84022', borderRadius: '12px', fontSize: '0.7rem' }}
+                    >
+                      {filteredNotifications.messages.filter(m => !m.isRead).length}
+                    </span>
+                  )}
                 </div>
                 <div className="d-flex flex-column gap-2">
                   {filteredNotifications.messages.map(message => (
@@ -318,12 +317,13 @@ const Notification = () => {
                       }}
                       onClick={() => {
                         // Mark as read
-                        setNotifications(prev => ({
-                          ...prev,
-                          messages: prev.messages.map(m =>
+                        const updated = {
+                          ...notifications,
+                          messages: notifications.messages.map(m =>
                             m.id === message.id ? { ...m, isRead: true, unreadCount: 0 } : m
                           )
-                        }));
+                        };
+                        updateNotifications(updated);
                         navigate(`/messaging?chatId=${message.chatId}`);
                       }}
                       onMouseEnter={e => {
@@ -358,7 +358,7 @@ const Notification = () => {
                           </span>
                         )}
                       </div>
-                      <div className="align-self-center d-flex align-items-center gap-2">
+                      <div className="align-self-center d-flex align-items-center gap-3">
                         {message.unreadCount > 0 && (
                           <span
                             className="badge rounded-pill text-white fw-bold"
@@ -367,7 +367,16 @@ const Notification = () => {
                             {message.unreadCount}
                           </span>
                         )}
-                        <i className="fas fa-chevron-right text-muted" style={{ fontSize: '0.75rem' }}></i>
+                        <div className="d-flex flex-column align-items-center gap-2">
+                          <i className="fas fa-chevron-right text-muted" style={{ fontSize: '0.75rem' }}></i>
+                          <button
+                            className="btn btn-link text-danger p-0 delete-btn"
+                            title="Delete notification"
+                            onClick={(e) => handleDeleteNotification('messages', message.id, e)}
+                          >
+                            <i className="fas fa-trash-alt"></i>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
