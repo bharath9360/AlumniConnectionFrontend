@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /** * CONFIGURATION: Centralized Dynamic Data 
  */
@@ -114,7 +113,6 @@ const JobVacancyList = () => {
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-      <AdminNavbar />
       
       <div className="container py-5">
         <h4 className="text-center fw-bold mb-4" style={{ color: '#b22222' }}>JOB VACANCIES</h4>

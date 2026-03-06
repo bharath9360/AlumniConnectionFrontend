@@ -68,14 +68,16 @@ const JobPostings = () => {
   return (
     <div className="dashboard-main-bg py-5 min-vh-100">
       <div className="container">
-        <div className="d-flex justify-content-between align-items-center mb-5">
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-5 gap-3">
           <div>
             <h2 className="fw-bold mb-0 text-dark">Job Opportunities</h2>
             <p className="text-muted small">Explore roles shared by your alumni network.</p>
           </div>
-          <button className="btn btn-mamcet-red px-4 fw-bold rounded-pill" onClick={() => setIsPostModalOpen(true)}>
-            <i className="fas fa-plus me-2"></i>Post a Job
-          </button>
+          <div>
+            <button className="btn btn-mamcet-red px-4 fw-bold rounded-pill" onClick={() => setIsPostModalOpen(true)}>
+              <i className="fas fa-plus me-2"></i>Post a Job
+            </button>
+          </div>
         </div>
 
         <div className="row g-4">
@@ -109,7 +111,7 @@ const JobPostings = () => {
                     </div>
                   </div>
 
-                  <div className="d-flex gap-2">
+                  <div className="d-flex gap-3 mt-2">
                     <button
                       className={`btn btn-pro ${job.applied ? 'btn-success' : 'btn-pro-primary'} btn-pro-sm px-4`}
                       onClick={() => { setSelectedJob(job); setIsApplyModalOpen(true); }}

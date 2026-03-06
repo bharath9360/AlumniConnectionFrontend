@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 // Layout Components
 import Navbar from './components/layout/Navbar';
 import BottomNav from './components/layout/BottomNav';
+import { AuthProvider } from './context/AuthContext';
 
 // Page Components
 import HomeScreen from './pages/Home/HomeScreen';
@@ -55,51 +56,53 @@ try {
 
 function App() {
   return (
-    <Router>
-      <div className="App d-flex flex-column min-vh-100">
-        <Navbar />
-        <main className="flex-grow-1 pb-lg-0 pb-5 mb-3 mb-lg-0">
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<HomeScreen />} />
-            <Route path="/about" element={<AboutUs />} />
-            <Route path="/contact" element={<ContactUs />} />
-            <Route path="/success" element={<ResponseSubmitted />} />
-            <Route path="/register" element={<RoleSelection />} />
-            <Route path="/signup/student" element={<StudentSignUp />} />
-            <Route path="/signup/alumni" element={<AlumniSignUp />} />
-            <Route path="/signup/admin" element={<AdminSignUp />} />
-            <Route path="/login" element={<LoginRoleSelection />} />
-            <Route path="/login/student" element={<StudentLogin />} />
-            <Route path="/login/alumni" element={<AlumniLogin />} />
-            <Route path="/login/admin" element={<AdminLogin />} />
-            <Route path="/alumni/home" element={<AlumniDashboard />} />
-            <Route path="/alumni/profile" element={<Profile />} />
-            <Route path="/jobs" element={<JobPostings />} />
-            <Route path="/events" element={<Events />} />
-            <Route path="/messaging" element={<Messaging />} />
-            <Route path="/notifications" element={<div className="container py-5"><h4>Notifications coming soon...</h4></div>} />
+    <AuthProvider>
+      <Router>
+        <div className="App d-flex flex-column min-vh-100">
+          <Navbar />
+          <main className="flex-grow-1 pb-lg-0 pb-5 mb-3 mb-lg-0">
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<HomeScreen />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/contact" element={<ContactUs />} />
+              <Route path="/success" element={<ResponseSubmitted />} />
+              <Route path="/register" element={<RoleSelection />} />
+              <Route path="/signup/student" element={<StudentSignUp />} />
+              <Route path="/signup/alumni" element={<AlumniSignUp />} />
+              <Route path="/signup/admin" element={<AdminSignUp />} />
+              <Route path="/login" element={<LoginRoleSelection />} />
+              <Route path="/login/student" element={<StudentLogin />} />
+              <Route path="/login/alumni" element={<AlumniLogin />} />
+              <Route path="/login/admin" element={<AdminLogin />} />
+              <Route path="/alumni/home" element={<AlumniDashboard />} />
+              <Route path="/alumni/profile" element={<Profile />} />
+              <Route path="/jobs" element={<JobPostings />} />
+              <Route path="/events" element={<Events />} />
+              <Route path="/messaging" element={<Messaging />} />
+              <Route path="/notifications" element={<div className="container py-5"><h4>Notifications coming soon...</h4></div>} />
 
-            {/* Admin Routes - Sorted */}
-            <Route path="/admin/home" element={<AdminHome />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/post" element={<AdminPost />} />
-            <Route path="/admin/upcoming-events-list" element={<UpcomingEventsList />} />
-            <Route path="/admin/create-event" element={<CreateEvent />} />
-            <Route path="/admin/job-vacancies" element={<JobVacancyList />} />
-            <Route path="/admin/create-job" element={<CreateJob />} />
-            <Route path="/admin/alumni" element={<AlumniManagement />} />
-            <Route path="/admin/review-application" element={<ReviewApplication />} />
-            <Route path="/admin/verify-success" element={<VerificationSuccess />} />
-            <Route path="/admin/view-profile" element={<ViewProfile />} />
-            <Route path="/admin/job-details" element={<JobDetailsView />} />
-            <Route path="/admin/add-alumni" element={<AddAlumni />} />
-            <Route path="/admin/view-event" element={<ViewEventDetail />} />
-          </Routes>
-        </main>
-        <BottomNav />
-      </div>
-    </Router>
+              {/* Admin Routes - Sorted */}
+              <Route path="/admin/home" element={<AdminHome />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/post" element={<AdminPost />} />
+              <Route path="/admin/upcoming-events-list" element={<UpcomingEventsList />} />
+              <Route path="/admin/create-event" element={<CreateEvent />} />
+              <Route path="/admin/job-vacancies" element={<JobVacancyList />} />
+              <Route path="/admin/create-job" element={<CreateJob />} />
+              <Route path="/admin/alumni" element={<AlumniManagement />} />
+              <Route path="/admin/review-application" element={<ReviewApplication />} />
+              <Route path="/admin/verify-success" element={<VerificationSuccess />} />
+              <Route path="/admin/view-profile" element={<ViewProfile />} />
+              <Route path="/admin/job-details" element={<JobDetailsView />} />
+              <Route path="/admin/add-alumni" element={<AddAlumni />} />
+              <Route path="/admin/view-event" element={<ViewEventDetail />} />
+            </Routes>
+          </main>
+          <BottomNav />
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

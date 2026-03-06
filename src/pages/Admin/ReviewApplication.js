@@ -1,6 +1,5 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /** * CONFIGURATION: Centralized labels and fallback data to avoid hardcoding inside the UI
  */
@@ -80,7 +79,6 @@ const ReviewApplication = () => {
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-      <AdminNavbar />
       
       <div className="container py-5 text-center">
         <h4 className="fw-bold mb-5" style={{ color: '#b22222', letterSpacing: '1px' }}>

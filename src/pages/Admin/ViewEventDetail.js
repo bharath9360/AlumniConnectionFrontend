@@ -1,6 +1,5 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /** * CONFIGURATION: Centralized labels, icons, and fallback values
  */
@@ -86,7 +85,6 @@ const ViewEventDetail = () => {
 
   return (
     <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
-      <AdminNavbar />
       
       <div className="container py-5">
         {/* Navigation Button */}

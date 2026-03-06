@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /** * CONFIGURATION: Centralized form metadata and constants
  */
@@ -70,7 +69,6 @@ const AddAlumni = () => {
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-      <AdminNavbar />
       <div className="container py-5">
         <div className="card shadow-sm mx-auto p-4" style={{ maxWidth: '600px' }}>
           <h4 className="fw-bold text-danger mb-4">{FORM_CONFIG.TITLE}</h4>

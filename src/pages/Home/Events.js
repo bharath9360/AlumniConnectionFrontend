@@ -65,11 +65,13 @@ const Events = () => {
   return (
     <div className="dashboard-main-bg py-5 min-vh-100">
       <div className="container">
-        <div className="d-flex justify-content-between align-items-center mb-5">
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-5 gap-3">
           <h2 className="fw-bold mb-0 text-dark">Alumni Events & Networking</h2>
-          <button className="btn btn-mamcet-red px-4 fw-bold rounded-pill" onClick={() => setIsCreateModalOpen(true)}>
-            <i className="fas fa-plus me-2"></i>Create Event
-          </button>
+          <div>
+            <button className="btn btn-mamcet-red px-4 fw-bold rounded-pill" onClick={() => setIsCreateModalOpen(true)}>
+              <i className="fas fa-plus me-2"></i>Create Event
+            </button>
+          </div>
         </div>
 
         <div className="row g-4 justify-content-center">
@@ -98,15 +100,15 @@ const Events = () => {
                     <div><i className="fas fa-clock me-2 text-mamcet-red"></i> {event.time}</div>
                   </div>
 
-                  <div className="d-flex gap-2">
+                  <div className="d-flex gap-2 mt-auto">
                     <button
-                      className="btn btn-pro btn-pro-outline btn-pro-sm flex-grow-1"
+                      className="btn btn-pro btn-pro-outline btn-pro-sm px-3"
                       onClick={() => { setSelectedEvent(event); setIsDetailModalOpen(true); }}
                     >
                       View Details
                     </button>
                     <button
-                      className={`btn btn-pro ${event.registered ? 'btn-success' : 'btn-pro-primary'} btn-pro-sm flex-grow-1`}
+                      className={`btn btn-pro ${event.registered ? 'btn-success' : 'btn-pro-primary'} btn-pro-sm px-3`}
                       onClick={() => { setSelectedEvent(event); setIsRegisterModalOpen(true); }}
                     >
                       {event.registered ? 'Registered' : 'Register Now'}

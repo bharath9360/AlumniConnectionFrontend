@@ -1,6 +1,5 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /** * CONSTANTS: Centralized text data to avoid hardcoding inside components
  */
@@ -92,7 +91,6 @@ const JobDetailsView = () => {
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-      <AdminNavbar />
       
       <div className="container py-5">
         <BackButton 

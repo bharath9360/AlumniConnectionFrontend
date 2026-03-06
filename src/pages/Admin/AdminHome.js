@@ -1,12 +1,10 @@
 import React from 'react';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 const AdminHome = () => {
     return (
         <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-            <AdminNavbar />
-            {/* Reduced marginTop from 150px to 60px to move content up */}
-            <div className="container" style={{ marginTop: '60px' }}>
+
+            <div className="container mt-4">
                 <div className="text-center">
                     <h1 className="fw-bold" style={{ color: '#b22222', fontSize: '2.5rem', marginBottom: '10px' }}>
                         WELCOME HOME

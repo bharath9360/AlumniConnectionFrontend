@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /** * CONFIGURATION: Centralized labels, fallbacks, and content
  */
@@ -140,8 +139,7 @@ const ViewProfile = () => {
 
   return (
     <div style={{ backgroundColor: '#f0f2f5', minHeight: '100vh', paddingBottom: '40px' }}>
-      <AdminNavbar />
-      
+
       <div className="container py-4">
         {/* Navigation Header */}
         <div className="d-flex align-items-center mb-4">
@@ -156,21 +154,21 @@ const ViewProfile = () => {
         {/* Info Grid */}
         <div className="row g-4">
           <InfoBox title={CONFIG.LABELS.CONTACT_TITLE} icon={CONFIG.ICONS.CONTACT}>
-            <p className="small mb-2"><strong>Email:</strong> <br/> {alumni.email}</p>
-            <p className="small mb-2"><strong>Phone:</strong> <br/> {CONFIG.FALLBACK.PHONE}</p>
-            <p className="small mb-0"><strong>Location:</strong> <br/> {CONFIG.FALLBACK.LOCATION}</p>
+            <p className="small mb-2"><strong>Email:</strong> <br /> {alumni.email}</p>
+            <p className="small mb-2"><strong>Phone:</strong> <br /> {CONFIG.FALLBACK.PHONE}</p>
+            <p className="small mb-0"><strong>Location:</strong> <br /> {CONFIG.FALLBACK.LOCATION}</p>
           </InfoBox>
 
           <InfoBox title={CONFIG.LABELS.ACADEMIC_TITLE} icon={CONFIG.ICONS.ACADEMIC}>
-            <p className="small mb-2"><strong>Institution:</strong> <br/> {CONFIG.FALLBACK.INSTITUTION}</p>
-            <p className="small mb-2"><strong>Batch:</strong> <br/> {alumni.batch} Passed Out</p>
-            <p className="small mb-0"><strong>Degree:</strong> <br/> {CONFIG.FALLBACK.DEGREE}</p>
+            <p className="small mb-2"><strong>Institution:</strong> <br /> {CONFIG.FALLBACK.INSTITUTION}</p>
+            <p className="small mb-2"><strong>Batch:</strong> <br /> {alumni.batch} Passed Out</p>
+            <p className="small mb-0"><strong>Degree:</strong> <br /> {CONFIG.FALLBACK.DEGREE}</p>
           </InfoBox>
 
           <InfoBox title={CONFIG.LABELS.CAREER_TITLE} icon={CONFIG.ICONS.CAREER}>
-            <p className="small mb-2"><strong>Current Role:</strong> <br/> {alumni.role}</p>
-            <p className="small mb-2"><strong>Company:</strong> <br/> {alumni.company}</p>
-            <p className="small mb-0"><strong>Experience:</strong> <br/> {CONFIG.FALLBACK.EXP}</p>
+            <p className="small mb-2"><strong>Current Role:</strong> <br /> {alumni.role}</p>
+            <p className="small mb-2"><strong>Company:</strong> <br /> {alumni.company}</p>
+            <p className="small mb-0"><strong>Experience:</strong> <br /> {CONFIG.FALLBACK.EXP}</p>
           </InfoBox>
 
           {/* Skills Section */}
@@ -187,21 +185,21 @@ const ViewProfile = () => {
         </div>
 
         <div className="mt-5 text-center">
-          <button className="btn btn-danger btn-lg rounded-pill px-5 fw-bold shadow" onClick={() => setIsChatOpen(true)}>
+          <button className="btn btn-danger rounded-pill px-4 py-2 fw-bold shadow" onClick={() => setIsChatOpen(true)}>
             <i className={`${CONFIG.ICONS.MSG} me-2`}></i> {CONFIG.LABELS.MSG_BTN}
           </button>
         </div>
       </div>
 
-      <ChatOverlay 
-        isOpen={isChatOpen} 
-        onClose={() => setIsChatOpen(false)} 
-        alumni={alumni} 
-        messages={messages} 
-        msgInput={msgInput} 
-        setMsgInput={setMsgInput} 
-        onSend={handleSend} 
-        chatEndRef={chatEndRef} 
+      <ChatOverlay
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        alumni={alumni}
+        messages={messages}
+        msgInput={msgInput}
+        setMsgInput={setMsgInput}
+        onSend={handleSend}
+        chatEndRef={chatEndRef}
       />
     </div>
   );

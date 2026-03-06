@@ -42,20 +42,21 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  animation: toastSlideIn 0.3s ease-out;
+  animation: toastFadeInDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-@keyframes toastSlideIn {
-  from {
-    transform: translateX(100%);
+@keyframes toastFadeInDown {
+  0% {
+    transform: translateY(-20px) scale(0.9);
     opacity: 0;
   }
 
-  to {
-    transform: translateX(0);
+  100% {
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }
+
 
 .toast-success {
   border-left: 5px solid #28a745;
@@ -147,6 +148,7 @@ body {
   align-items: center !important;
   justify-content: center !important;
   min-height: 40px;
+  width: auto !important;
   /* Touch target baseline */
 }
 

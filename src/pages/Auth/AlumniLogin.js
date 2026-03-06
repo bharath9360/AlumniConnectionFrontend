@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { storage } from '../../utils/storage';
+import { useAuth } from '../../context/AuthContext';
+import { storage } from '../../utils/storage'; // Kept for getUsers
 import '../../styles/Auth.css';
 
 const AlumniLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -14,7 +16,7 @@ const AlumniLogin = () => {
     const users = storage.getUsers();
     const alumniUser = users.find(u => u.id === 'alumni_1');
     if (alumniUser) {
-      storage.updateCurrentUser(alumniUser);
+      login(alumniUser);
       console.log('Successfully set alumni user session');
     }
     navigate('/alumni/home');

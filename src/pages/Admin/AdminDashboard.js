@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /** * CONFIGURATION: Centralized data, labels, and styles 
  */
@@ -108,7 +107,6 @@ const AdminDashboard = () => {
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-      <AdminNavbar />
       
       <div className="container py-4 text-center">
         <h3 className="fw-bold text-danger mb-1" style={{ letterSpacing: '1px' }}>

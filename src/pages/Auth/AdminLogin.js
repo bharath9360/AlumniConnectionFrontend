@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { storage } from '../../utils/storage';
+import { useAuth } from '../../context/AuthContext';
 import '../../styles/Auth.css';
 
 const AdminLogin = () => {
   const [credentials, setCredentials] = useState({ adminId: '', password: '', secretKey: '' });
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
@@ -21,7 +22,7 @@ const AdminLogin = () => {
       company: 'MAMCET',
       profilePic: ''
     };
-    storage.updateCurrentUser(adminUser);
+    login(adminUser);
     navigate('/admin/home');
   };
 

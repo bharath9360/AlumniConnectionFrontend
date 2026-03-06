@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /** * CONFIGURATION: Centralized data to avoid hardcoded strings 
  */
@@ -96,7 +95,6 @@ const CreateEvent = () => {
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-      <AdminNavbar />
       
       <div className="container py-5">
         <h4 className="text-center fw-bold mb-5" style={{ color: '#b22222' }}>

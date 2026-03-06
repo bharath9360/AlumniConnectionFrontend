@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 import * as XLSX from 'xlsx';
 
 /** * CONFIGURATION: Centralized data to eliminate hardcoding 
@@ -115,7 +114,6 @@ const AlumniManagement = () => {
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-      <AdminNavbar />
       <div className="container py-5 text-center">
         <h3 className="fw-bold mb-4" style={{ color: '#b22222' }}>{CONFIG.LABELS.PAGE_TITLE}</h3>
         

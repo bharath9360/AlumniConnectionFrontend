@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminNavbar from '../../components/admin/AdminNavbar';
 
 /** * CONFIGURATION: Centralized constants to eliminate hardcoding 
  */
@@ -105,7 +104,6 @@ const UpcomingEventsList = () => {
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-      <AdminNavbar />
       
       <div className="container py-5">
         <h4 className="text-center fw-bold mb-4" style={{ color: '#b22222' }}>

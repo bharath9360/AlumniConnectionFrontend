@@ -1,28 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { storage } from '../../utils/storage';
+import { useAuth } from '../../context/AuthContext';
+import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
 import '../../styles/Navbar.css';
 
 const BottomNav = () => {
     const location = useLocation();
     const path = location.pathname;
-    const [userData, setUserData] = useState(null);
-
-    useEffect(() => {
-        setUserData(storage.getCurrentUser());
-    }, []);
+    const { user } = useAuth();
 
     const isDashboard = path.startsWith('/alumni') || path.startsWith('/jobs') || path.startsWith('/events') || path.startsWith('/messaging') || path.startsWith('/notifications') || path.startsWith('/profile');
 
-    if (!isDashboard || !userData || path.startsWith('/admin')) return null;
+    if (!isDashboard || !user || path.startsWith('/admin')) return null;
 
-    const navItems = [
-        { path: '/alumni/home', icon: 'fa-home', label: 'Home' },
-        { path: '/jobs', icon: 'fa-briefcase', label: 'Jobs' },
-        { path: '/events', icon: 'fa-calendar-alt', label: 'Events' },
-        { path: '/messaging', icon: 'fa-comment-dots', label: 'Messaging' },
-        { path: '/notifications', icon: 'fa-bell', label: 'Notifications' }
-    ];
+    const roleKey = getUserRoleKey(user);
+    const navItems = navigationConfig[roleKey] || [];
 
     return (
         <div className="bottom-nav d-lg-none shadow-lg border-top fixed-bottom bg-white d-flex justify-content-around align-items-center py-2">

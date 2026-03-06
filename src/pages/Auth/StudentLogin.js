@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { storage } from '../../utils/storage';
+import { useAuth } from '../../context/AuthContext';
 import '../../styles/Auth.css';
 
 const StudentLogin = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -15,7 +16,7 @@ const StudentLogin = () => {
       role: 'student',
       profilePic: ''
     };
-    storage.updateCurrentUser(studentUser);
+    login(studentUser);
     navigate('/alumni/home');
   };
   return (

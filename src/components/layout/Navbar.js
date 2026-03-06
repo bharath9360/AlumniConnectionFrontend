@@ -1,104 +1,158 @@
-// src/components/layout/Navbar.js
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { storage } from '../../utils/storage';
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
+import { FaSignOutAlt, FaSearch } from 'react-icons/fa';
 import '../../styles/Navbar.css';
 
 const Navbar = () => {
   const location = useLocation();
   const path = location.pathname;
-  const [userData, setUserData] = useState(null);
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    setUserData(storage.getCurrentUser());
-  }, []);
+  const roleKey = getUserRoleKey(user);
 
   const isLandingPage = path === '/';
   const isAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/signup');
-  const isDashboard = path.startsWith('/alumni') || path.startsWith('/jobs') || path.startsWith('/events') || path.startsWith('/messaging') || path.startsWith('/notifications') || path.startsWith('/profile');
+  const isDashboard = user && !isLandingPage && !isAuthPage;
 
   const handleLogout = (e) => {
     e.preventDefault();
-    storage.logout();
-    window.location.href = '/';
+    logout();
+    navigate('/');
   };
 
-  if (path.startsWith('/admin')) return null;
+  const navItems = navigationConfig[roleKey] || [];
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm px-2 px-md-0">
-      <div className="container d-flex align-items-center">
+    <nav className="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm px-2 px-md-3 mb-3">
+      <div className="container-fluid d-flex align-items-center">
 
-        {/* Mobile Profile Toggle - LinkedIn Style */}
-        {isDashboard && userData && (
-          <Link to="/alumni/profile" className="d-lg-none navbar-mobile-profile">
+        {/* Mobile Profile Display (if logged in) */}
+        {isDashboard && (
+          <Link to={roleKey === 'admin' ? "/admin/profile" : "/alumni/profile"} className="d-lg-none navbar-mobile-profile me-2">
             <div className="avatar-xs bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
-              {userData?.profilePic ? <img src={userData.profilePic} alt="Me" className="nav-profile-img" /> : (userData?.name?.[0] || "?")}
+              {user?.profilePic ? <img src={user.profilePic} alt="Me" className="nav-profile-img" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (user?.name?.[0] || "?")}
             </div>
           </Link>
         )}
 
-        <Link className="navbar-brand d-flex align-items-center flex-grow-1 flex-md-grow-0" to={isDashboard ? "/alumni/home" : "/"}>
+        {/* Brand Logo */}
+        <Link className="navbar-brand d-flex align-items-center flex-grow-1 flex-md-grow-0" to={user ? (roleKey === 'admin' ? "/admin/home" : "/alumni/home") : "/"}>
           <img src="https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/ALUMINI_CONNECT_LOGO_hwlrpw.png" alt="Logo" style={{ width: '40px' }} className="me-2 d-none d-sm-inline" />
-          <span className="fw-bold brand-name-red" style={{ color: '#c84022' }}>ALUMNI CONNECT</span>
+          <span className="fw-bold brand-name-red" style={{ color: roleKey === 'admin' ? '#b22222' : '#c84022', letterSpacing: roleKey === 'admin' ? '1px' : '0' }}>
+            {roleKey === 'admin' ? 'ADMIN PANEL' : 'ALUMNI CONNECT'}
+          </span>
         </Link>
 
-        {/* Desktop Navigation Links */}
-        <div className="collapse navbar-collapse d-none d-lg-flex justify-content-end" id="navbarNav">
-          {isLandingPage && (
-            <ul className="navbar-nav ms-auto align-items-center">
-              <li className="nav-item"><Link className="nav-link mx-2 fw-semibold" to="/about">About</Link></li>
-              <li className="nav-item"><Link className="nav-link mx-2 fw-semibold" to="/contact">Contact</Link></li>
-              <li className="nav-item ms-lg-3"><Link to="/login" className="btn btn-outline-secondary me-2 px-4">Log In</Link></li>
-              <li className="nav-item"><Link to="/register" className="btn btn-custom-red text-white px-4" style={{ backgroundColor: '#c84022' }}>Register</Link></li>
+        {/* Mobile Toggler */}
+        <button
+          className="navbar-toggler border-0 shadow-none ms-auto"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span className="navbar-toggler-icon"></span>
+        </button>
+
+        <div className="collapse navbar-collapse justify-content-end text-center mt-3 mt-lg-0" id="navbarNav">
+
+          {/* Unauthenticated / Guest Routing */}
+          {(!user || isLandingPage) && (
+            <ul className="navbar-nav ms-auto align-items-center gap-3 gap-lg-0">
+              {navItems.map(item => (
+                <li className="nav-item" key={item.path}>
+                  <Link className="nav-link mx-2 fw-semibold d-flex align-items-center justify-content-center" to={item.path}>
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+              <li className="nav-item ms-lg-3 mt-2 mt-lg-0"><Link to="/login" className="btn btn-outline-secondary px-4 w-100 w-lg-auto">Log In</Link></li>
+              <li className="nav-item mt-2 mt-lg-0 ms-lg-2"><Link to="/register" className="btn btn-custom-red text-white px-4 w-100 w-lg-auto" style={{ backgroundColor: '#c84022' }}>Register</Link></li>
             </ul>
           )}
 
-          {isDashboard && !isAuthPage && (
-            <ul className="navbar-nav align-items-center flex-row">
-              <li className="nav-item mx-3 text-center">
-                <Link className={`nav-link p-0 ${path === '/alumni/home' ? 'text-mamcet-red' : ''}`} to="/alumni/home">
-                  <i className="fas fa-home d-block mb-1 fs-5"></i>
-                  <span className="extra-small fw-bold">Home</span>
-                </Link>
-              </li>
-              <li className="nav-item mx-3 text-center">
-                <Link className={`nav-link p-0 ${path === '/jobs' ? 'text-mamcet-red' : ''}`} to="/jobs">
-                  <i className="fas fa-briefcase d-block mb-1 fs-5"></i>
-                  <span className="extra-small fw-bold">Jobs</span>
-                </Link>
-              </li>
-              <li className="nav-item mx-3 text-center">
-                <Link className={`nav-link p-0 ${path === '/events' ? 'text-mamcet-red' : ''}`} to="/events">
-                  <i className="fas fa-calendar-alt d-block mb-1 fs-5"></i>
-                  <span className="extra-small fw-bold">Events</span>
-                </Link>
-              </li>
-              <li className="nav-item mx-3 text-center">
-                <Link className={`nav-link p-0 ${path === '/notifications' ? 'text-mamcet-red' : ''}`} to="/notifications">
-                  <i className="fas fa-bell d-block mb-1 fs-5"></i>
-                  <span className="extra-small fw-bold">Notifications</span>
-                </Link>
-              </li>
-              <li className="nav-item mx-3 text-center">
-                <Link className={`nav-link p-0 ${path === '/messaging' ? 'text-mamcet-red' : ''}`} to="/messaging">
-                  <i className="fas fa-comment-dots d-block mb-1 fs-5"></i>
-                  <span className="extra-small fw-bold">Messaging</span>
-                </Link>
-              </li>
-              <li className="nav-item ms-4">
-                <button onClick={handleLogout} className="btn btn-sm btn-pro btn-pro-outline btn-pro-sm text-danger border-danger">Logout</button>
-              </li>
+          {/* Authenticated Dashboard Routing */}
+          {user && isDashboard && (
+            <ul className="navbar-nav mx-auto mb-2 mb-lg-0 gap-3 gap-lg-4 text-center align-items-center">
+              {navItems.map(item => {
+                const IconComponent = item.icon;
+                const isActive = path === item.path || path.startsWith(item.path + '/');
+                return (
+                  <li className="nav-item" key={item.path}>
+                    <Link
+                      className={`nav-link py-2 d-flex flex-column align-items-center ${isActive ? 'active-nav-item' : ''}`}
+                      to={item.path}
+                      style={{
+                        color: isActive ? '#b22222' : '#555',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        borderBottom: isActive ? '3px solid #b22222' : 'none',
+                        transition: '0.2s',
+                        paddingBottom: '2px'
+                      }}
+                    >
+                      {IconComponent && <IconComponent className="mb-1" size={18} />}
+                      <span className="text-uppercase" style={{ fontSize: '11px' }}>{item.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
+
+          {/* User Controls (Search & Profile/Logout) for authenticated users */}
+          {user && isDashboard && (
+            <div className="d-flex flex-column flex-lg-row align-items-center gap-3 mt-3 mt-lg-0 pb-3 pb-lg-0 border-top border-lg-0 pt-3 pt-lg-0">
+
+              {/* Optional Search Bar for specific roles */}
+              {roleKey === 'admin' && (
+                <div className="input-group border rounded-pill bg-light px-3 py-1" style={{ width: '100%', maxWidth: '250px' }}>
+                  <span className="bg-transparent border-0 mt-1 d-flex align-items-center"><FaSearch className="text-muted small" /></span>
+                  <input
+                    type="text"
+                    className="form-control border-0 bg-transparent shadow-none"
+                    placeholder="SEARCH MESSAGES..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{ fontSize: '11px' }}
+                  />
+                </div>
+              )}
+
+              {/* Profile Overview (Desktop) & Logout */}
+              <div className="d-flex align-items-center border-start-lg ps-lg-3 w-100 justify-content-center justify-content-lg-start">
+                <span className="fw-bold me-2 text-uppercase d-none d-lg-block" style={{ color: roleKey === 'admin' ? '#b22222' : '#c84022', fontSize: '13px' }}>
+                  {roleKey}
+                </span>
+
+                <div className="rounded-circle overflow-hidden border d-none d-lg-block" style={{ width: '35px', height: '35px', backgroundColor: '#eee' }}>
+                  {user?.profilePic ? (
+                    <img
+                      src={user.profilePic}
+                      alt="Avatar"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div className="d-flex align-items-center justify-content-center w-100 h-100 fw-bold text-secondary">
+                      {user?.name?.[0]?.toUpperCase() || "?"}
+                    </div>
+                  )}
+                </div>
+
+                <button onClick={handleLogout} className="btn btn-sm btn-link text-danger ms-lg-2 d-flex align-items-center gap-1 text-decoration-none" title="Logout">
+                  <FaSignOutAlt size={16} /> <span className="d-lg-none">Logout</span>
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
-
-        {/* Small Search Icon for Mobile */}
-        {isDashboard && (
-          <button className="btn btn-link text-muted d-lg-none">
-            <i className="fas fa-search"></i>
-          </button>
-        )}
       </div>
     </nav>
   );

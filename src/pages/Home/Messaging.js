@@ -139,7 +139,9 @@ const Messaging = () => {
                         <i className="fas fa-paperclip cursor-pointer"></i>
                         <i className="fas fa-smile cursor-pointer"></i>
                       </div>
-                      <button className="btn btn-mamcet-red btn-sm px-4 fw-bold rounded-pill" onClick={handleSendMessage}>Send</button>
+                      <div>
+                        <button className="btn btn-mamcet-red btn-sm px-4 fw-bold rounded-pill" onClick={handleSendMessage}>Send</button>
+                      </div>
                     </div>
                   </div>
                 </div>
