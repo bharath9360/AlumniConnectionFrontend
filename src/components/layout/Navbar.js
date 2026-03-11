@@ -65,7 +65,7 @@ const Navbar = () => {
           {/* Unauthenticated / Guest Routing */}
           {(!user || isLandingPage) && (
             <ul className="navbar-nav ms-auto align-items-center gap-3 gap-lg-0">
-              {navItems.map(item => (
+              {(navigationConfig.guest || []).map(item => (
                 <li className="nav-item" key={item.path}>
                   <Link className="nav-link mx-2 fw-semibold d-flex align-items-center justify-content-center" to={item.path}>
                     {item.label}

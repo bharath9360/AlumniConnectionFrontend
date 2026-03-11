@@ -26,6 +26,8 @@ import Events from './pages/Home/Events';
 import Messaging from './pages/Home/Messaging';
 import Notification from './pages/Home/Notification';
 import Profile from './pages/Alumni/Profile';
+import JobSearch from './pages/Student/JobSearch';
+import StudentEvents from './pages/Student/StudentEvents';
 
 // --- Admin Pages Import ---
 import AdminHome from './pages/Admin/AdminHome';
@@ -79,6 +81,8 @@ function App() {
               <Route path="/alumni/home" element={<AlumniDashboard />} />
               <Route path="/alumni/profile" element={<Profile />} />
               <Route path="/jobs" element={<JobPostings />} />
+              <Route path="/Student/JobSearch" element={<JobSearch />} />
+              <Route path="/student/StudentEvents" element={<StudentEvents />} />
               <Route path="/events" element={<Events />} />
               <Route path="/messaging" element={<Messaging />} />
               <Route path="/notifications" element={<Notification />} />
