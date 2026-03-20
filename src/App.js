@@ -83,7 +83,7 @@ function App() {
               <Route path="/login/alumni" element={<AlumniLogin />} />
               <Route path="/login/admin" element={<AdminLogin />} />
               <Route path="/alumni/home" element={<AlumniDashboard />} />
-              <Route path="/alumni/profile" element={<Profile />} />
+              <Route path="/alumni/profile" element={<UserProfile />} />
               <Route path="/jobs" element={<JobPostings />} />
               <Route path="/Student/JobSearch" element={<JobSearch />} />
               <Route path="/student/StudentEvents" element={<StudentEvents />} />

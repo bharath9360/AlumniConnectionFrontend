@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
+import NotificationDropdown from '../notifications/NotificationDropdown';
 import { FaSignOutAlt, FaSearch, FaCommentDots } from 'react-icons/fa';
 import '../../styles/Navbar.css';
 
@@ -10,6 +11,7 @@ const Navbar = () => {
   const path = location.pathname;
   const navigate = useNavigate();
   const { user, userRole, logout } = useAuth();
+  const roleKey = getUserRoleKey(user);
 
   const isLandingPage = path === '/';
   const isAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/signup');
