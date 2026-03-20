@@ -29,8 +29,8 @@ export const navigationConfig = {
     ],
     student: [
         { path: '/alumni/home', icon: FaHome, label: 'Home' },
-        { path: '/jobs', icon: FaBriefcase, label: 'Jobs' },
-        { path: '/events', icon: FaCalendarAlt, label: 'Events' },
+        { path: '/student/JobSearch', icon: FaBriefcase, label: 'Jobs' },
+        { path: '/student/StudentEvents', icon: FaCalendarAlt, label: 'Events' },
         { path: '/notifications', icon: FaBell, label: 'Notifications' },
         { path: '/messaging', icon: FaCommentDots, label: 'Messaging' }
     ],

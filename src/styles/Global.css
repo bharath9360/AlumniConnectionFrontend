@@ -248,6 +248,11 @@ body {
     width: 95%;
     margin: 10px;
   }
+
+  /* Padding for fixed BottomNav */
+  main {
+    padding-bottom: 80px !important;
+  }
 }
 
 /* Base Responsive Typography */

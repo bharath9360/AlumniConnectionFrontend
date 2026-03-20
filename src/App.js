@@ -29,6 +29,8 @@ import JobPostings from './pages/Home/JobPostings';
 import Events from './pages/Home/Events';
 import Messaging from './pages/Home/Messaging';
 import Notification from './pages/Home/Notification';
+import JobSearch from './pages/Student/JobSearch';
+import StudentEvents from './pages/Student/StudentEvents';
 
 // Admin Components
 import AdminPost from './pages/Admin/AdminPost';
@@ -80,6 +82,14 @@ function App() {
               <Route path="/login/student" element={<StudentLogin />} />
               <Route path="/login/alumni" element={<AlumniLogin />} />
               <Route path="/login/admin" element={<AdminLogin />} />
+              <Route path="/alumni/home" element={<AlumniDashboard />} />
+              <Route path="/alumni/profile" element={<Profile />} />
+              <Route path="/jobs" element={<JobPostings />} />
+              <Route path="/Student/JobSearch" element={<JobSearch />} />
+              <Route path="/student/StudentEvents" element={<StudentEvents />} />
+              <Route path="/events" element={<Events />} />
+              <Route path="/messaging" element={<Messaging />} />
+              <Route path="/notifications" element={<Notification />} />
 
               {/* Protected Routes - All Authenticated Users */}
               <Route element={<ProtectedRoute />}>

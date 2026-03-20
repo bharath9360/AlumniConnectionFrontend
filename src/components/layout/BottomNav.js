@@ -9,25 +9,31 @@ const BottomNav = () => {
     const path = location.pathname;
     const { user } = useAuth();
 
-    const isDashboard = path.startsWith('/admin') || path.startsWith('/alumni') || path.startsWith('/jobs') || path.startsWith('/events') || path.startsWith('/messaging') || path.startsWith('/notifications') || path.startsWith('/profile');
+    const isLandingPage = path === '/';
+    const isAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/signup');
+    const isDashboard = user && !isLandingPage && !isAuthPage && !path.startsWith('/admin');
 
-    if (!isDashboard || !user) return null;
+    if (!isDashboard) return null;
 
     const roleKey = getUserRoleKey(user);
-    const navItems = navigationConfig[roleKey] || [];
+    const navItems = (navigationConfig[roleKey] || []).filter(item => item.label !== 'Messaging');
 
     return (
-        <div className="bottom-nav d-lg-none shadow-lg border-top fixed-bottom bg-white d-flex justify-content-around align-items-center py-2">
-            {navItems.map((item) => (
-                <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`nav-item text-center text-decoration-none ${path === item.path ? 'text-mamcet-red' : 'text-muted'}`}
-                >
-                    <i className={`fas ${item.icon} d-block fs-5`}></i>
-                    <span className="extra-small fw-bold">{item.label}</span>
-                </Link>
-            ))}
+        <div className="bottom-nav d-lg-none shadow-lg border-top fixed-bottom bg-white d-flex justify-content-around align-items-center py-2" style={{ height: '60px' }}>
+            {navItems.map((item) => {
+                const IconComponent = item.icon;
+                const isActive = path === item.path;
+                return (
+                    <Link
+                        key={item.path}
+                        to={item.path}
+                        className="nav-item text-center text-decoration-none"
+                        style={{ color: isActive ? '#c84022' : '#6c757d' }}
+                    >
+                        {IconComponent && <IconComponent size={24} />}
+                    </Link>
+                );
+            })}
         </div>
     );
 };

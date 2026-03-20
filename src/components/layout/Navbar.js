@@ -1,9 +1,8 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { navigationConfig } from '../../config/navigationConfig';
-import NotificationDropdown from '../notifications/NotificationDropdown';
-import { FaSignOutAlt } from 'react-icons/fa';
+import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
+import { FaSignOutAlt, FaSearch, FaCommentDots } from 'react-icons/fa';
 import '../../styles/Navbar.css';
 
 const Navbar = () => {
@@ -30,57 +29,26 @@ const Navbar = () => {
       <div className="container-fluid d-flex align-items-center">
 
         {/* Brand Logo */}
-        <Link className="navbar-brand d-flex align-items-center" to={user ? (userRole === 'admin' ? "/admin/home" : "/alumni/home") : "/"}>
-          <img src="https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/ALUMINI_CONNECT_LOGO_hwlrpw.png" alt="Logo" style={{ width: '40px' }} className="me-2 d-none d-sm-inline" />
-          <span className="fw-bold brand-name-red" style={{ color: userRole === 'admin' ? '#b22222' : '#c84022', letterSpacing: userRole === 'admin' ? '1px' : '0' }}>
-            {userRole === 'admin' ? 'ADMIN PANEL' : 'ALUMNI CONNECT'}
+        <Link className="navbar-brand d-flex align-items-center flex-grow-1 flex-md-grow-0" to={user ? (roleKey === 'admin' ? "/admin/home" : "/alumni/home") : "/"}>
+          <img src="https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/ALUMINI_CONNECT_LOGO_hwlrpw.png" alt="Logo" style={{ width: '40px' }} className="me-2 d-none d-lg-inline" />
+          <span className="fw-bold brand-name-red d-none d-lg-inline" style={{ color: roleKey === 'admin' ? '#b22222' : '#c84022', letterSpacing: roleKey === 'admin' ? '1px' : '0' }}>
+            {roleKey === 'admin' ? 'ADMIN PANEL' : 'ALUMNI CONNECT'}
           </span>
         </Link>
 
-        {/* Mobile controls for Dashboard (Notifications, Logout, Profile) */}
-        {isDashboard && (
-          <div className={`d-lg-none d-flex align-items-center gap-3 ${userRole === 'admin' ? 'ms-auto me-2' : 'ms-auto'}`}>
-            <NotificationDropdown />
-            <button onClick={handleLogout} className="btn btn-sm text-danger p-0 d-flex align-items-center" title="Logout">
-              <FaSignOutAlt size={20} />
-            </button>
-            <Link to={userRole === 'admin' ? "/admin/profile" : "/alumni/profile"} className="navbar-mobile-profile">
-              <div className="avatar-xs bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center border" style={{ width: '32px', height: '32px', overflow: 'hidden' }}>
-                {user?.profilePic ? <img src={user.profilePic} alt="Me" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (user?.name?.[0] || "?")}
-              </div>
-            </Link>
-          </div>
+        {/* Mobile Messaging Icon */}
+        {user && isDashboard && (
+          <Link to="/messaging" className="d-lg-none ms-auto text-decoration-none me-2" style={{ color: roleKey === 'admin' ? '#b22222' : '#c84022' }}>
+            <FaCommentDots size={24} />
+          </Link>
         )}
 
-        {/* Mobile Guest Login/Register (visible outside toggler) */}
-        {(!user || isLandingPage) && (
-          <div className="d-lg-none d-flex align-items-center gap-2 ms-auto me-2">
-            <Link to="/login" className="btn btn-sm btn-outline-secondary text-nowrap px-2" style={{ fontSize: '12px' }}>Log In</Link>
-            <Link to="/register" className="btn btn-sm text-white text-nowrap px-2" style={{ backgroundColor: '#c84022', fontSize: '12px' }}>Register</Link>
-          </div>
-        )}
-
-        {/* Mobile Toggler - Show if NOT on dashboard */}
-        {(!isDashboard) && (
-          <button
-            className="navbar-toggler border-0 shadow-none ms-auto"
-            type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#navbarNav"
-            aria-controls="navbarNav"
-            aria-expanded="false"
-            aria-label="Toggle navigation"
-          >
-            <span className="navbar-toggler-icon"></span>
-          </button>
-        )}
-
-        <div className={`collapse navbar-collapse justify-content-end text-center mt-3 mt-lg-0 ${isDashboard ? 'd-none d-lg-flex' : ''}`} id="navbarNav">
+        <div className="collapse navbar-collapse justify-content-end text-center mt-3 mt-lg-0" id="navbarNav">
 
           {/* Unauthenticated / Guest Routing */}
           {(!user || isLandingPage) && (
             <ul className="navbar-nav ms-auto align-items-center gap-3 gap-lg-0">
-              {guestNavItems.map(item => (
+              {(navigationConfig.guest || []).map(item => (
                 <li className="nav-item" key={item.path}>
                   <Link className="nav-link mx-2 fw-semibold d-flex align-items-center justify-content-center" to={item.path}>
                     {item.label}

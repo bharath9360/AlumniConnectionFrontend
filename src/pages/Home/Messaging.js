@@ -155,11 +155,11 @@ const Messaging = () => {
   );
 
   return (
-    <div className="dashboard-main-bg" style={{ height: 'calc(100vh - 80px)', overflow: 'hidden', position: 'relative' }}>
-      <div className="container-fluid h-100 px-0 px-md-3 py-0 py-md-3 d-flex flex-column" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="messaging-viewport w-100" style={{ backgroundColor: '#f3f2ef' }}>
+      <div className="container-fluid h-100 px-0 px-md-3 py-0 py-md-2 d-flex flex-column" style={{ maxWidth: '1400px', margin: '0 auto', minHeight: 0 }}>
         <div
           className="row g-0 flex-grow-1 bg-white rounded-0 rounded-md-3 overflow-hidden w-100 m-0"
-          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.10)', border: '1px solid #e0e0e0' }}
+          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.10)', border: '1px solid #e0e0e0', minHeight: 0 }}
         >
 
           {/* ─── LEFT: Chat Sidebar ─── */}
