@@ -1,43 +1,83 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { storage } from '../../utils/storage';
-import Modal from '../../components/common/Modal';
 import Toast from '../../components/common/Toast';
+import { FaCamera, FaPencilAlt, FaPlus, FaBriefcase, FaUniversity, FaTimes } from 'react-icons/fa';
+
 const Profile = () => {
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
 
-    // Modal states
-    const [isEditHeaderOpen, setIsEditHeaderOpen] = useState(false);
-    const [isEditAboutOpen, setIsEditAboutOpen] = useState(false);
-    const [isEditExpOpen, setIsEditExpOpen] = useState(false);
-    const [isEditEduOpen, setIsEditEduOpen] = useState(false);
-    const [isEditSkillsOpen, setIsEditSkillsOpen] = useState(false);
-
-    // Form states
+    const [editingSection, setEditingSection] = useState(null);
     const [editData, setEditData] = useState({});
+    const [skillsInput, setSkillsInput] = useState("");
+
+    // File inputs refs
+    const profilePicInputRef = useRef(null);
+    const coverPicInputRef = useRef(null);
 
     useEffect(() => {
         const user = storage.getCurrentUser();
         setUserData(user);
-        setEditData(user);
+        setEditData(user || {});
         setLoading(false);
     }, []);
 
-    const handleSave = (modalSetter) => {
-        storage.updateCurrentUser(editData);
-        setUserData(editData);
-        modalSetter(false);
+    const showToast = (message, type) => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+
+    const handleSave = () => {
+        const parsedSkills = skillsInput.split(',').map(s => s.trim()).filter(s => s);
+        const finalData = { ...editData, skills: parsedSkills };
+        storage.updateCurrentUser(finalData);
+        setUserData(finalData);
+        setEditingSection(null);
         showToast("Profile updated successfully!", "success");
+    };
+
+    const handleCancel = () => {
+        setEditData(userData);
+        setEditingSection(null);
     };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setEditData({ ...editData, [name]: value });
+        setEditData(prev => ({ ...prev, [name]: value }));
     };
 
-    const showToast = (message, type) => {
-        setToast({ message, type });
+    const handleArrayChange = (arrayName, index, field, value) => {
+        setEditData(prev => {
+            const newArray = [...(prev[arrayName] || [])];
+            newArray[index] = { ...newArray[index], [field]: value };
+            return { ...prev, [arrayName]: newArray };
+        });
+    };
+
+    const addArrayItem = (arrayName, defaultItem) => {
+        setEditData(prev => ({
+            ...prev,
+            [arrayName]: [...(prev[arrayName] || []), { ...defaultItem, id: Date.now() }]
+        }));
+    };
+
+    const removeArrayItem = (arrayName, index) => {
+        setEditData(prev => {
+            const newArray = [...(prev[arrayName] || [])];
+            newArray.splice(index, 1);
+            return { ...prev, [arrayName]: newArray };
+        });
+    };
+
+    // Using local state for skills input during editing to prevent trimming trailing commas
+
+    const handlePhotoUpload = (e, fieldName) => {
+        const file = e.target.files[0];
+        if (file) {
+            const fileUrl = URL.createObjectURL(file);
+            setEditData(prev => ({ ...prev, [fieldName]: fileUrl }));
+        }
     };
 
     if (loading) return <div className="p-5 text-center">Loading Profile...</div>;
@@ -50,217 +90,333 @@ const Profile = () => {
         </div>
     );
 
-    return (
-        <div className="dashboard-main-bg py-4 min-vh-100">
-            <div className="container">
-                <div className="row justify-content-center">
-                    <div className="col-lg-9">
+    const displayData = editingSection ? editData : userData;
 
-                        {/* LINKEDIN STYLE HEADER */}
-                        <div className="dashboard-card bg-white shadow-sm overflow-hidden mb-4 rounded-3 border-0">
-                            <div className="profile-cover-wrapper position-relative" style={{ height: '200px' }}>
+    return (
+        <div className="py-4 min-vh-100" style={{ backgroundColor: '#f3f2ef' }}>
+            <div className="container" style={{ maxWidth: '850px' }}>
+
+                {/* STICKY EDIT ACTION BAR */}
+                {editingSection && (
+                    <div className="position-fixed bottom-0 start-0 end-0 bg-white p-3 shadow-lg border-top d-flex justify-content-end gap-2" style={{ zIndex: 1050 }}>
+                        <button className="btn btn-outline-secondary fw-bold px-4 rounded-pill" onClick={handleCancel}>
+                            Cancel
+                        </button>
+                        <button className="btn btn-mamcet-red fw-bold px-4 rounded-pill" style={{ backgroundColor: '#c84022', color: 'white' }} onClick={handleSave}>
+                            Save Changes
+                        </button>
+                    </div>
+                )}
+
+                <div className="row justify-content-center">
+                    <div className="col-12">
+
+                        {/* HERO HEADER SECTION */}
+                        <div className="bg-white shadow-sm overflow-hidden mb-4 rounded-3 border-0 position-relative">
+                            {/* Cover Photo */}
+                            <div className="position-relative" style={{ height: '220px', backgroundColor: '#a0b4b7' }}>
                                 <img
-                                    src={userData.coverPic || "https://via.placeholder.com/1200x400"}
+                                    src={displayData.coverPic || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80"}
                                     alt="Cover"
                                     className="w-100 h-100 object-fit-cover"
                                 />
-                                <button
-                                    className="btn btn-light btn-sm position-absolute top-0 end-0 m-3 shadow-sm rounded-circle"
-                                    onClick={() => setIsEditHeaderOpen(true)}
-                                >
-                                    <i className="fas fa-pencil-alt text-mamcet-red"></i>
-                                </button>
+                                {editingSection === 'hero' && (
+                                    <>
+                                        <button
+                                            className="btn btn-light position-absolute top-0 end-0 m-3 shadow rounded-circle d-flex align-items-center justify-content-center"
+                                            style={{ width: '40px', height: '40px', color: '#c84022' }}
+                                            onClick={() => coverPicInputRef.current.click()}
+                                        >
+                                            <FaCamera />
+                                        </button>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            ref={coverPicInputRef}
+                                            className="d-none"
+                                            onChange={(e) => handlePhotoUpload(e, 'coverPic')}
+                                        />
+                                    </>
+                                )}
                             </div>
 
                             <div className="px-4 pb-4 position-relative">
-                                <div className="profile-avatar-pro shadow" style={{
-                                    marginTop: '-100px',
-                                    width: '160px',
-                                    height: '160px',
-                                    borderRadius: '50%',
-                                    border: '4px solid white',
-                                    backgroundColor: '#f8f9fa',
-                                    overflow: 'hidden',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '4rem',
-                                    fontWeight: 'bold',
-                                    color: '#c84022'
-                                }}>
-                                    {userData.profilePic ? (
-                                        <img src={userData.profilePic} alt="Profile" className="w-100 h-100 object-fit-cover" />
-                                    ) : (userData.name?.[0] || "?")}
+                                {/* Profile Avatar */}
+                                <div className="position-relative d-inline-block" style={{ marginTop: '-110px' }}>
+                                    <div className="shadow-lg bg-white" style={{
+                                        width: '160px', height: '160px', borderRadius: '50%',
+                                        border: '4px solid white', overflow: 'hidden', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center', fontSize: '4rem',
+                                        fontWeight: 'bold', color: '#c84022'
+                                    }}>
+                                        {displayData.profilePic ? (
+                                            <img src={displayData.profilePic} alt="Profile" className="w-100 h-100 object-fit-cover" />
+                                        ) : (displayData.name?.[0] || "?")}
+                                    </div>
+
+                                    {editingSection === 'hero' && (
+                                        <>
+                                            <button
+                                                className="btn btn-light position-absolute shadow rounded-circle d-flex align-items-center justify-content-center"
+                                                style={{ width: '40px', height: '40px', color: '#c84022', bottom: '10px', right: '10px' }}
+                                                onClick={() => profilePicInputRef.current.click()}
+                                            >
+                                                <FaCamera />
+                                            </button>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                ref={profilePicInputRef}
+                                                className="d-none"
+                                                onChange={(e) => handlePhotoUpload(e, 'profilePic')}
+                                            />
+                                        </>
+                                    )}
                                 </div>
 
-                                <div className="mt-3 d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-                                    <div className="mobile-text-center w-100 w-md-auto">
-                                        <h2 className="fw-bold mb-0 text-dark">{userData.name}</h2>
-                                        <p className="lead fs-6 text-muted mb-2">{userData.role} at {userData.company}</p>
-                                        <div className="d-flex flex-wrap align-items-center gap-3 text-muted extra-small">
-                                            <span>{userData.batch} Batch</span>
-                                            <span>&bull;</span>
-                                            <span className="text-mamcet-red fw-bold">{userData.connections} connections</span>
-                                            <span className="d-none d-md-inline">&bull;</span>
-                                            <span className="d-none d-md-inline">{userData.views} profile views</span>
-                                        </div>
-                                    </div>
-                                    <div className="d-flex flex-wrap gap-2 w-100 w-md-auto justify-content-md-end">
-                                        <button className="btn btn-pro btn-pro-primary flex-grow-1 flex-md-grow-0">Open to</button>
-                                        <button className="btn btn-pro btn-pro-outline flex-grow-1 flex-md-grow-0">Add section</button>
-                                        <button
-                                            className="btn btn-pro btn-pro-ghost-red rounded-circle border shadow-sm d-none d-md-flex"
-                                            onClick={() => setIsEditHeaderOpen(true)}
-                                        >
-                                            <i className="fas fa-pencil-alt"></i>
+                                {/* Header Text Content */}
+                                <div className="mt-3">
+                                    {!editingSection && (
+                                        <button className="btn btn-sm text-muted position-absolute top-0 end-0 m-3" onClick={() => setEditingSection('hero')}>
+                                            <FaPencilAlt size={18} />
                                         </button>
-                                    </div>
+                                    )}
+                                    {editingSection !== 'hero' ? (
+                                        <>
+                                            <h2 className="fw-bold mb-1 text-dark">{displayData.name}</h2>
+                                            <p className="fs-5 text-dark mb-2">{displayData.role} {displayData.company ? `at ${displayData.company}` : ''}</p>
+                                            <div className="d-flex flex-wrap align-items-center gap-3 text-muted small">
+                                                <span>{displayData.batch} Batch</span>
+                                                <span>&bull;</span>
+                                                <span className="fw-bold" style={{ color: '#c84022' }}>{displayData.connections || 500}+ connections</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="row g-3 mt-1">
+                                            <div className="col-md-6">
+                                                <label className="form-label extra-small fw-bold text-muted text-uppercase mb-1">Full Name</label>
+                                                <input type="text" className="form-control fw-bold fs-5" name="name" value={editData.name || ''} onChange={handleChange} />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label extra-small fw-bold text-muted text-uppercase mb-1">Batch</label>
+                                                <input type="text" className="form-control" name="batch" value={editData.batch || ''} onChange={handleChange} />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label extra-small fw-bold text-muted text-uppercase mb-1">Headline / Role</label>
+                                                <input type="text" className="form-control" name="role" value={editData.role || ''} onChange={handleChange} />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label extra-small fw-bold text-muted text-uppercase mb-1">Company</label>
+                                                <input type="text" className="form-control" name="company" value={editData.company || ''} onChange={handleChange} />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label extra-small fw-bold text-muted text-uppercase mb-1">Connections</label>
+                                                <input type="text" className="form-control" name="connections" value={editData.connections || ''} onChange={handleChange} />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label extra-small fw-bold text-muted text-uppercase mb-1">Profile Views</label>
+                                                <input type="number" className="form-control" name="views" value={editData.views || ''} onChange={handleChange} />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
                         {/* ABOUT SECTION */}
-                        <div className="dashboard-card bg-white shadow-sm p-4 mb-4 rounded-3 border-0">
+                        <div className="bg-white shadow-sm p-4 mb-4 rounded-3 border-0 position-relative">
                             <div className="d-flex justify-content-between align-items-center mb-3">
-                                <h5 className="fw-bold mb-0 text-dark">About</h5>
-                                <button className="btn btn-link text-decoration-none p-0" onClick={() => setIsEditAboutOpen(true)}>
-                                    <i className="fas fa-pencil-alt text-mamcet-red"></i>
-                                </button>
+                                <h4 className="fw-bold mb-0 text-dark">About</h4>
+                                {!editingSection && (
+                                    <button className="btn btn-sm text-muted" onClick={() => setEditingSection('about')}>
+                                        <FaPencilAlt size={16} />
+                                    </button>
+                                )}
                             </div>
-                            <p className="text-muted mb-0">{userData.bio}</p>
+                            {editingSection !== 'about' ? (
+                                <p className="text-dark mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                                    {displayData.bio || "No summary provided. Edit profile to add one."}
+                                </p>
+                            ) : (
+                                <textarea
+                                    className="form-control"
+                                    name="bio"
+                                    rows="4"
+                                    value={editData.bio || ''}
+                                    onChange={handleChange}
+                                    placeholder="Write a brief summary about your professional background..."
+                                ></textarea>
+                            )}
                         </div>
 
                         {/* EXPERIENCE SECTION */}
-                        <div className="dashboard-card bg-white shadow-sm p-4 mb-4 rounded-3 border-0">
+                        <div className="bg-white shadow-sm p-4 mb-4 rounded-3 border-0">
                             <div className="d-flex justify-content-between align-items-center mb-4">
-                                <h5 className="fw-bold mb-0 text-dark">Experience</h5>
-                                <div className="d-flex gap-3">
-                                    <button className="btn btn-link text-decoration-none p-0 btn-pro btn-pro-ghost-red">
-                                        <i className="fas fa-plus"></i>
+                                <h4 className="fw-bold mb-0 text-dark">Experience</h4>
+                                {!editingSection ? (
+                                    <button className="btn btn-sm text-muted" onClick={() => setEditingSection('experience')}>
+                                        <FaPencilAlt size={16} />
                                     </button>
-                                    <button className="btn btn-link text-decoration-none p-0 btn-pro btn-pro-ghost-red" onClick={() => setIsEditExpOpen(true)}>
-                                        <i className="fas fa-pencil-alt"></i>
+                                ) : editingSection === 'experience' && (
+                                    <button
+                                        className="btn btn-sm btn-outline-secondary rounded-pill d-flex align-items-center gap-2 px-3"
+                                        onClick={() => addArrayItem('experience', { title: '', company: '', duration: '', desc: '' })}
+                                    >
+                                        <FaPlus size={12} /> Add Role
                                     </button>
-                                </div>
+                                )}
                             </div>
-                            {userData.experience?.map((exp, idx) => (
-                                <div key={exp.id} className={`d-flex gap-3 ${idx !== userData.experience.length - 1 ? 'mb-4 border-bottom pb-4' : ''}`}>
-                                    <div className="bg-light rounded p-3 d-flex align-items-center justify-content-center" style={{ width: '56px', height: '56px' }}>
-                                        <i className="fas fa-briefcase text-secondary fs-4"></i>
+
+                            {(displayData.experience || []).length === 0 && editingSection !== 'experience' ? (
+                                <p className="text-muted">No experience listed.</p>
+                            ) : (
+                                (displayData.experience || []).map((exp, idx) => (
+                                    <div key={exp.id || idx} className={`d-flex gap-3 position-relative ${idx !== (displayData.experience.length - 1) ? 'mb-4 pb-4 border-bottom' : ''}`}>
+                                        <div className="bg-light rounded p-3 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px' }}>
+                                            <FaBriefcase className="text-secondary fs-5" />
+                                        </div>
+
+                                        {editingSection !== 'experience' ? (
+                                            <div className="flex-grow-1">
+                                                <h6 className="fw-bold mb-0 fs-5">{exp.title}</h6>
+                                                <p className="text-dark mb-1">{exp.company}</p>
+                                                <p className="small text-muted mb-2">{exp.duration}</p>
+                                                <p className="text-dark mb-0" style={{ lineHeight: '1.5' }}>{exp.desc}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex-grow-1 row g-2">
+                                                <div className="col-12 text-end">
+                                                    <button className="btn btn-sm text-danger p-0" onClick={() => removeArrayItem('experience', idx)}>
+                                                        <FaTimes /> Remove
+                                                    </button>
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <input type="text" className="form-control form-control-sm fw-bold" placeholder="Job Title" value={exp.title || ''} onChange={e => handleArrayChange('experience', idx, 'title', e.target.value)} />
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <input type="text" className="form-control form-control-sm" placeholder="Company Name" value={exp.company || ''} onChange={e => handleArrayChange('experience', idx, 'company', e.target.value)} />
+                                                </div>
+                                                <div className="col-12">
+                                                    <input type="text" className="form-control form-control-sm" placeholder="Duration (e.g., Jan 2020 - Present)" value={exp.duration || ''} onChange={e => handleArrayChange('experience', idx, 'duration', e.target.value)} />
+                                                </div>
+                                                <div className="col-12">
+                                                    <textarea className="form-control form-control-sm" rows="2" placeholder="Description" value={exp.desc || ''} onChange={e => handleArrayChange('experience', idx, 'desc', e.target.value)}></textarea>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div>
-                                        <h6 className="fw-bold mb-0">{exp.title}</h6>
-                                        <p className="small text-dark mb-1">{exp.company}</p>
-                                        <p className="extra-small text-muted mb-2">{exp.duration}</p>
-                                        <p className="small text-muted mb-0">{exp.desc}</p>
-                                    </div>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
 
                         {/* EDUCATION SECTION */}
-                        <div className="dashboard-card bg-white shadow-sm p-4 mb-4 rounded-3 border-0">
+                        <div className="bg-white shadow-sm p-4 mb-4 rounded-3 border-0">
                             <div className="d-flex justify-content-between align-items-center mb-4">
-                                <h5 className="fw-bold mb-0 text-dark">Education</h5>
-                                <div className="d-flex gap-3">
-                                    <button className="btn btn-link text-decoration-none p-0">
-                                        <i className="fas fa-plus text-mamcet-red"></i>
+                                <h4 className="fw-bold mb-0 text-dark">Education</h4>
+                                {!editingSection ? (
+                                    <button className="btn btn-sm text-muted" onClick={() => setEditingSection('education')}>
+                                        <FaPencilAlt size={16} />
                                     </button>
-                                    <button className="btn btn-link text-decoration-none p-0" onClick={() => setIsEditEduOpen(true)}>
-                                        <i className="fas fa-pencil-alt text-mamcet-red"></i>
+                                ) : editingSection === 'education' && (
+                                    <button
+                                        className="btn btn-sm btn-outline-secondary rounded-pill d-flex align-items-center gap-2 px-3"
+                                        onClick={() => addArrayItem('education', { school: '', degree: '', duration: '' })}
+                                    >
+                                        <FaPlus size={12} /> Add School
                                     </button>
-                                </div>
+                                )}
                             </div>
-                            {userData.education?.map((edu, idx) => (
-                                <div key={edu.id} className="d-flex gap-3">
-                                    <div className="bg-light rounded p-3 d-flex align-items-center justify-content-center" style={{ width: '56px', height: '56px' }}>
-                                        <i className="fas fa-university text-secondary fs-4"></i>
+
+                            {(displayData.education || []).length === 0 && editingSection !== 'education' ? (
+                                <p className="text-muted">No education listed.</p>
+                            ) : (
+                                (displayData.education || []).map((edu, idx) => (
+                                    <div key={edu.id || idx} className={`d-flex gap-3 position-relative ${idx !== (displayData.education.length - 1) ? 'mb-4 pb-4 border-bottom' : ''}`}>
+                                        <div className="bg-light rounded p-3 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px' }}>
+                                            <FaUniversity className="text-secondary fs-5" />
+                                        </div>
+
+                                        {editingSection !== 'education' ? (
+                                            <div className="flex-grow-1">
+                                                <h6 className="fw-bold fs-5 mb-0">{edu.school}</h6>
+                                                <p className="text-dark mb-1">{edu.degree}</p>
+                                                <p className="small text-muted mb-0">{edu.duration}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex-grow-1 row g-2">
+                                                <div className="col-12 text-end">
+                                                    <button className="btn btn-sm text-danger p-0" onClick={() => removeArrayItem('education', idx)}>
+                                                        <FaTimes /> Remove
+                                                    </button>
+                                                </div>
+                                                <div className="col-md-12">
+                                                    <input type="text" className="form-control form-control-sm fw-bold" placeholder="School/University Name" value={edu.school || ''} onChange={e => handleArrayChange('education', idx, 'school', e.target.value)} />
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <input type="text" className="form-control form-control-sm" placeholder="Degree/Field of Study" value={edu.degree || ''} onChange={e => handleArrayChange('education', idx, 'degree', e.target.value)} />
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <input type="text" className="form-control form-control-sm" placeholder="Duration (e.g., 2018 - 2022)" value={edu.duration || ''} onChange={e => handleArrayChange('education', idx, 'duration', e.target.value)} />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div>
-                                        <h6 className="fw-bold mb-0">{edu.school}</h6>
-                                        <p className="small text-dark mb-1">{edu.degree}</p>
-                                        <p className="extra-small text-muted mb-0">{edu.duration}</p>
-                                    </div>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
 
                         {/* SKILLS SECTION */}
-                        <div className="dashboard-card bg-white shadow-sm p-4 mb-4 rounded-3 border-0">
+                        <div className="bg-white shadow-sm p-4 mb-4 rounded-3 border-0 pb-5">
                             <div className="d-flex justify-content-between align-items-center mb-4">
-                                <h5 className="fw-bold mb-0 text-dark">Skills</h5>
-                                <div className="d-flex gap-3">
-                                    <button className="btn btn-link text-decoration-none p-0">
-                                        <i className="fas fa-plus text-mamcet-red"></i>
+                                <h4 className="fw-bold mb-0 text-dark">Skills</h4>
+                                {!editingSection && (
+                                    <button className="btn btn-sm text-muted" onClick={() => { setEditingSection('skills'); setSkillsInput((userData.skills || []).join(', ')); }}>
+                                        <FaPencilAlt size={16} />
                                     </button>
-                                    <button className="btn btn-link text-decoration-none p-0" onClick={() => setIsEditSkillsOpen(true)}>
-                                        <i className="fas fa-pencil-alt text-mamcet-red"></i>
-                                    </button>
+                                )}
+                            </div>
+
+                            {editingSection !== 'skills' ? (
+                                <div className="d-flex flex-wrap gap-2">
+                                    {(displayData.skills || []).length > 0 ? (
+                                        displayData.skills.map((skill, idx) => (
+                                            <span key={idx} className="badge bg-light text-dark border p-2 px-3 rounded-pill fw-semibold fs-6">
+                                                {skill}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <p className="text-muted">No skills added yet.</p>
+                                    )}
                                 </div>
-                            </div>
-                            <div className="d-flex flex-wrap gap-2">
-                                {userData.skills?.map((skill, idx) => (
-                                    <span key={idx} className="badge bg-light text-dark border p-2 px-3 rounded-pill fw-normal">
-                                        {skill}
-                                    </span>
-                                ))}
-                            </div>
+                            ) : (
+                                <div>
+                                    <label className="form-label small text-muted">Enter skills separated by commas</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        value={skillsInput}
+                                        onChange={(e) => setSkillsInput(e.target.value)}
+                                        placeholder="e.g., React, Node.js, Project Management"
+                                    />
+                                    <div className="d-flex flex-wrap gap-2 mt-3">
+                                        {skillsInput.split(',').map(s => s.trim()).filter(s => s).map((skill, idx) => (
+                                            <span key={idx} className="badge bg-light text-dark border p-2 px-3 rounded-pill fw-semibold">
+                                                {skill}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                     </div>
                 </div>
             </div>
 
-            {/* MODALS */}
-            <Modal
-                isOpen={isEditHeaderOpen}
-                onClose={() => setIsEditHeaderOpen(false)}
-                title="Edit Intro"
-                footer={<button className="btn btn-mamcet-red" onClick={() => handleSave(setIsEditHeaderOpen)}>Save Changes</button>}
-            >
-                <div className="row g-3">
-                    <div className="col-12">
-                        <label className="form-label extra-small fw-bold">Full Name</label>
-                        <input type="text" className="form-control" name="name" value={editData.name} onChange={handleChange} />
-                    </div>
-                    <div className="col-12">
-                        <label className="form-label extra-small fw-bold">Headline (Role)</label>
-                        <input type="text" className="form-control" name="role" value={editData.role} onChange={handleChange} />
-                    </div>
-                    <div className="col-12">
-                        <label className="form-label extra-small fw-bold">Current Company</label>
-                        <input type="text" className="form-control" name="company" value={editData.company} onChange={handleChange} />
-                    </div>
-                    <div className="col-6">
-                        <label className="form-label extra-small fw-bold">Profile Picture URL</label>
-                        <input type="text" className="form-control" name="profilePic" value={editData.profilePic} onChange={handleChange} />
-                    </div>
-                    <div className="col-6">
-                        <label className="form-label extra-small fw-bold">Cover Photo URL</label>
-                        <input type="text" className="form-control" name="coverPic" value={editData.coverPic} onChange={handleChange} />
-                    </div>
-                </div>
-            </Modal>
-
-            <Modal
-                isOpen={isEditAboutOpen}
-                onClose={() => setIsEditAboutOpen(false)}
-                title="Edit About"
-                footer={<button className="btn btn-mamcet-red" onClick={() => handleSave(setIsEditAboutOpen)}>Save Changes</button>}
-            >
-                <div className="col-12">
-                    <label className="form-label extra-small fw-bold">Summary</label>
-                    <textarea className="form-control" name="bio" rows="6" value={editData.bio} onChange={handleChange}></textarea>
-                </div>
-            </Modal>
-
-            {/* TOAST NOTIFICATION */}
             {toast && (
-                <Toast
-                    message={toast.message}
-                    type={toast.type}
-                    onClose={() => setToast(null)}
-                />
+                <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999 }}>
+                    <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+                </div>
             )}
         </div>
     );

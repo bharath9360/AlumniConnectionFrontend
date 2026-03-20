@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
@@ -9,10 +9,7 @@ const Navbar = () => {
   const location = useLocation();
   const path = location.pathname;
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const [search, setSearch] = useState("");
-
-  const roleKey = getUserRoleKey(user);
+  const { user, userRole, logout } = useAuth();
 
   const isLandingPage = path === '/';
   const isAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/signup');
@@ -24,20 +21,12 @@ const Navbar = () => {
     navigate('/');
   };
 
-  const navItems = navigationConfig[roleKey] || [];
+  const dashboardNavItems = navigationConfig[userRole] || [];
+  const guestNavItems = navigationConfig.guest || [];
 
   return (
     <nav className="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm px-2 px-md-3 mb-3">
       <div className="container-fluid d-flex align-items-center">
-
-        {/* Mobile Profile Display (if logged in) */}
-        {isDashboard && (
-          <Link to={roleKey === 'admin' ? "/admin/profile" : "/alumni/profile"} className="d-lg-none navbar-mobile-profile me-2">
-            <div className="avatar-xs bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px' }}>
-              {user?.profilePic ? <img src={user.profilePic} alt="Me" className="nav-profile-img" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (user?.name?.[0] || "?")}
-            </div>
-          </Link>
-        )}
 
         {/* Brand Logo */}
         <Link className="navbar-brand d-flex align-items-center flex-grow-1 flex-md-grow-0" to={user ? (roleKey === 'admin' ? "/admin/home" : "/alumni/home") : "/"}>
@@ -74,7 +63,7 @@ const Navbar = () => {
           {/* Authenticated Dashboard Routing */}
           {user && isDashboard && (
             <ul className="navbar-nav mx-auto mb-2 mb-lg-0 gap-3 gap-lg-4 text-center align-items-center">
-              {navItems.map(item => {
+              {dashboardNavItems.map(item => {
                 const IconComponent = item.icon;
                 const isActive = path === item.path || path.startsWith(item.path + '/');
                 return (
@@ -104,28 +93,17 @@ const Navbar = () => {
           {user && isDashboard && (
             <div className="d-flex flex-column flex-lg-row align-items-center gap-3 mt-3 mt-lg-0 pb-3 pb-lg-0 border-top border-lg-0 pt-3 pt-lg-0">
 
-              {/* Optional Search Bar for specific roles */}
-              {roleKey === 'admin' && (
-                <div className="input-group border rounded-pill bg-light px-3 py-1" style={{ width: '100%', maxWidth: '250px' }}>
-                  <span className="bg-transparent border-0 mt-1 d-flex align-items-center"><FaSearch className="text-muted small" /></span>
-                  <input
-                    type="text"
-                    className="form-control border-0 bg-transparent shadow-none"
-                    placeholder="SEARCH MESSAGES..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    style={{ fontSize: '11px' }}
-                  />
-                </div>
-              )}
-
               {/* Profile Overview (Desktop) & Logout */}
-              <div className="d-flex align-items-center border-start-lg ps-lg-3 w-100 justify-content-center justify-content-lg-start">
-                <span className="fw-bold me-2 text-uppercase d-none d-lg-block" style={{ color: roleKey === 'admin' ? '#b22222' : '#c84022', fontSize: '13px' }}>
-                  {roleKey}
+              <div className="d-flex align-items-center border-start-lg ps-lg-3 w-100 justify-content-center justify-content-lg-start gap-3">
+
+                {/* Notification Dropdown */}
+                <NotificationDropdown />
+
+                <span className="fw-bold me-2 text-uppercase d-none d-lg-block" style={{ color: userRole === 'admin' ? '#b22222' : '#c84022', fontSize: '13px' }}>
+                  {userRole}
                 </span>
 
-                <div className="rounded-circle overflow-hidden border d-none d-lg-block" style={{ width: '35px', height: '35px', backgroundColor: '#eee' }}>
+                <Link to={userRole === 'admin' ? "/admin/profile" : "/alumni/profile"} className="rounded-circle overflow-hidden border d-none d-lg-block text-decoration-none" style={{ width: '35px', height: '35px', backgroundColor: '#eee' }}>
                   {user?.profilePic ? (
                     <img
                       src={user.profilePic}
@@ -137,7 +115,7 @@ const Navbar = () => {
                       {user?.name?.[0]?.toUpperCase() || "?"}
                     </div>
                   )}
-                </div>
+                </Link>
 
                 <button onClick={handleLogout} className="btn btn-sm btn-link text-danger ms-lg-2 d-flex align-items-center gap-1 text-decoration-none" title="Logout">
                   <FaSignOutAlt size={16} /> <span className="d-lg-none">Logout</span>

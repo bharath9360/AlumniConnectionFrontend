@@ -17,15 +17,32 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    const login = (userData) => {
+    const login = React.useCallback((userData) => {
         storage.updateCurrentUser(userData); // Keep localStorage in sync
         setUser(userData);
-    };
+    }, []);
 
-    const logout = () => {
+    const logout = React.useCallback(() => {
         storage.logout();
         setUser(null);
-    };
+    }, []);
+
+    // Determine the active user role dynamically to avoid calculating it in every component
+    const userRole = React.useMemo(() => {
+        if (!user) return 'guest';
+        const rawRole = (user.role || '').toLowerCase();
+        if (rawRole === 'admin' || rawRole === 'administrator') return 'admin';
+        if (rawRole === 'student') return 'student';
+        return 'alumni';
+    }, [user]);
+
+    // Memoize the context value to prevent unnecessary re-renders in consuming components
+    const contextValue = React.useMemo(() => ({
+        user,
+        userRole,
+        login,
+        logout
+    }), [user, userRole, login, logout]);
 
     if (loading) {
         return (
@@ -36,7 +53,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     return (
-        <AuthContext.Provider value={{ user, login, logout }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );

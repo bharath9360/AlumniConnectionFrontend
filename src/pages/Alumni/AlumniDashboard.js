@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { storage } from '../../utils/storage';
 import ProfileCard from './components/ProfileCard';
@@ -7,6 +8,7 @@ import { NewsWidget, EventsWidget } from './components/SidebarWidgets';
 import Toast from '../../components/common/Toast';
 
 const AlumniDashboard = () => {
+  const navigate = useNavigate();
 
   const [userData, setUserData] = useState(null);
   const [feedData, setFeedData] = useState([]);
@@ -130,14 +132,14 @@ const AlumniDashboard = () => {
               </div>
 
               <div className="d-flex justify-content-between">
-                <button className="btn btn-link text-decoration-none text-muted small hover-bg-light p-2 rounded">
-                  <i className="fas fa-image text-primary me-2"></i>Media
+                <button className="btn btn-link text-decoration-none text-muted small hover-bg-light p-2 rounded" onClick={() => navigate('/jobs')}>
+                  <i className="fas fa-briefcase text-primary me-2"></i>Jobs
                 </button>
-                <button className="btn btn-link text-decoration-none text-muted small hover-bg-light p-2 rounded">
+                <button className="btn btn-link text-decoration-none text-muted small hover-bg-light p-2 rounded" onClick={() => navigate('/events')}>
                   <i className="fas fa-calendar-alt text-warning me-2"></i>Event
                 </button>
-                <button className="btn btn-link text-decoration-none text-muted small hover-bg-light p-2 rounded">
-                  <i className="fas fa-newspaper text-success me-2"></i>Write article
+                <button className="btn btn-link text-decoration-none text-muted small hover-bg-light p-2 rounded" onClick={() => navigate('/messaging')}>
+                  <i className="fas fa-envelope text-success me-2"></i>Messages
                 </button>
               </div>
 
