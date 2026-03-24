@@ -4,9 +4,7 @@ import {
     FaCalendarAlt,
     FaBell,
     FaCommentDots,
-    FaUserGraduate,
     FaChartLine,
-    FaClipboardList,
     FaClipboardCheck,
     FaInfoCircle,
     FaEnvelope
@@ -22,12 +20,10 @@ export const navigationConfig = {
     ],
     admin: [
         { path: '/admin/home', icon: FaHome, label: 'Home' },
-        { path: '/admin/post', icon: FaClipboardList, label: 'Post' },
         { path: '/admin/approvals', icon: FaClipboardCheck, label: 'Approvals' },
-        { path: '/admin/alumni', icon: FaUserGraduate, label: 'Alumni' },
-        { path: '/admin/dashboard', icon: FaChartLine, label: 'Dashboard' },
-        { path: '/notifications', icon: FaBell, label: 'Notifications' },
-        { path: '/messaging', icon: FaCommentDots, label: 'Messaging' }
+        { path: '/admin/dashboard', icon: FaChartLine, label: 'Stats' },
+        { path: '/notifications', icon: FaBell, label: 'Alerts' },
+        { path: '/messaging', icon: FaCommentDots, label: 'Inbox' }
     ],
     student: [
         { path: '/alumni/home', icon: FaHome, label: 'Home' },

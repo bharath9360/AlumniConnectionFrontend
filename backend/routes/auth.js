@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { sendOTPEmail, sendApprovalEmail } = require('../services/emailService');
 const { protect } = require('../middleware/auth');
+const { profileUpload } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -255,6 +256,31 @@ router.get('/me', protect, async (req, res) => {
   sendAuthResponse(res, 200, user, token);
 });
 
+// ─── PUT /api/auth/profile ────────────────────────────────────
+router.put('/profile', protect, async (req, res) => {
+  try {
+    const updates = req.body;
+    // Don't allow password or secret key updates via this route
+    delete updates.password;
+    delete updates.secretKey;
+    delete updates.otp;
+    delete updates.otpExpiry;
+
+    const user = await User.findByIdAndUpdate(req.user._id, updates, {
+      new: true,
+      runValidators: true
+    });
+    
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    
+    const token = signToken(user._id);
+    sendAuthResponse(res, 200, user, token);
+  } catch (err) {
+    console.error('Profile update error:', err);
+    res.status(500).json({ message: 'Failed to update profile.' });
+  }
+});
+
 // ─── GET /api/auth/users/:id — Public profile ────────────────
 router.get('/users/:id', async (req, res) => {
   try {
@@ -264,6 +290,32 @@ router.get('/users/:id', async (req, res) => {
     res.json({ success: true, data: user });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch user.' });
+  }
+});
+
+// ─── PUT /api/auth/profile-pic — Upload profile picture ──────
+// Accepts multipart/form-data with field name 'profilePic'
+router.put('/profile-pic', protect, profileUpload.single('profilePic'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file provided.' });
+    }
+
+    const imageUrl = `${process.env.BACKEND_URL || 'http://localhost:5000'}/uploads/profiles/${req.file.filename}`;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { profilePic: imageUrl },
+      { new: true }
+    );
+
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    const token = signToken(user._id);
+    sendAuthResponse(res, 200, user, token);
+  } catch (err) {
+    console.error('Profile pic upload error:', err);
+    res.status(500).json({ message: 'Failed to upload profile picture.' });
   }
 });
 

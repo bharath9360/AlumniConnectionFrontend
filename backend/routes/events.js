@@ -68,7 +68,15 @@ router.post('/', protect, async (req, res) => {
           icon: '📅',
           relatedId: event._id
         }));
-        await Notification.insertMany(notifDocs);
+        const created = await Notification.insertMany(notifDocs);
+
+        // Real-time socket push
+        const io = req.app.get('io');
+        if (io) {
+          created.forEach((notif, i) => {
+            io.to(recipients[i]._id.toString()).emit('notification_received', notif);
+          });
+        }
       } catch (_) {}
     } else {
       try {
@@ -110,7 +118,15 @@ router.put('/:id/approve', protect, authorize('admin'), async (req, res) => {
         icon: '📅',
         relatedId: event._id
       }));
-      await Notification.insertMany(notifDocs);
+      const created = await Notification.insertMany(notifDocs);
+
+      // Real-time socket push
+      const io = req.app.get('io');
+      if (io) {
+        created.forEach((notif, i) => {
+          io.to(recipients[i]._id.toString()).emit('notification_received', notif);
+        });
+      }
     } catch (_) {}
     res.json({ success: true, message: 'Event approved.', data: event });
   } catch (err) {

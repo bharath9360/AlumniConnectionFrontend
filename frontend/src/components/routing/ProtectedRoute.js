@@ -1,17 +1,34 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-const ProtectedRoute = ({ allowedRoles = [] }) => {
-    const { user, userRole } = useAuth();
+const isTokenValid = (token) => {
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp * 1000 > Date.now();
+  } catch (e) {
+    return false;
+  }
+};
 
-    if (!user) {
+const ProtectedRoute = ({ allowedRoles = [] }) => {
+    const { user, userRole, logout } = useAuth();
+    const token = localStorage.getItem('alumni_token');
+    const valid = isTokenValid(token);
+
+    useEffect(() => {
+        if (user && !valid) {
+            logout();
+        }
+    }, [user, valid, logout]);
+
+    if (!user || !valid) {
         return <Navigate to="/login" replace />;
     }
 
-    // If specific roles are required, check — otherwise allow any authenticated user
+    // Role check
     if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-        // Redirect to the user's own dashboard
         if (userRole === 'admin') return <Navigate to="/admin/home" replace />;
         return <Navigate to="/alumni/home" replace />;
     }

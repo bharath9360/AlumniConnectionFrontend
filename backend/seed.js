@@ -30,7 +30,7 @@ const run = async () => {
       designation: 'Senior Software Engineer',
       batch: '2020-2024',
       bio: 'Building scalable AI solutions and passionate about mentoring the next generation of engineers.',
-      connections: '500+',
+      connectionCount: '500+',
       views: 1240,
       skills: ['React.js', 'Node.js', 'System Design', 'Cloud Computing', 'AI Integration'],
       experience: [

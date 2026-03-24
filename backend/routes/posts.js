@@ -1,38 +1,94 @@
 const express = require('express');
 const Post = require('../models/Post');
 const { protect, optionalAuth } = require('../middleware/auth');
+const { postUpload: upload } = require('../middleware/upload');
 
 const router = express.Router();
 
 // ─── GET /api/posts — All posts, newest first ─────────────────
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const posts = await Post.find().sort({ createdAt: -1 });
+    const posts = await Post.find()
+      .sort({ createdAt: -1 })
+      .populate('userId', 'name profilePic role designation');
+
     const userId = req.user?._id;
-    const result = posts.map(post => post.toClientObject(userId));
+    const result = posts.map(post => {
+      const obj = post.toClientObject(userId);
+      // Overlay the author's live data from the populated User document
+      if (post.userId && typeof post.userId === 'object') {
+        obj.userName  = post.userId.name;
+        obj.userPic   = post.userId.profilePic || '';
+        obj.userRole  = post.userId.designation || post.userId.role || '';
+        obj.authorId  = post.userId._id;
+      }
+      return obj;
+    });
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch posts.' });
   }
 });
 
+
 // ─── POST /api/posts — Create new post ────────────────────────
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, upload.single('image'), async (req, res) => {
   try {
-    const { content, media } = req.body;
-    if (!content?.trim()) {
-      return res.status(400).json({ message: 'Post content cannot be empty.' });
+    const { content } = req.body;
+    let mediaUrl = req.body.media || '';
+
+    if (req.file) {
+      mediaUrl = `${process.env.BACKEND_URL || 'http://localhost:5000'}/uploads/posts/${req.file.filename}`;
     }
+
+    if (!content?.trim() && !mediaUrl) {
+      return res.status(400).json({ message: 'Post content or image cannot be empty.' });
+    }
+
     const post = await Post.create({
       userId: req.user._id,
       userName: req.user.name,
       userRole: req.user.designation || req.user.role,
       userPic: req.user.profilePic || '',
-      content,
-      media: media || ''
+      content: content || '',
+      media: mediaUrl
     });
+
+    // Notify accepted connections
+    try {
+      const User = require('../models/User');
+      const Notification = require('../models/Notification');
+      const me = await User.findById(req.user._id).select('connections');
+      
+      if (me && me.connections && me.connections.length > 0) {
+        const acceptedConnIds = me.connections
+          .filter(c => c.status === 'Accepted')
+          .map(c => c.userId);
+
+        if (acceptedConnIds.length > 0) {
+          const notifDocs = acceptedConnIds.map(id => ({
+            userId: id,
+            type: 'post',
+            title: `New post from ${req.user.name}`,
+            description: content ? content.substring(0, 60) : 'Shared an image',
+            icon: '📰',
+            relatedId: post._id
+          }));
+          const created = await Notification.insertMany(notifDocs);
+
+          const io = req.app.get('io');
+          if (io) {
+            created.forEach((notif, i) => {
+              io.to(acceptedConnIds[i].toString()).emit('notification_received', notif);
+            });
+          }
+        }
+      }
+    } catch (_) {}
+
     res.status(201).json({ success: true, data: post.toClientObject(req.user._id) });
   } catch (err) {
+    console.error('Create post error:', err);
     res.status(500).json({ message: 'Failed to create post.' });
   }
 });

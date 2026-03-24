@@ -254,3 +254,99 @@
 .extra-small {
   font-size: 0.85rem;
 }
+
+/* ===== HERO - Animated Section ===== */
+.hero-content {
+  position: relative;
+  z-index: 5;
+}
+
+.hero-sub-text {
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+.hero-scroll-indicator {
+  margin-top: 2.5rem;
+}
+
+/* Floating decorative background circles */
+.hero-deco-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(200, 64, 34, 0.18);
+  pointer-events: none;
+}
+
+.hero-deco-circle--1 {
+  width: 400px;
+  height: 400px;
+  top: -100px;
+  right: -80px;
+}
+
+.hero-deco-circle--2 {
+  width: 280px;
+  height: 280px;
+  bottom: -60px;
+  left: -60px;
+}
+
+@media (max-width: 768px) {
+  .hero-main-headline {
+    font-size: 2.4rem;
+  }
+  .hero-deco-circle--1 { width: 220px; height: 220px; }
+  .hero-deco-circle--2 { width: 160px; height: 160px; }
+}
+
+/* ===== EVENTS CAROUSEL ===== */
+.event-carousel-card {
+  border: 1px solid #f0f0f0;
+  transition: box-shadow 0.3s ease;
+}
+
+.event-carousel-tag {
+  position: relative;
+}
+
+.carousel-dot-list {
+  gap: 6px;
+  padding-bottom: 4px;
+}
+
+.event-color-header {
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+}
+
+/* ===== EVENT DETAIL MODAL ===== */
+.event-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(3px);
+}
+
+.event-modal-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 576px) {
+  .event-modal-card { max-width: 100%; border-radius: 16px !important; }
+}
+
+/* Testimonial quote text */
+.testimonial-quote {
+  font-size: 1.05rem;
+  line-height: 1.7;
+}

@@ -1,214 +1,435 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { authService, connectionService, chatService } from '../../services/api';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import toast from 'react-hot-toast';
+import { authService, connectionService, chatService } from '../../services/api';
+import Toast from '../../components/common/Toast';
 import { ClipLoader } from 'react-spinners';
-import { FiMessageCircle, FiUserPlus, FiUserCheck, FiUserX, FiBriefcase, FiMapPin, FiBook, FiUsers } from 'react-icons/fi';
+import {
+  FaUserPlus, FaCommentDots, FaCheckCircle, FaClock,
+  FaBriefcase, FaGraduationCap, FaMapMarkerAlt, FaEnvelope,
+  FaArrowLeft
+} from 'react-icons/fa';
 
+// ── Connection button states ─────────────────────────────────
+const CONNECTION_STATES = {
+  none:      { label: 'Connect',  icon: FaUserPlus,    variant: 'btn-mamcet-red',    disabled: false },
+  pending:   { label: 'Pending',  icon: FaClock,       variant: 'btn-outline-secondary', disabled: true  },
+  connected: { label: 'Message', icon: FaCommentDots, variant: 'btn-pro-outline',    disabled: false }
+};
+
+const ConnectButton = ({ status, onConnect, onMessage, loading }) => {
+  const cfg = CONNECTION_STATES[status] || CONNECTION_STATES.none;
+  const IconComp = cfg.icon;
+
+  const handleClick = () => {
+    if (status === 'connected') onMessage();
+    else if (status === 'none')  onConnect();
+  };
+
+  return (
+    <motion.button
+      className={`btn ${cfg.variant} rounded-pill px-4 d-flex align-items-center gap-2 fw-bold`}
+      style={{ fontSize: 14 }}
+      whileHover={!cfg.disabled ? { scale: 1.04 } : {}}
+      whileTap={!cfg.disabled  ? { scale: 0.97 } : {}}
+      disabled={cfg.disabled || loading}
+      onClick={handleClick}
+    >
+      {loading
+        ? <ClipLoader size={14} color="#fff" />
+        : <IconComp size={15} />
+      }
+      {cfg.label}
+    </motion.button>
+  );
+};
+
+// ── Section wrapper ──────────────────────────────────────────
+const ProfileSection = ({ title, children, className = '' }) => (
+  <motion.div
+    className={`bg-white rounded-4 shadow-sm border-0 p-4 mb-3 ${className}`}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.35 }}
+  >
+    {title && <h5 className="fw-bold text-dark mb-4">{title}</h5>}
+    {children}
+  </motion.div>
+);
+
+// ── Main Component ───────────────────────────────────────────
 const PublicProfile = () => {
-  const { id } = useParams();
-  const { user: currentUser } = useAuth();
-  const navigate = useNavigate();
+  const { id }    = useParams();
+  const navigate  = useNavigate();
+  const { user: me } = useAuth();
 
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [connStatus, setConnStatus] = useState('none'); // none | Pending | Accepted
-  const [connLoading, setConnLoading] = useState(false);
-  const [msgLoading, setMsgLoading] = useState(false);
+  const [profile, setProfile]           = useState(null);
+  const [connStatus, setConnStatus]     = useState('none');   // none | pending | connected
+  const [isReceiver, setIsReceiver]     = useState(false);
+  const [loading,   setLoading]         = useState(true);
+  const [connLoading, setConnLoading]   = useState(false);
+  const [toast,     setToast]           = useState(null);
 
-  const fetchProfile = useCallback(async () => {
-    try {
-      const [profileRes, statusRes] = await Promise.all([
-        authService.getUserById(id),
-        currentUser ? connectionService.getStatus(id).catch(() => ({ data: { status: 'none' } })) : Promise.resolve({ data: { status: 'none' } })
-      ]);
-      setProfile(profileRes.data.data);
-      setConnStatus(statusRes.data.status);
-    } catch (err) {
-      toast.error('Could not load profile.');
-    } finally {
-      setLoading(false);
-    }
-  }, [id, currentUser]);
+  const showToast = (message, type = 'info') => setToast({ message, type });
 
-  useEffect(() => { fetchProfile(); }, [fetchProfile]);
+  const isOwnProfile = me?._id === id || me?.id === id;
 
+  // ── Fetch user + connection status ────────────────────────
+  useEffect(() => {
+    const fetchAll = async () => {
+      setLoading(true);
+      try {
+        const userRes = await authService.getUserById(id);
+        setProfile(userRes.data.data || userRes.data);
+
+        if (me && !isOwnProfile) {
+          const statusRes = await connectionService.getStatus(id);
+          setConnStatus(statusRes.data.status || 'none');
+          setIsReceiver(statusRes.data.isReceiver || false);
+        }
+      } catch (err) {
+        showToast('Could not load profile. Please try again.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (id) fetchAll();
+  }, [id, me, isOwnProfile]);
+
+  // ── Connection action ─────────────────────────────────────
   const handleConnect = async () => {
-    if (!currentUser) return navigate('/login');
+    if (!me) { navigate('/login'); return; }
     setConnLoading(true);
     try {
-      if (connStatus === 'Accepted') {
-        await connectionService.removeConnection(id);
-        setConnStatus('none');
-        toast.success('Connection removed.');
-      } else if (connStatus === 'Pending') {
-        toast('Connection request already sent! ⏳');
-      } else {
-        await connectionService.sendRequest(id);
-        setConnStatus('Pending');
-        toast.success('Connection request sent! 🤝');
-      }
+      // The Axios interceptor inside api.js automatically attaches the Authorization header.
+      await connectionService.sendRequest(id);
+      setConnStatus('Pending');
+      showToast(`Connection request sent to ${profile?.name}! 🤝`, 'success');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed. Try again.');
+      console.log('🔥 Connection Error Details:', err.response?.data);
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to send request.';
+      const statusCode = err.response?.status ? ` (Status: ${err.response.status})` : '';
+      showToast(`${errorMsg}${statusCode}`, 'error');
     } finally {
       setConnLoading(false);
     }
   };
 
-  const handleMessage = async () => {
-    if (!currentUser) return navigate('/login');
-    setMsgLoading(true);
+  const handleAccept = async () => {
+    setConnLoading(true);
     try {
-      await chatService.accessChat(id);
-      navigate('/messaging');
+      await connectionService.acceptRequest(id);
+      setConnStatus('Accepted');
+      setIsReceiver(false);
+      showToast('Connection accepted! 🎉', 'success');
     } catch (err) {
-      toast.error('Could not open chat.');
-    } finally {
-      setMsgLoading(false);
+      showToast('Failed to accept connection.', 'error');
+    } finally { setConnLoading(false); }
+  };
+
+  const handleReject = async () => {
+    setConnLoading(true);
+    try {
+      await connectionService.removeConnection(id);
+      setConnStatus('none');
+      setIsReceiver(false);
+      showToast('Connection request removed.', 'info');
+    } catch (err) {
+      showToast('Failed to reject connection.', 'error');
+    } finally { setConnLoading(false); }
+  };
+
+  // ── Message action (navigate to messaging) ────────────────
+  const handleMessage = async () => {
+    if (!me) { navigate('/login'); return; }
+    try {
+      const res = await chatService.accessChat(id);
+      navigate('/messaging', { state: { openChatId: res.data?.data?._id || res.data?._id } });
+    } catch {
+      navigate('/messaging');
     }
   };
 
-  const roleColor = (role) => {
-    if (role === 'admin') return '#0d6efd';
-    if (role === 'alumni') return '#c84022';
-    return '#198754';
-  };
-
-  if (loading) return (
-    <div className="d-flex justify-content-center align-items-center min-vh-100">
-      <ClipLoader color="#c84022" size={48} />
-    </div>
-  );
-
-  if (!profile) return (
-    <div className="d-flex justify-content-center align-items-center min-vh-100">
-      <div className="text-center">
-        <h3>Profile not found</h3>
-        <Link to="/" className="btn btn-outline-secondary mt-3">Go Home</Link>
+  // ── Loading ───────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="min-vh-100 d-flex align-items-center justify-content-center dashboard-main-bg">
+        <ClipLoader color="#c84022" size={48} />
       </div>
-    </div>
-  );
+    );
+  }
 
-  const isMe = currentUser?._id === id;
-  const acceptedConnections = (profile.connections || []).filter(c => c.status === 'Accepted').length;
+  if (!profile) {
+    return (
+      <div className="min-vh-100 d-flex flex-column align-items-center justify-content-center text-center p-4 dashboard-main-bg">
+        <i className="fas fa-user-slash fa-3x text-muted mb-3"></i>
+        <h4 className="fw-bold">Profile Not Found</h4>
+        <p className="text-muted">This user might not exist or may have removed their account.</p>
+        <Link to="/" className="btn btn-mamcet-red rounded-pill px-4 mt-2">Back to Home</Link>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ backgroundColor: '#f3f2ef', minHeight: '100vh', paddingBottom: '40px' }}>
-      <div className="container" style={{ maxWidth: '860px', paddingTop: '24px' }}>
+    <div className="dashboard-main-bg py-4 min-vh-100">
+      <div className="container">
 
-        {/* Profile Card */}
-        <div className="bg-white rounded-3 overflow-hidden shadow-sm mb-3">
-          {/* Cover */}
-          <div style={{
-            height: '140px',
-            background: profile.coverPic
-              ? `url(${profile.coverPic}) center/cover`
-              : 'linear-gradient(135deg, #c84022, #e85a3a)',
-            position: 'relative'
-          }}></div>
+        {/* Back arrow */}
+        <button
+          className="btn btn-sm btn-light rounded-pill px-3 mb-3 d-flex align-items-center gap-2 fw-semibold"
+          onClick={() => navigate(-1)}
+          style={{ color: '#555' }}
+        >
+          <FaArrowLeft size={12} /> Back
+        </button>
 
-          <div className="px-4 pb-4">
-            {/* Avatar */}
-            <div style={{ marginTop: '-50px', marginBottom: '12px' }}>
-              <div className="rounded-circle overflow-hidden border-4 border-white d-inline-flex align-items-center justify-content-center bg-light"
-                style={{ width: '100px', height: '100px', border: '4px solid white', fontSize: '2.5rem', fontWeight: 'bold', color: '#c84022', backgroundColor: '#fde8e3' }}>
-                {profile.profilePic
-                  ? <img src={profile.profilePic} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : profile.name?.charAt(0).toUpperCase()
+        <div className="row g-4 justify-content-center">
+          <div className="col-lg-8">
+
+            {/* ── HERO CARD ─────────────────────────────── */}
+            <motion.div
+              className="bg-white rounded-4 shadow-sm border-0 mb-3 overflow-hidden"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              {/* Cover photo */}
+              <div style={{ height: 180, overflow: 'hidden', backgroundColor: '#c84022', position: 'relative' }}>
+                {profile.coverPic
+                  ? <img src={profile.coverPic} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : (
+                    <div
+                      style={{
+                        width: '100%', height: '100%',
+                        background: 'linear-gradient(135deg, #c84022 0%, #8b1a0e 100%)'
+                      }}
+                    />
+                  )
                 }
               </div>
-            </div>
 
-            {/* Name & Role */}
-            <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
-              <div>
-                <h3 className="fw-bold mb-1">{profile.name}</h3>
-                <span className="badge rounded-pill px-3 py-1" style={{ backgroundColor: roleColor(profile.role), color: 'white', fontSize: '0.75rem' }}>
-                  {profile.role?.toUpperCase()}
-                </span>
-                {profile.designation && <p className="text-muted mb-1 mt-1" style={{ fontSize: '0.95rem' }}>{profile.designation}{profile.company ? ` at ${profile.company}` : ''}</p>}
-                {profile.department && <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}><FiBook className="me-1" />{profile.department} {profile.batch ? `• Batch ${profile.batch}` : ''}</p>}
-                {profile.city && <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}><FiMapPin className="me-1" />{profile.city}{profile.state ? `, ${profile.state}` : ''}</p>}
-              </div>
-
-              {!isMe && (
-                <div className="d-flex gap-2 flex-wrap">
-                  <button
-                    className="btn px-4 d-flex align-items-center gap-2"
-                    style={{ backgroundColor: connStatus === 'Accepted' ? '#e8f4fd' : '#c84022', color: connStatus === 'Accepted' ? '#0b66c2' : 'white', borderRadius: '20px', fontWeight: 600, fontSize: '0.85rem', border: 'none' }}
-                    onClick={handleConnect}
-                    disabled={connLoading}
-                  >
-                    {connLoading ? <ClipLoader size={14} color="currentColor" /> :
-                      connStatus === 'Accepted' ? <><FiUserCheck /> Connected</> :
-                      connStatus === 'Pending' ? <><FiUserX /> Pending</> :
-                      <><FiUserPlus /> Connect</>}
-                  </button>
-                  <button
-                    className="btn px-4 d-flex align-items-center gap-2"
-                    style={{ backgroundColor: 'white', color: '#c84022', border: '2px solid #c84022', borderRadius: '20px', fontWeight: 600, fontSize: '0.85rem' }}
-                    onClick={handleMessage}
-                    disabled={msgLoading}
-                  >
-                    {msgLoading ? <ClipLoader size={14} color="#c84022" /> : <><FiMessageCircle /> Message</>}
-                  </button>
+              {/* Profile info */}
+              <div className="px-4 pb-4 position-relative">
+                {/* Avatar */}
+                <div
+                  className="rounded-circle border border-4 border-white shadow overflow-hidden"
+                  style={{
+                    width: 120, height: 120, marginTop: -60,
+                    backgroundColor: '#f8f9fa',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '2.8rem', fontWeight: 800, color: '#c84022'
+                  }}
+                >
+                  {profile.profilePic
+                    ? <img src={profile.profilePic} alt={profile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : profile.name?.[0]?.toUpperCase() || '?'
+                  }
                 </div>
-              )}
-            </div>
 
-            {/* Connection count */}
-            <p className="mt-2 mb-0" style={{ fontSize: '0.85rem', color: '#0b66c2', fontWeight: 500 }}>
-              <FiUsers className="me-1" />{acceptedConnections} connection{acceptedConnections !== 1 ? 's' : ''}
-            </p>
+                <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mt-2 gap-3">
+                  <div>
+                    <h3 className="fw-bold text-dark mb-1">{profile.name}</h3>
+                    <p className="text-muted mb-1" style={{ fontSize: 15 }}>
+                      {profile.headline || `${profile.role || ''} ${profile.company ? `at ${profile.company}` : ''}`}
+                    </p>
+                    <div className="d-flex flex-wrap gap-3 extra-small text-muted">
+                      {profile.location && (
+                        <span><FaMapMarkerAlt className="me-1" style={{ color: '#c84022' }} />{profile.location}</span>
+                      )}
+                      {profile.batch && (
+                        <span><FaGraduationCap className="me-1" style={{ color: '#c84022' }} />Batch {profile.batch}</span>
+                      )}
+                      {profile.email && !isOwnProfile && (
+                        <span><FaEnvelope className="me-1" style={{ color: '#c84022' }} />{profile.email}</span>
+                      )}
+                    </div>
 
-            {/* Bio */}
-            {profile.bio && <p className="mt-3 text-dark" style={{ fontSize: '0.95rem', lineHeight: 1.6 }}>{profile.bio}</p>}
+                    {/* Connection count */}
+                    {connStatus === 'connected' && (
+                      <p className="extra-small fw-bold mb-0 mt-1" style={{ color: '#c84022' }}>
+                        ✓ Connected
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="d-flex gap-2 flex-wrap">
+                    {isOwnProfile ? (
+                      <Link to="/alumni/profile" className="btn btn-pro-outline rounded-pill px-4 fw-bold" style={{ fontSize: 14 }}>
+                        Edit Profile
+                      </Link>
+                    ) : (
+                      <>
+                        {connStatus.toLowerCase() === 'pending' && isReceiver ? (
+                          <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-success rounded-pill px-4 fw-bold d-flex align-items-center gap-2"
+                              style={{ fontSize: 14 }}
+                              onClick={handleAccept}
+                              disabled={connLoading}
+                            >
+                              <FaCheckCircle size={14} /> Accept
+                            </button>
+                            <button
+                              className="btn btn-outline-danger rounded-pill px-4 fw-bold"
+                              style={{ fontSize: 14 }}
+                              onClick={handleReject}
+                              disabled={connLoading}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <ConnectButton
+                            status={connStatus.toLowerCase()}
+                            onConnect={handleConnect}
+                            onMessage={handleMessage}
+                            loading={connLoading}
+                          />
+                        )}
+                        
+                        {connStatus.toLowerCase() !== 'connected' && (
+                          <button
+                            className="btn btn-outline-secondary rounded-pill px-4 fw-bold d-flex align-items-center gap-2"
+                            style={{ fontSize: 14 }}
+                            onClick={handleMessage}
+                          >
+                            <FaCommentDots size={14} /> Message
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* ── ABOUT ─────────────────────────────────── */}
+            {profile.bio && (
+              <ProfileSection title="About">
+                <p className="text-muted mb-0" style={{ lineHeight: 1.8 }}>{profile.bio}</p>
+              </ProfileSection>
+            )}
+
+            {/* ── EXPERIENCE ────────────────────────────── */}
+            {profile.experience?.length > 0 && (
+              <ProfileSection title="Experience">
+                {profile.experience.map((exp, idx) => (
+                  <div
+                    key={exp.id || idx}
+                    className={`d-flex gap-3 ${idx < profile.experience.length - 1 ? 'mb-4 pb-4 border-bottom' : ''}`}
+                  >
+                    <div
+                      className="bg-light rounded d-flex align-items-center justify-content-center flex-shrink-0"
+                      style={{ width: 52, height: 52 }}
+                    >
+                      <FaBriefcase style={{ color: '#c84022', fontSize: 20 }} />
+                    </div>
+                    <div>
+                      <h6 className="fw-bold mb-0">{exp.title}</h6>
+                      <p className="small text-dark mb-1">{exp.company}</p>
+                      <p className="extra-small text-muted mb-1">{exp.duration}</p>
+                      {exp.desc && <p className="small text-muted mb-0">{exp.desc}</p>}
+                    </div>
+                  </div>
+                ))}
+              </ProfileSection>
+            )}
+
+            {/* ── EDUCATION ─────────────────────────────── */}
+            {profile.education?.length > 0 && (
+              <ProfileSection title="Education">
+                {profile.education.map((edu, idx) => (
+                  <div
+                    key={edu.id || idx}
+                    className={`d-flex gap-3 ${idx < profile.education.length - 1 ? 'mb-4 pb-4 border-bottom' : ''}`}
+                  >
+                    <div
+                      className="bg-light rounded d-flex align-items-center justify-content-center flex-shrink-0"
+                      style={{ width: 52, height: 52 }}
+                    >
+                      <FaGraduationCap style={{ color: '#c84022', fontSize: 20 }} />
+                    </div>
+                    <div>
+                      <h6 className="fw-bold mb-0">{edu.school}</h6>
+                      <p className="small text-dark mb-1">{edu.degree}</p>
+                      <p className="extra-small text-muted mb-0">{edu.duration}</p>
+                    </div>
+                  </div>
+                ))}
+              </ProfileSection>
+            )}
+
+            {/* ── SKILLS ────────────────────────────────── */}
+            {profile.skills?.length > 0 && (
+              <ProfileSection title="Skills">
+                <div className="d-flex flex-wrap gap-2">
+                  {profile.skills.map((skill, idx) => (
+                    <span
+                      key={idx}
+                      className="badge bg-light text-dark border px-3 py-2 rounded-pill fw-normal"
+                      style={{ fontSize: 13 }}
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </ProfileSection>
+            )}
+
+            {/* Empty state */}
+            {!profile.bio && !profile.experience?.length && !profile.education?.length && !profile.skills?.length && (
+              <ProfileSection>
+                <div className="text-center py-3">
+                  <i className="fas fa-user fa-2x text-muted mb-2"></i>
+                  <p className="text-muted mb-0">This user hasn't filled out their profile yet.</p>
+                </div>
+              </ProfileSection>
+            )}
+
+          </div>
+
+          {/* ── RIGHT: Mini card ─────────────────────── */}
+          <div className="col-lg-4 d-none d-lg-block">
+            <motion.div
+              className="bg-white rounded-4 shadow-sm border-0 p-4 mb-3"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.15 }}
+            >
+              <h6 className="fw-bold mb-3 text-dark">People also viewed</h6>
+              <p className="extra-small text-muted">More profiles coming soon.</p>
+            </motion.div>
+
+            {connStatus === 'connected' && (
+              <motion.div
+                className="bg-white rounded-4 shadow-sm border-0 p-4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.25 }}
+              >
+                <h6 className="fw-bold mb-3 text-dark">
+                  <FaCheckCircle className="me-2" style={{ color: '#2e7d32' }} />
+                  You're connected
+                </h6>
+                <p className="extra-small text-muted mb-3">
+                  You and {profile.name?.split(' ')[0]} are connected. You can message each other freely.
+                </p>
+                <button
+                  className="btn btn-mamcet-red rounded-pill w-100 fw-bold d-flex align-items-center justify-content-center gap-2"
+                  onClick={handleMessage}
+                  style={{ fontSize: 13 }}
+                >
+                  <FaCommentDots size={14} /> Send a Message
+                </button>
+              </motion.div>
+            )}
           </div>
         </div>
-
-        {/* Skills */}
-        {profile.skills?.length > 0 && (
-          <div className="bg-white rounded-3 shadow-sm p-4 mb-3">
-            <h5 className="fw-bold mb-3">Skills</h5>
-            <div className="d-flex flex-wrap gap-2">
-              {profile.skills.map((skill, i) => (
-                <span key={i} className="badge rounded-pill px-3 py-2" style={{ backgroundColor: '#fff5f5', color: '#c84022', border: '1px solid #f5c6bb', fontSize: '0.82rem' }}>
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Experience */}
-        {profile.experience?.length > 0 && (
-          <div className="bg-white rounded-3 shadow-sm p-4 mb-3">
-            <h5 className="fw-bold mb-3"><FiBriefcase className="me-2" />Experience</h5>
-            {profile.experience.map((exp, i) => (
-              <div key={i} className="border-start border-2 ps-3 mb-3" style={{ borderColor: '#c84022' }}>
-                <h6 className="fw-semibold mb-0">{exp.title}</h6>
-                <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>{exp.company} • {exp.duration}</p>
-                {exp.desc && <p className="text-muted mt-1" style={{ fontSize: '0.85rem' }}>{exp.desc}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Education */}
-        {profile.education?.length > 0 && (
-          <div className="bg-white rounded-3 shadow-sm p-4 mb-3">
-            <h5 className="fw-bold mb-3"><FiBook className="me-2" />Education</h5>
-            {profile.education.map((edu, i) => (
-              <div key={i} className="border-start border-2 ps-3 mb-3" style={{ borderColor: '#c84022' }}>
-                <h6 className="fw-semibold mb-0">{edu.school}</h6>
-                <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>{edu.degree} • {edu.duration}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
       </div>
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 };

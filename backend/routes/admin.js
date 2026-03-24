@@ -75,4 +75,64 @@ router.get('/stats', protect, authorize('admin'), async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/pending-events ───────────────────────────
+// (Alias — mirrors GET /api/events/pending for admin convenience)
+router.get('/pending-events', protect, authorize('admin'), async (req, res) => {
+  try {
+    const Event = require('../models/Event');
+    const events = await Event.find({ status: 'Pending' })
+      .populate('createdBy', 'name email role')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, data: events });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch pending events.' });
+  }
+});
+
+// ─── PUT /api/admin/approve-event/:id ────────────────────────
+// Alias for PUT /api/events/:id/approve — keeps Admin route prefix consistent
+router.put('/approve-event/:id', protect, authorize('admin'), async (req, res) => {
+  try {
+    const Event = require('../models/Event');
+    const event = await Event.findByIdAndUpdate(req.params.id, { status: 'Approved' }, { new: true });
+    if (!event) return res.status(404).json({ message: 'Event not found.' });
+
+    try {
+      const recipients = await User.find({ role: { $in: ['student', 'alumni'] } }).select('_id');
+      const notifDocs = recipients.map(u => ({
+        userId: u._id,
+        type: 'event_alert',
+        title: `New Event: ${event.title}`,
+        description: `${event.date || ''} at ${event.venue || 'TBD'}`,
+        icon: '📅',
+        relatedId: event._id
+      }));
+      const created = await Notification.insertMany(notifDocs);
+      const io = req.app.get('io');
+      if (io) {
+        created.forEach((notif, i) => {
+          io.to(recipients[i]._id.toString()).emit('notification_received', notif);
+        });
+      }
+    } catch (_) {}
+
+    res.json({ success: true, message: 'Event approved.', data: event });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to approve event.' });
+  }
+});
+
+// ─── PUT /api/admin/reject-event/:id ─────────────────────────
+router.put('/reject-event/:id', protect, authorize('admin'), async (req, res) => {
+  try {
+    const Event = require('../models/Event');
+    const event = await Event.findByIdAndDelete(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found.' });
+    res.json({ success: true, message: 'Event rejected and removed.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to reject event.' });
+  }
+});
+
 module.exports = router;
+
