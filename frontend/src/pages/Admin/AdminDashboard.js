@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { adminService } from '../../services/api';
+import { ClipLoader } from 'react-spinners';
 
-/** * CONFIGURATION: Centralized data, labels, and styles 
- */
 const DASHBOARD_CONFIG = {
-  TITLES: {
-    MAIN: "DASHBOARD",
-    SUB: "OVERVIEW"
-  },
+  TITLES: { MAIN: "DASHBOARD", SUB: "OVERVIEW" },
   COLORS: {
     STUDENTS: '#22d3ee',
     ALUMNI: '#ec4899',
@@ -14,144 +12,82 @@ const DASHBOARD_CONFIG = {
     BG_LIGHT_BLUE: '#f0f9ff',
     BG_LIGHT_PINK: '#fdf2f8'
   },
-  LABELS: {
-    ALUMNI: "TOTAL ALUMNI",
-    STUDENTS: "TOTAL STUDENTS",
-    USERS: "TOTAL USERS",
-    STAFFS: "STAFFS",
-    RECENT_MSG: "Recent Messages",
-    PENDING_VERIF: "Pending Verifications",
-    MSG_DESC: "Review contact form submissions",
-    VERIF_DESC: "Verify new user accounts",
-    MSG_SUFFIX: " New Messages",
-    USER_SUFFIX: " Users"
-  },
-  ICONS: {
-    MAIL: "✉️",
-    USER: "👤"
-  }
+  LABELS: { ALUMNI: "PENDING ALUMNI", STUDENTS: "PENDING JOBS", USERS: "TOTAL USERS" }
 };
 
-/** * COMPONENT: StatCard 
- * Renders the top numerical summary cards
- */
 const StatCard = ({ label, value, bgColor }) => (
-  <div className="col-md-3">
-    <div className="card shadow-sm border-0 p-4" style={{ backgroundColor: bgColor, borderRadius: '15px' }}>
+  <div className="col-md-4">
+    <div className="card shadow-sm border-0 p-4 text-center h-100" style={{ backgroundColor: bgColor, borderRadius: '15px' }}>
       <p className="text-muted fw-bold mb-1" style={{ fontSize: '11px' }}>{label}</p>
-      <h2 className="fw-bold mb-0">{value}</h2>
+      <h2 className="fw-bold mb-0" style={{ color: '#c84022' }}>{value}</h2>
     </div>
   </div>
 );
 
-/** * COMPONENT: ChartLegendItem 
- * Renders an individual item in the chart legend
- */
-const ChartLegendItem = ({ color, label, percentage }) => (
-  <div className="mb-3 d-flex align-items-center">
-    <span className="me-3" style={{ width: '40px', height: '15px', backgroundColor: color, display: 'inline-block', borderRadius: '2px' }}></span>
-    <span className="fw-bold small text-muted">{label} ({percentage}%)</span>
-  </div>
-);
-
-/** * COMPONENT: UpdateNotificationCard 
- * Renders the wide cards for messages and verifications
- */
-const UpdateNotificationCard = ({ tag, title, description, icon, iconBg }) => (
-  <div className="card shadow-sm border-0 p-4 mb-4 text-start bg-white border rounded">
-    <div className="row align-items-center">
-      <div className="col-8">
-        <p className="text-danger fw-bold mb-1" style={{ fontSize: '11px' }}>{tag}</p>
-        <h6 className="fw-bold mb-1">{title}</h6>
-        <p className="text-muted small mb-0">{description}</p>
-      </div>
-      <div className="col-4 text-end">
-        <div className="d-inline-block p-3 rounded" style={{ backgroundColor: iconBg }}>
-          <span className="fs-3">{icon}</span>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-/** * MAIN COMPONENT: AdminDashboard 
- */
 const AdminDashboard = () => {
-  // Data State (Could be fetched from an API)
-  const [stats] = useState({
-    students: 3504,
-    alumni: 1250,
-    staffs: 1500,
-    totalUsers: 7059,
-    recentMessages: 5,
-    pendingVerifications: 10
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    pendingAlumni: 0,
+    pendingJobs: 0,
+    pendingEvents: 0,
+    totalPosts: 0
   });
+  const [loading, setLoading] = useState(true);
 
-  // Derived Logic for Chart
-  const totalForChart = stats.students + stats.alumni + stats.staffs;
-  const studentPerc = Math.round((stats.students / totalForChart) * 100);
-  const alumniPerc = Math.round((stats.alumni / totalForChart) * 100);
-  const staffPerc = 100 - (studentPerc + alumniPerc);
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await adminService.getStats();
+        if (res.data?.data) {
+          setStats(res.data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch admin stats');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
 
-  const pieStyle = {
-    width: '250px',
-    height: '250px',
-    borderRadius: '50%',
-    background: `conic-gradient(
-      ${DASHBOARD_CONFIG.COLORS.STUDENTS} 0% ${studentPerc}%, 
-      ${DASHBOARD_CONFIG.COLORS.ALUMNI} ${studentPerc}% ${studentPerc + alumniPerc}%, 
-      ${DASHBOARD_CONFIG.COLORS.STAFFS} ${studentPerc + alumniPerc}% 100%
-    )`,
-    boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-  };
+  if (loading) {
+    return (
+      <div className="min-vh-100 d-flex justify-content-center align-items-center" style={{ backgroundColor: '#fff' }}>
+        <ClipLoader color="#c84022" size={50} />
+      </div>
+    );
+  }
+
+  const totalPending = stats.pendingAlumni + stats.pendingJobs + stats.pendingEvents;
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
-      
-      <div className="container py-4 text-center">
+      <div className="container py-5 text-center" style={{ maxWidth: '900px' }}>
         <h3 className="fw-bold text-danger mb-1" style={{ letterSpacing: '1px' }}>
           {DASHBOARD_CONFIG.TITLES.MAIN}
         </h3>
         <p className="text-muted small fw-bold mb-5">{DASHBOARD_CONFIG.TITLES.SUB}</p>
 
-        {/* 1. Statistics Row */}
+        {/* Statistics Row */}
         <div className="row justify-content-center mb-5 g-4">
-          <StatCard label={DASHBOARD_CONFIG.LABELS.ALUMNI} value={stats.alumni} bgColor={DASHBOARD_CONFIG.COLORS.BG_LIGHT_BLUE} />
-          <StatCard label={DASHBOARD_CONFIG.LABELS.STUDENTS} value={stats.students} bgColor={DASHBOARD_CONFIG.COLORS.BG_LIGHT_BLUE} />
-          <StatCard label={DASHBOARD_CONFIG.LABELS.USERS} value={stats.totalUsers} bgColor={DASHBOARD_CONFIG.COLORS.BG_LIGHT_BLUE} />
+          <StatCard label="TOTAL PLATFORM USERS" value={stats.totalUsers} bgColor={DASHBOARD_CONFIG.COLORS.BG_LIGHT_BLUE} />
+          <StatCard label="TOTAL SUBMITTED POSTS" value={stats.totalPosts} bgColor={DASHBOARD_CONFIG.COLORS.BG_LIGHT_PINK} />
+          <StatCard label="ITEMS AWAITING APPROVAL" value={totalPending} bgColor="#fff3cd" />
         </div>
 
-        {/* 2. Visual Chart Section */}
-        <div className="row align-items-center justify-content-center mb-5 py-4">
-          <div className="col-md-4 d-flex justify-content-center">
-            <div style={pieStyle}></div>
-          </div>
-          <div className="col-md-3 text-start ps-lg-5">
-            <ChartLegendItem color={DASHBOARD_CONFIG.COLORS.STUDENTS} label="STUDENTS" percentage={studentPerc} />
-            <ChartLegendItem color={DASHBOARD_CONFIG.COLORS.ALUMNI} label="ALUMNI" percentage={alumniPerc} />
-            <ChartLegendItem color={DASHBOARD_CONFIG.COLORS.STAFFS} label={DASHBOARD_CONFIG.LABELS.STAFFS} percentage={staffPerc} />
-          </div>
-        </div>
-
-        {/* 3. Notification/Update Section */}
+        {/* Action/Notification Section */}
         <div className="row justify-content-center mt-5">
-          <div className="col-md-8">
-            <UpdateNotificationCard 
-              tag={DASHBOARD_CONFIG.LABELS.RECENT_MSG}
-              title={`${stats.recentMessages}${DASHBOARD_CONFIG.LABELS.MSG_SUFFIX}`}
-              description={DASHBOARD_CONFIG.LABELS.MSG_DESC}
-              icon={DASHBOARD_CONFIG.ICONS.MAIL}
-              iconBg={DASHBOARD_CONFIG.COLORS.BG_LIGHT_BLUE}
-            />
-            <UpdateNotificationCard 
-              tag={DASHBOARD_CONFIG.LABELS.PENDING_VERIF}
-              title={`${stats.pendingVerifications}${DASHBOARD_CONFIG.LABELS.USER_SUFFIX}`}
-              description={DASHBOARD_CONFIG.LABELS.VERIF_DESC}
-              icon={DASHBOARD_CONFIG.ICONS.USER}
-              iconBg={DASHBOARD_CONFIG.COLORS.BG_LIGHT_PINK}
-            />
+          <div className="col-md-8 text-center p-5 bg-light rounded-4 shadow-sm border">
+            <h4 className="fw-bold mb-3">Moderation Hub</h4>
+            <p className="text-muted mb-4">
+              You have <strong>{stats.pendingAlumni}</strong> alumni registrations, <strong>{stats.pendingJobs}</strong> job postings, and <strong>{stats.pendingEvents}</strong> events waiting for your review.
+            </p>
+            <Link to="/admin/approvals" className="btn btn-lg text-white rounded-pill px-5 fw-bold shadow-sm" style={{ backgroundColor: '#c84022' }}>
+              <i className="fas fa-tasks me-2"></i> Open Approval Dashboard
+            </Link>
           </div>
         </div>
+
       </div>
     </div>
   );

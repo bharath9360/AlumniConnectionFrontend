@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { storage } from '../../utils/storage';
 import Modal from '../../components/common/Modal';
 import Toast from '../../components/common/Toast';
+import { jobService } from '../../services/api';
+
 const JobPostings = () => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,41 +12,59 @@ const JobPostings = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = React.useRef(null);
   const [toast, setToast] = useState(null);
-  const [activeTab, setActiveTab] = useState('all'); // Added state for tabs
+  const [activeTab, setActiveTab] = useState('all');
+
+  const [savedJobIds, setSavedJobIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('alumni_saved_jobs') || '[]');
+    } catch { return []; }
+  });
 
   useEffect(() => {
-    setJobs(storage.getJobs());
-    setLoading(false);
+    localStorage.setItem('alumni_saved_jobs', JSON.stringify(savedJobIds));
+  }, [savedJobIds]);
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const res = await jobService.getJobs();
+        setJobs(res.data?.data || []);
+      } catch (err) {
+        showToast("Failed to fetch jobs from server.", "error");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchJobs();
   }, []);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
   };
 
-  const handleApply = (jobId) => {
-    const updatedJobs = jobs.map(job => {
-      if (job.id === jobId) return { ...job, applied: true };
-      return job;
-    });
-    setJobs(updatedJobs);
-    storage.saveJobs(updatedJobs);
-    setIsApplyModalOpen(false);
-    setSelectedFile(null);
-    showToast("Application submitted successfully!", "success");
+  const handleApply = async (jobId) => {
+    try {
+      await jobService.applyJob(jobId);
+      setJobs(jobs.map(job => (job.id === jobId ? { ...job, applied: true } : job)));
+      setIsApplyModalOpen(false);
+      setSelectedFile(null);
+      showToast("Application submitted successfully!", "success");
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to submit application.", "error");
+    }
   };
 
   const handleSaveJob = (jobId) => {
-    const updatedJobs = jobs.map(job => {
-      if (job.id === jobId) return { ...job, saved: !job.saved };
-      return job;
+    setSavedJobIds(prev => {
+      const isCurrentlySaved = prev.includes(jobId);
+      const newSaved = isCurrentlySaved ? prev.filter(id => id !== jobId) : [...prev, jobId];
+      showToast(isCurrentlySaved ? "Job removed from saved list." : "Job saved to your list!", "success");
+      return newSaved;
     });
-    setJobs(updatedJobs);
-    storage.saveJobs(updatedJobs);
-    const isSaved = updatedJobs.find(j => j.id === jobId)?.saved;
-    showToast(isSaved ? "Job saved to your list!" : "Job removed from saved list.", "success");
   };
 
-  const filteredJobs = activeTab === 'all' ? jobs : jobs.filter(job => job.saved);
+  const activeJobs = jobs.map(j => ({ ...j, saved: savedJobIds.includes(j.id) }));
+  const filteredJobs = activeTab === 'all' ? activeJobs : activeJobs.filter(job => job.saved);
 
   if (loading) return <div className="p-5 text-center">Loading Job Openings...</div>;
 

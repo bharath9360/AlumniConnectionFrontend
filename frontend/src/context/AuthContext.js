@@ -17,6 +17,10 @@ export const AuthProvider = ({ children }) => {
 
     if (storedToken && storedUser) {
       try {
+        const payload = JSON.parse(atob(storedToken.split('.')[1]));
+        if (payload.exp * 1000 < Date.now()) {
+          throw new Error('Token expired');
+        }
         setUser(JSON.parse(storedUser));
       } catch (_) {
         localStorage.removeItem(TOKEN_KEY);

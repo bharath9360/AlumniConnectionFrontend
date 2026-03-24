@@ -47,13 +47,21 @@ export const authService = {
 
   getMe: () => api.get('/auth/me'),
 
-  getUserById: (userId) => api.get(`/auth/users/${userId}`)
+  updateProfile: (data) => api.put('/auth/profile', data),
+
+  getUserById: (userId) => api.get(`/auth/users/${userId}`),
+
+  // Upload profile picture as multipart/form-data
+  uploadProfilePic: (formData) =>
+    api.put('/auth/profile-pic', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
 };
 
 // ─── Post / Feed Service ──────────────────────────────────────
 export const postService = {
   getFeed: () => api.get('/posts'),
-  createPost: (data) => api.post('/posts', data),
+  createPost: (formData) => api.post('/posts', formData),
   likePost: (postId) => api.put(`/posts/${postId}/like`),
   addComment: (postId, content) => api.post(`/posts/${postId}/comment`, { content }),
   deletePost: (postId) => api.delete(`/posts/${postId}`)

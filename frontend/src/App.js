@@ -22,7 +22,6 @@ import AlumniLogin from './pages/Auth/AlumniLogin';
 import AdminLogin from './pages/Auth/AdminLogin';
 
 // Unified Authenticated Components
-import UnifiedDashboard from './pages/Dashboard/UnifiedDashboard';
 import AlumniDashboard from './pages/Alumni/AlumniDashboard';
 import UserProfile from './pages/Profile/UserProfile';
 import PublicProfile from './pages/Profile/PublicProfile';
@@ -92,7 +91,7 @@ function App() {
 
               {/* ── Protected: Admin Only ────────────────────────────── */}
               <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                <Route path="/admin/home" element={<UnifiedDashboard />} />
+                <Route path="/admin/home" element={<AlumniDashboard />} />
                 <Route path="/admin/profile" element={<UserProfile />} />
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
                 <Route path="/admin/post" element={<AdminPost />} />

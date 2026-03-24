@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { adminService, jobService, eventService } from '../../services/api';
 import toast from 'react-hot-toast';
 import { ClipLoader } from 'react-spinners';
@@ -197,7 +198,11 @@ const AdminApprovals = () => {
                           <h6 className="fw-bold mb-0">{j.title}</h6>
                           <p className="text-muted mb-1" style={{ fontSize: '0.83rem' }}>{j.company} • {j.location} • {j.type}</p>
                           <p className="text-muted mb-0" style={{ fontSize: '0.8rem' }}>
-                            By: <strong>{j.postedBy?.name || j.postedByName}</strong> ({j.postedBy?.role})
+                            By: <strong>
+                              <Link to={`/profile/${j.postedBy?._id || j.postedBy}`} className="text-decoration-none" style={{ color: '#c84022' }}>
+                                {j.postedBy?.name || j.postedByName}
+                              </Link>
+                            </strong> ({j.postedBy?.role})
                           </p>
                         </div>
                         <div className="d-flex gap-2 flex-shrink-0 ms-3">
@@ -228,7 +233,11 @@ const AdminApprovals = () => {
                         <h6 className="fw-bold mb-0">{e.title}</h6>
                         <p className="text-muted mb-1" style={{ fontSize: '0.83rem' }}>{e.date} at {e.venue || 'TBD'} • {e.category}</p>
                         <p className="text-muted mb-0" style={{ fontSize: '0.8rem' }}>
-                          By: <strong>{e.createdBy?.name}</strong> ({e.createdBy?.role})
+                          By: <strong>
+                            <Link to={`/profile/${e.createdBy?._id || e.createdBy}`} className="text-decoration-none" style={{ color: '#c84022' }}>
+                              {e.createdBy?.name}
+                            </Link>
+                          </strong> ({e.createdBy?.role})
                         </p>
                       </div>
                       <div className="d-flex gap-2 flex-shrink-0 ms-3">

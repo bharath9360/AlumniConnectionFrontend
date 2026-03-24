@@ -1,21 +1,62 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
 import NotificationDropdown from '../notifications/NotificationDropdown';
-import { FaSignOutAlt, FaCommentDots } from 'react-icons/fa';
+import { FaSignOutAlt, FaCommentDots, FaBars, FaTimes } from 'react-icons/fa';
 import '../../styles/Navbar.css';
 
+const LOGO_URL =
+  'https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/ALUMINI_CONNECT_LOGO_hwlrpw.png';
+
+// ─── tiny reusable avatar ─────────────────────────────────────
+const Avatar = ({ user, size = 38 }) => (
+  <div
+    style={{
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      overflow: 'hidden',
+      backgroundColor: '#eee',
+      flexShrink: 0,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      border: '2px solid #fff',
+      boxShadow: '0 1px 4px rgba(0,0,0,.15)',
+    }}
+  >
+    {user?.profilePic ? (
+      <img
+        src={user.profilePic}
+        alt="Profile"
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    ) : (
+      <span style={{ fontWeight: 700, fontSize: size * 0.4, color: '#c84022' }}>
+        {user?.name?.[0]?.toUpperCase() || '?'}
+      </span>
+    )}
+  </div>
+);
+
+// ─── component ───────────────────────────────────────────────
 const Navbar = () => {
-  const location = useLocation();
-  const path = location.pathname;
-  const navigate = useNavigate();
+  const location  = useLocation();
+  const path      = location.pathname;
+  const navigate  = useNavigate();
   const { user, userRole, logout } = useAuth();
-  const roleKey = getUserRoleKey(user);
+  const roleKey   = getUserRoleKey(user);
+
+  // used for the pre‑login mobile menu
+  const [isOpen, setIsOpen] = useState(false);
 
   const isLandingPage = path === '/';
-  const isAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/signup');
-  const isDashboard = user && !isLandingPage && !isAuthPage;
+  const isAuthPage    = path.startsWith('/login') ||
+                        path.startsWith('/register') ||
+                        path.startsWith('/signup') ||
+                        path.startsWith('/role-selection');
+  const isDashboard   = !!user && !isLandingPage && !isAuthPage;
 
   const handleLogout = (e) => {
     e.preventDefault();
@@ -23,127 +64,219 @@ const Navbar = () => {
     navigate('/');
   };
 
-  const dashboardNavItems = navigationConfig[userRole] || [];
+  const brandColor     = roleKey === 'admin' ? '#b22222' : '#c84022';
+  const brandLabel     = roleKey === 'admin' ? 'ADMIN PANEL' : 'ALUMNI CONNECT';
+  const dashboardHome  = roleKey === 'admin' ? '/admin/home' : '/alumni/home';
+  const dashboardItems = navigationConfig[userRole] || [];
 
+  /* ─────────────────────────────────────────────────────────── *
+   *  RENDER                                                       *
+   * ─────────────────────────────────────────────────────────── */
   return (
-    <nav className="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm px-2 px-md-3 mb-3">
-      <div className="container-fluid d-flex align-items-center">
+    <nav className="navbar navbar-light bg-white sticky-top shadow-sm mb-3"
+         style={{ padding: '0 12px' }}>
 
-        {/* Mobile: Profile Avatar far-left (LinkedIn style) */}
-        {user && isDashboard && (
+      <div className="d-flex align-items-center w-100" style={{ minHeight: 56 }}>
+
+        {/* ═══════════════════════════════════════════════════ *
+         *  LEFT SECTION                                         *
+         * ═══════════════════════════════════════════════════ */}
+        <div className="d-flex align-items-center" style={{ flex: '0 0 auto' }}>
+
+          {/* POST‑LOGIN MOBILE: avatar FIRST (far left), then logo */}
+          {user && isDashboard && (
+            <Link
+              to={`/profile/${user._id || user.id}`}
+              className="d-lg-none text-decoration-none me-2"
+            >
+              <Avatar user={user} size={38} />
+            </Link>
+          )}
+
+          {/* brand logo — hidden on mobile when logged in (avatar takes its place) */}
           <Link
-            to={userRole === 'admin' ? '/admin/profile' : `/profile/${user._id}`}
-            className="d-lg-none me-2 flex-shrink-0 text-decoration-none rounded-circle overflow-hidden"
-            style={{ width: '34px', height: '34px', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            className={`navbar-brand d-flex align-items-center m-0 p-0 ${
+              user && isDashboard ? 'd-none d-lg-flex' : 'd-flex'
+            }`}
+            to={user ? dashboardHome : '/'}
           >
-            {user?.profilePic ? (
-              <img src={user.profilePic} alt="" style={{ width: '34px', height: '34px', objectFit: 'cover', borderRadius: '50%' }} />
-            ) : (
-              <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#c84022' }}>
-                {user?.name?.[0]?.toUpperCase() || '?'}
-              </span>
-            )}
+            <img
+              src={LOGO_URL}
+              alt="MAMCET Alumni Connect"
+              style={{ width: 38, height: 38, objectFit: 'contain' }}
+            />
+            {/* brand text: hidden on xs; always visible sm+ */}
+            <span
+              className="fw-bold ms-2 d-none d-sm-inline"
+              style={{ color: brandColor, fontSize: 14, letterSpacing: roleKey === 'admin' ? 1 : 0 }}
+            >
+              {brandLabel}
+            </span>
           </Link>
-        )}
+        </div>
 
-        {/* Brand Logo */}
-        <Link className="navbar-brand d-flex align-items-center flex-grow-1 flex-md-grow-0" to={user ? (roleKey === 'admin' ? "/admin/home" : "/alumni/home") : "/"}>
-          <img src="https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/ALUMINI_CONNECT_LOGO_hwlrpw.png" alt="Logo" style={{ width: '40px' }} className="me-2 d-none d-lg-inline" />
-          <span className="fw-bold brand-name-red d-none d-lg-inline" style={{ color: roleKey === 'admin' ? '#b22222' : '#c84022', letterSpacing: roleKey === 'admin' ? '1px' : '0' }}>
-            {roleKey === 'admin' ? 'ADMIN PANEL' : 'ALUMNI CONNECT'}
-          </span>
-        </Link>
+        {/* spacer */}
+        <div className="flex-grow-1" />
 
-        {/* Mobile Messaging Icon */}
-        {user && isDashboard && (
-          <Link to="/messaging" className="d-lg-none ms-auto text-decoration-none me-2" style={{ color: roleKey === 'admin' ? '#b22222' : '#c84022' }}>
-            <FaCommentDots size={24} />
-          </Link>
-        )}
+        {/* ═══════════════════════════════════════════════════ *
+         *  RIGHT SECTION — depends on auth state               *
+         * ═══════════════════════════════════════════════════ */}
 
-        <div className="collapse navbar-collapse justify-content-end text-center mt-3 mt-lg-0" id="navbarNav">
-
-          {/* Unauthenticated / Guest Routing */}
-          {(!user || isLandingPage) && (
-            <ul className="navbar-nav ms-auto align-items-center gap-3 gap-lg-0">
+        {/* ── GUEST (not logged in) ── */}
+        {!user && (
+          <>
+            {/* Desktop: About / Contact links + Login / Register */}
+            <div className="d-none d-lg-flex align-items-center gap-3">
               {(navigationConfig.guest || []).map(item => (
-                <li className="nav-item" key={item.path}>
-                  <Link className="nav-link mx-2 fw-semibold d-flex align-items-center justify-content-center" to={item.path}>
-                    {item.label}
+                <Link key={item.path} className="nav-link fw-semibold" to={item.path}>
+                  {item.label}
+                </Link>
+              ))}
+              {/* Hide Login/Register on auth pages and landing page */}
+              {!isAuthPage && !isLandingPage && (
+                <>
+                  <Link to="/login" className="btn btn-outline-secondary px-3 rounded-pill" style={{ fontSize: 13 }}>
+                    Log In
+                  </Link>
+                  <Link to="/register" className="btn text-white px-3 rounded-pill" style={{ backgroundColor: brandColor, fontSize: 13 }}>
+                    Register
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* Mobile: hamburger toggle (About/Contact open in drawer below) */}
+            <button
+              className="btn border-0 shadow-none d-lg-none"
+              onClick={() => setIsOpen(o => !o)}
+              aria-label="Toggle menu"
+            >
+              {isOpen ? <FaTimes size={22} /> : <FaBars size={22} />}
+            </button>
+          </>
+        )}
+
+        {/* ── LOGGED IN — desktop only right controls ── */}
+        {user && isDashboard && (
+          <div className="d-none d-lg-flex align-items-center gap-3">
+            {dashboardItems.map(item => {
+              const Icon     = item.icon;
+              const isActive = path === item.path || path.startsWith(item.path + '/');
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className="d-flex flex-column align-items-center text-decoration-none"
+                  style={{
+                    color: isActive ? '#b22222' : '#555',
+                    fontWeight: 700,
+                    borderBottom: isActive ? '3px solid #b22222' : '3px solid transparent',
+                    paddingBottom: 2,
+                    fontSize: 11,
+                    transition: '0.2s',
+                  }}
+                >
+                  {Icon && <Icon size={18} className="mb-1" />}
+                  <span className="text-uppercase">{item.label}</span>
+                </Link>
+              );
+            })}
+
+            <NotificationDropdown />
+
+            <Link
+              to={`/profile/${user?._id || user?.id}`}
+              className="text-decoration-none"
+            >
+              <Avatar user={user} size={34} />
+            </Link>
+
+            <button
+              onClick={handleLogout}
+              className="btn btn-sm btn-link text-danger p-0 ms-1"
+              title="Logout"
+            >
+              <FaSignOutAlt size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* ── LOGGED IN — mobile right icons ── */}
+        {user && isDashboard && (
+          <div className="d-lg-none d-flex align-items-center gap-2">
+            <Link
+              to="/messaging"
+              className="text-decoration-none"
+              style={{ color: brandColor }}
+            >
+              <FaCommentDots size={22} />
+            </Link>
+          </div>
+        )}
+
+        {/* ── LOGGED IN on landing/auth page — "Go to Dashboard" button ── */}
+        {user && !isDashboard && (
+          <Link
+            to={dashboardHome}
+            className="btn text-white px-3 fw-bold rounded-pill"
+            style={{ backgroundColor: brandColor, fontSize: 13 }}
+          >
+            Dashboard
+          </Link>
+        )}
+
+      </div>{/* /d-flex */}
+
+      {/* ══════════════════════════════════════════════════════════ *
+       *  MOBILE DRAWER — pre‑login only                            *
+       *  Appears below the header row when hamburger is toggled     *
+       * ══════════════════════════════════════════════════════════ */}
+      {!user && isOpen && (
+        <div
+          className="d-lg-none pb-3 border-top mt-2"
+          style={{ width: '100%' }}
+        >
+          <ul className="navbar-nav text-center gap-2 mt-2">
+            {(navigationConfig.guest || []).map(item => (
+              <li className="nav-item" key={item.path}>
+                <Link
+                  className="nav-link fw-semibold"
+                  to={item.path}
+                  onClick={() => setIsOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+
+            {/* Hide Login/Register on auth pages and landing page */}
+            {!isAuthPage && !isLandingPage && (
+              <>
+                <li className="nav-item mt-1">
+                  <Link
+                    to="/login"
+                    className="btn btn-outline-secondary w-100 rounded-pill"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Log In
                   </Link>
                 </li>
-              ))}
-              <li className="nav-item ms-lg-3 mt-2 mt-lg-0"><Link to="/login" className="btn btn-outline-secondary px-4 w-100 w-lg-auto">Log In</Link></li>
-              <li className="nav-item mt-2 mt-lg-0 ms-lg-2"><Link to="/register" className="btn btn-custom-red text-white px-4 w-100 w-lg-auto" style={{ backgroundColor: '#c84022' }}>Register</Link></li>
-            </ul>
-          )}
-
-          {/* Authenticated Dashboard Routing */}
-          {user && isDashboard && (
-            <ul className="navbar-nav mx-auto mb-2 mb-lg-0 gap-3 gap-lg-4 text-center align-items-center">
-              {dashboardNavItems.map(item => {
-                const IconComponent = item.icon;
-                const isActive = path === item.path || path.startsWith(item.path + '/');
-                return (
-                  <li className="nav-item" key={item.path}>
-                    <Link
-                      className={`nav-link py-2 d-flex flex-column align-items-center ${isActive ? 'active-nav-item' : ''}`}
-                      to={item.path}
-                      style={{
-                        color: isActive ? '#b22222' : '#555',
-                        fontWeight: 'bold',
-                        fontSize: '13px',
-                        borderBottom: isActive ? '3px solid #b22222' : 'none',
-                        transition: '0.2s',
-                        paddingBottom: '2px'
-                      }}
-                    >
-                      {IconComponent && <IconComponent className="mb-1" size={18} />}
-                      <span className="text-uppercase" style={{ fontSize: '11px' }}>{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          {/* User Controls (Search & Profile/Logout) for authenticated users */}
-          {user && isDashboard && (
-            <div className="d-flex flex-column flex-lg-row align-items-center gap-3 mt-3 mt-lg-0 pb-3 pb-lg-0 border-top border-lg-0 pt-3 pt-lg-0">
-
-              {/* Profile Overview (Desktop) & Logout */}
-              <div className="d-flex align-items-center border-start-lg ps-lg-3 w-100 justify-content-center justify-content-lg-start gap-3">
-
-                {/* Notification Dropdown */}
-                <NotificationDropdown />
-
-                <span className="fw-bold me-2 text-uppercase d-none d-lg-block" style={{ color: userRole === 'admin' ? '#b22222' : '#c84022', fontSize: '13px' }}>
-                  {userRole}
-                </span>
-
-                <Link to={userRole === 'admin' ? "/admin/profile" : "/alumni/profile"} className="rounded-circle overflow-hidden border d-none d-lg-block text-decoration-none" style={{ width: '35px', height: '35px', backgroundColor: '#eee' }}>
-                  {user?.profilePic ? (
-                    <img
-                      src={user.profilePic}
-                      alt="Avatar"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div className="d-flex align-items-center justify-content-center w-100 h-100 fw-bold text-secondary">
-                      {user?.name?.[0]?.toUpperCase() || "?"}
-                    </div>
-                  )}
-                </Link>
-
-                <button onClick={handleLogout} className="btn btn-sm btn-link text-danger ms-lg-2 d-flex align-items-center gap-1 text-decoration-none" title="Logout">
-                  <FaSignOutAlt size={16} /> <span className="d-lg-none">Logout</span>
-                </button>
-              </div>
-            </div>
-          )}
-
+                <li className="nav-item mt-1">
+                  <Link
+                    to="/register"
+                    className="btn text-white w-100 rounded-pill"
+                    style={{ backgroundColor: brandColor }}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Register
+                  </Link>
+                </li>
+              </>
+            )}
+          </ul>
         </div>
-      </div>
+      )}
+
     </nav>
   );
 };

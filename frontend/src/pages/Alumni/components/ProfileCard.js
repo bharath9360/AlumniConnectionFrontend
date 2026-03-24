@@ -5,7 +5,7 @@ const ProfileCard = ({ user }) => {
         <div className="dashboard-card bg-white shadow-sm overflow-hidden mb-4 rounded-3 border-0">
             <div className="profile-card-header bg-mamcet-red" style={{ height: '60px' }}></div>
             <div className="text-center px-3 pb-3" style={{ marginTop: '-30px' }}>
-                <Link to="/alumni/profile" className="text-decoration-none">
+                <Link to={`/profile/${user?._id || user?.id}`} className="text-decoration-none">
                     <div className="avatar-md mx-auto bg-white border rounded-circle d-flex align-items-center justify-content-center shadow-sm"
                         style={{ width: '72px', height: '72px', overflow: 'hidden' }}>
                         {user?.profilePic ? (
@@ -27,7 +27,7 @@ const ProfileCard = ({ user }) => {
                     </div>
                     <div className="d-flex justify-content-between align-items-center py-1 hover-bg-light rounded cursor-pointer">
                         <span className="extra-small text-muted fw-bold">Connections</span>
-                        <span className="extra-small text-mamcet-red fw-bold">{user.connections}</span>
+                        <span className="extra-small text-mamcet-red fw-bold">{(Array.isArray(user.connections) ? user.connections.length : user.connections) || 0}</span>
                     </div>
                 </div>
 

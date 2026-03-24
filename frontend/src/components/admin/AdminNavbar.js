@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import NotificationDropdown from '../notifications/NotificationDropdown';
 
 const AdminNavbar = () => {
     const location = useLocation();
+    const { user, logout } = useAuth();
     const [search, setSearch] = useState("");
 
     const navLinkStyle = (path) => ({
@@ -48,7 +51,7 @@ const AdminNavbar = () => {
                         <li className="nav-item"><Link className="nav-link py-2" to="/admin/dashboard" style={navLinkStyle('/admin/dashboard')}>DASHBOARD</Link></li>
                     </ul>
 
-                    {/* Right Side: Search and Admin Profile */}
+                    {/* Right Side: Search, Notification Bell, and Admin Profile */}
                     <div className="d-flex flex-column flex-lg-row align-items-center gap-3 mt-3 mt-lg-0">
                         <div className="input-group border rounded-pill bg-light px-3 py-1" style={{ width: '100%', maxWidth: '250px' }}>
                             <span className="bg-transparent border-0 mt-1"><i className="fas fa-search text-muted small"></i></span>
@@ -62,15 +65,26 @@ const AdminNavbar = () => {
                             />
                         </div>
 
-                        <div className="d-flex align-items-center border-start-lg ps-lg-3 border-top border-lg-0 pt-3 pt-lg-0 w-100 justify-content-center justify-content-lg-start">
-                            <span className="fw-bold me-2" style={{ color: '#b22222', fontSize: '13px' }}>ADMIN</span>
-                            <div className="rounded-circle overflow-hidden border" style={{ width: '35px', height: '35px' }}>
-                                <img
-                                    src="https://img.freepik.com/free-vector/businessman-character-avatar-isolated_24877-60111.jpg"
-                                    alt="AdminAvatar"
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                />
-                            </div>
+                        <div className="d-flex align-items-center border-start-lg ps-lg-3 border-top border-lg-0 pt-3 pt-lg-0 w-100 justify-content-center justify-content-lg-start gap-3">
+                            {/* ── Single Notification Bell (Phase 4 Fix) ── */}
+                            <NotificationDropdown />
+
+                            <span className="fw-bold" style={{ color: '#b22222', fontSize: '13px' }}>ADMIN</span>
+
+                            {/* Dynamic admin avatar using actual profile pic */}
+                            <Link to={`/profile/${user?._id || user?.id}`} className="rounded-circle overflow-hidden border text-decoration-none" style={{ width: '35px', height: '35px', backgroundColor: '#eee', display: 'block' }}>
+                                {user?.profilePic ? (
+                                    <img
+                                        src={user.profilePic}
+                                        alt="Admin Avatar"
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    />
+                                ) : (
+                                    <div className="d-flex align-items-center justify-content-center w-100 h-100 fw-bold" style={{ color: '#b22222' }}>
+                                        {user?.name?.[0]?.toUpperCase() || 'A'}
+                                    </div>
+                                )}
+                            </Link>
                         </div>
                     </div>
                 </div>

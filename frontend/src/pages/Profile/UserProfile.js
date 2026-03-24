@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { storage } from '../../utils/storage';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { authService } from '../../services/api';
 import Modal from '../../components/common/Modal';
 import Toast from '../../components/common/Toast';
 
 const UserProfile = ({ isHome }) => {
-    const { user: authUser, userRole } = useAuth();
+    const { user: authUser, userRole, updateUser } = useAuth();
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
+    const [uploadingPic, setUploadingPic] = useState(false);
+    const profilePicInputRef = useRef(null);
 
     // Modal states
     const [isEditHeaderOpen, setIsEditHeaderOpen] = useState(false);
@@ -22,23 +24,57 @@ const UserProfile = ({ isHome }) => {
     const [editData, setEditData] = useState({});
 
     useEffect(() => {
-        let user = storage.getCurrentUser();
-        // Fallback to auth context if storage is empty
-        if (!user && authUser) {
-            user = authUser;
-        }
-        if (user) {
-            setUserData(user);
-            setEditData(user);
-        }
-        setLoading(false);
+        const fetchUser = async () => {
+            try {
+                const res = await authService.getMe();
+                setUserData(res.data.user || res.data.data || res.data);
+                setEditData(res.data.user || res.data.data || res.data);
+            } catch (err) {
+                // fallback to context user
+                if (authUser) {
+                    setUserData(authUser);
+                    setEditData(authUser);
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchUser();
     }, [authUser]);
 
-    const handleSave = (modalSetter) => {
-        storage.updateCurrentUser(editData);
-        setUserData(editData);
-        modalSetter(false);
-        showToast("Profile updated successfully!", "success");
+    const handleSave = async (modalSetter) => {
+        try {
+            const res = await authService.updateProfile(editData);
+            setUserData(res.data.user || editData);
+            modalSetter(false);
+            showToast("Profile updated successfully!", "success");
+        } catch (err) {
+            showToast("Failed to update profile.", "error");
+        }
+    };
+
+    // ── LinkedIn-style camera icon: upload & update profile pic ────
+    const handleProfilePicUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setUploadingPic(true);
+        try {
+            const formData = new FormData();
+            formData.append('profilePic', file);
+            const res = await authService.uploadProfilePic(formData);
+            const updatedUser = res.data.user;
+            setUserData(prev => ({ ...prev, profilePic: updatedUser.profilePic }));
+            setEditData(prev => ({ ...prev, profilePic: updatedUser.profilePic }));
+            // Update auth context so navbar avatar & localStorage refresh immediately
+            if (updateUser) updateUser(updatedUser);
+            showToast("Profile picture updated!", "success");
+        } catch (err) {
+            showToast("Failed to upload picture. Please try again.", "error");
+        } finally {
+            setUploadingPic(false);
+            // Clear the input so the same file can be re-selected if needed
+            if (profilePicInputRef.current) profilePicInputRef.current.value = '';
+        }
     };
 
     const handleChange = (e) => {
@@ -127,7 +163,10 @@ const UserProfile = ({ isHome }) => {
                             </div>
 
                             <div className="px-4 pb-4 position-relative">
-                                <div className="profile-avatar-pro shadow" style={{
+                                {/* ── LinkedIn-style profile avatar with camera overlay ── */}
+                            <div
+                                className="profile-avatar-pro shadow position-relative"
+                                style={{
                                     marginTop: '-100px',
                                     width: '160px',
                                     height: '160px',
@@ -140,12 +179,45 @@ const UserProfile = ({ isHome }) => {
                                     justifyContent: 'center',
                                     fontSize: '4rem',
                                     fontWeight: 'bold',
-                                    color: '#c84022'
+                                    color: '#c84022',
+                                    cursor: 'pointer'
+                                }}
+                                onClick={() => !uploadingPic && profilePicInputRef.current?.click()}
+                                title="Change profile picture"
+                            >
+                                {userData.profilePic ? (
+                                    <img src={userData.profilePic} alt="Profile" className="w-100 h-100 object-fit-cover" />
+                                ) : (userData.name?.[0] || "?")}
+
+                                {/* Camera icon overlay */}
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: '40%',
+                                    background: 'rgba(0,0,0,0.45)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '0 0 50% 50%'
                                 }}>
-                                    {userData.profilePic ? (
-                                        <img src={userData.profilePic} alt="Profile" className="w-100 h-100 object-fit-cover" />
-                                    ) : (userData.name?.[0] || "?")}
+                                    {uploadingPic ? (
+                                        <div className="spinner-border spinner-border-sm text-white" role="status" />
+                                    ) : (
+                                        <i className="fas fa-camera text-white" style={{ fontSize: '1.1rem' }}></i>
+                                    )}
                                 </div>
+
+                                {/* Hidden file input */}
+                                <input
+                                    ref={profilePicInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    onChange={handleProfilePicUpload}
+                                />
+                            </div>
 
                                 <div className="mt-3 d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
                                     <div className="mobile-text-center w-100 w-md-auto">
@@ -156,7 +228,7 @@ const UserProfile = ({ isHome }) => {
                                         <div className="d-flex flex-wrap align-items-center gap-3 text-muted extra-small">
                                             <span>{userData.batch} Batch</span>
                                             <span>&bull;</span>
-                                            <span className="text-mamcet-red fw-bold">{userData.connections} connections</span>
+                                            <span className="text-mamcet-red fw-bold">{(Array.isArray(userData.connections) ? userData.connections.length : userData.connections) || 0} connections</span>
                                             <span className="d-none d-md-inline">&bull;</span>
                                             <span className="d-none d-md-inline">{userData.views} profile views</span>
                                         </div>
@@ -288,11 +360,25 @@ const UserProfile = ({ isHome }) => {
                             <input type="text" className="form-control" name="company" value={editData.company || ""} onChange={handleChange} />
                         </div>
                     )}
-                    <div className="col-6">
-                        <label className="form-label extra-small fw-bold">Profile Picture URL</label>
-                        <input type="text" className="form-control" name="profilePic" value={editData.profilePic || ""} onChange={handleChange} />
+                    <div className="col-12">
+                        <label className="form-label extra-small fw-bold">Profile Picture</label>
+                        <div className="d-flex align-items-center gap-3">
+                            <div className="rounded-circle overflow-hidden border" style={{ width: '56px', height: '56px', flexShrink: 0, backgroundColor: '#f8f9fa' }}>
+                                {editData.profilePic ? (
+                                    <img src={editData.profilePic} alt="Current" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                    <div className="d-flex align-items-center justify-content-center w-100 h-100 fw-bold" style={{ color: '#c84022', fontSize: '1.4rem' }}>
+                                        {editData.name?.[0] || '?'}
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <p className="extra-small text-muted mb-1">Click the camera icon on your profile photo to upload a new picture directly.</p>
+                                <p className="extra-small text-muted mb-0">Supported: JPG, PNG, WEBP (max 3MB)</p>
+                            </div>
+                        </div>
                     </div>
-                    <div className="col-6">
+                    <div className="col-12">
                         <label className="form-label extra-small fw-bold">Cover Photo URL</label>
                         <input type="text" className="form-control" name="coverPic" value={editData.coverPic || ""} onChange={handleChange} />
                     </div>
