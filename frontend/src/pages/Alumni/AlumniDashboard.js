@@ -104,7 +104,14 @@ const CreatePostBox = ({ user, onPostCreated, showToast }) => {
       if (imageFile) formData.append('image', imageFile, imageFile.name || 'image.jpg');
 
       const res = await postService.createPost(formData);
-      onPostCreated(res.data.data);
+      const newPost = {
+        ...res.data.data,
+        userName: user?.name,
+        userPic: user?.profilePic || '',
+        userRole: user?.designation || user?.role || '',
+        authorId: user?._id || user?.id,
+      };
+      onPostCreated(newPost);
       setPostText('');
       removeImage();
       setExpanded(false);

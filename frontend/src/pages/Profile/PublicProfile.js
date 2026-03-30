@@ -19,7 +19,9 @@ const CONNECTION_STATES = {
 };
 
 const ConnectButton = ({ status, onConnect, onMessage, loading }) => {
-  const cfg = CONNECTION_STATES[status] || CONNECTION_STATES.none;
+  let normalized = status?.toLowerCase() || 'none';
+  if (normalized === 'accepted') normalized = 'connected';
+  const cfg = CONNECTION_STATES[normalized] || CONNECTION_STATES.none;
   const IconComp = cfg.icon;
 
   const handleClick = () => {
@@ -85,7 +87,9 @@ const PublicProfile = () => {
 
         if (me && !isOwnProfile) {
           const statusRes = await connectionService.getStatus(id);
-          setConnStatus(statusRes.data.status || 'none');
+          let rawStatus = statusRes.data.status?.toLowerCase() || 'none';
+          if (rawStatus === 'accepted') rawStatus = 'connected';
+          setConnStatus(rawStatus);
           setIsReceiver(statusRes.data.isReceiver || false);
         }
       } catch (err) {
@@ -104,7 +108,7 @@ const PublicProfile = () => {
     try {
       // The Axios interceptor inside api.js automatically attaches the Authorization header.
       await connectionService.sendRequest(id);
-      setConnStatus('Pending');
+      setConnStatus('pending');
       showToast(`Connection request sent to ${profile?.name}! 🤝`, 'success');
     } catch (err) {
       console.log('🔥 Connection Error Details:', err.response?.data);
@@ -120,7 +124,7 @@ const PublicProfile = () => {
     setConnLoading(true);
     try {
       await connectionService.acceptRequest(id);
-      setConnStatus('Accepted');
+      setConnStatus('connected');
       setIsReceiver(false);
       showToast('Connection accepted! 🎉', 'success');
     } catch (err) {

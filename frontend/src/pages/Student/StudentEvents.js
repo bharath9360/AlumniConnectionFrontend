@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { storage } from '../../utils/storage';
 import Modal from '../../components/common/Modal';
 import Toast from '../../components/common/Toast';
 import { eventService } from '../../services/api';
