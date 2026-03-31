@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { chatService } from '../../services/api';
-import { socketService } from '../../services/socket';
+import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import {
   ChatSidebar,
@@ -12,6 +12,7 @@ import {
 
 const Messaging = () => {
   const { user } = useAuth();
+  const { socket: contextSocket, isOnline } = useSocket();
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -23,19 +24,22 @@ const Messaging = () => {
   const [isComposing, setIsComposing] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [notConnectedUser, setNotConnectedUser] = useState(null);
+  const [userConnections, setUserConnections] = useState([]);
   const location = useLocation();
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const selectChatRef = useRef(null);
 
-  // ── Connect Socket & Setup listeners ──────────────────────────
-  useEffect(() => {
-    if (!user) return;
+    // ── Connect Socket & Setup listeners ──────────────────────────
+    useEffect(() => {
+      if (!user || !contextSocket) return;
 
-    socketRef.current = socketService.connect();
-    const socket = socketRef.current;
+      // Use the shared SocketContext socket — single connection for the whole app
+      const socket = contextSocket;
+      socketRef.current = socket;
 
-    socket.emit('setup', user);
+      socket.emit('setup', user);
 
     socket.on('message_received', (newMessage) => {
       // Update the active chat messages in real-time if the chat is open
@@ -75,7 +79,23 @@ const Messaging = () => {
       socket.off('typing');
       socket.off('stop_typing');
     };
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]); // intentional: contextSocket omitted to avoid re-subscribing on every render
+
+  // ── Derive display info from a chat document ──────────────────
+  // Declared here (before the fetchChats effect) to avoid TDZ error
+  const enrichChat = useCallback((chat, currentUserId, onlineList = []) => {
+    const otherParticipant = chat.participants.find(p => (p._id || p) !== currentUserId);
+    const otherId = otherParticipant?._id?.toString() || '';
+    return {
+      ...chat,
+      userName: otherParticipant?.name || 'Unknown User',
+      userInitial: (otherParticipant?.name || 'U').charAt(0).toUpperCase(),
+      userRole: otherParticipant?.role || '',
+      otherUserId: otherId,
+      status: onlineList.includes(otherId) ? 'online' : 'offline',
+    };
+  }, []);
 
   // ── Fetch all chats on mount ──────────────────────────────────
   useEffect(() => {
@@ -101,19 +121,43 @@ const Messaging = () => {
     };
 
     if (user) fetchChats();
-  }, [user, location.search]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, location.search, enrichChat]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Derive display info from a chat document ──────────────────
-  const enrichChat = (chat, currentUserId) => {
-    const otherParticipant = chat.participants.find(p => (p._id || p) !== currentUserId);
-    return {
-      ...chat,
-      userName: otherParticipant?.name || 'Unknown User',
-      userInitial: (otherParticipant?.name || 'U').charAt(0).toUpperCase(),
-      userRole: otherParticipant?.role || '',
-      status: 'offline',
-    };
-  };
+  // ── Re-derive online status whenever onlineUsers changes ─────
+  useEffect(() => {
+    if (!user || chats.length === 0) return;
+    setChats(prev =>
+      prev.map(chat => ({
+        ...chat,
+        status: isOnline(chat.otherUserId) ? 'online' : 'offline',
+      }))
+    );
+    // Also refresh activeChat header status
+    if (activeChat?.otherUserId) {
+      setActiveChat(prev =>
+        prev ? { ...prev, status: isOnline(prev.otherUserId) ? 'online' : 'offline' } : prev
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline]);
+
+  // ── Build accepted connection ID set from AuthContext user ────────
+  // We read directly from the user object (already in memory) instead of
+  // calling /auth/me, which may not return the connections field at all.
+  useEffect(() => {
+    if (!user) return;
+    const connections = user?.connections || [];
+    const acceptedIds = connections
+      .filter(c => (c.status || '').toLowerCase() === 'accepted')
+      .map(c => {
+        // Handle both populated ({ userId: { _id } }) and raw ({ userId: ObjectId })
+        const raw = c.userId?._id || c.userId || c.user?._id || c.user;
+        return raw?.toString();
+      })
+      .filter(Boolean);
+    setUserConnections(acceptedIds);
+  }, [user]);
+
 
   // ── Select a chat and load messages ──────────────────────────
   const selectChat = useCallback(async (chat) => {
@@ -136,6 +180,7 @@ const Messaging = () => {
 
   // ── Start new chat from user search ──────────────────────────
   const handleSelectNewUser = async (selectedUser) => {
+    setNotConnectedUser(null); // clear any previous warning
     try {
       const { data: chat } = await chatService.accessChat(selectedUser._id);
       const enriched = enrichChat(chat, user._id);
@@ -146,6 +191,11 @@ const Messaging = () => {
       });
       await selectChat(enriched);
     } catch (err) {
+      // Task 3: backend returns 403 NOT_CONNECTED — show inline warning
+      if (err.response?.status === 403 || err.response?.data?.code === 'NOT_CONNECTED') {
+        setNotConnectedUser(selectedUser);
+        return;
+      }
       console.error('Failed to open chat:', err);
     }
     setIsComposing(false);
@@ -244,8 +294,20 @@ const Messaging = () => {
                 {isComposing ? (
                   <>
                     <div className="px-3 py-2 bg-light border-bottom small text-muted">
-                      Search alumni, students, or admins to message
+                      Search your connections to message
                     </div>
+
+                    {/* Task 3: Not-connected warning banner */}
+                    {notConnectedUser && (
+                      <div className="mx-3 mt-2 mb-1 alert alert-warning d-flex align-items-start gap-2 py-2 px-3 rounded-3" style={{ fontSize: '0.82rem' }}>
+                        <i className="fas fa-lock-open mt-1 flex-shrink-0" style={{ color: '#c84022' }}></i>
+                        <div>
+                          <strong>Not connected with {notConnectedUser.name}</strong><br />
+                          You must be connected to send a message to this user.
+                        </div>
+                      </div>
+                    )}
+
                     {searchResults.length === 0 && search.trim().length > 0 ? (
                       <p className="text-muted text-center py-5 small">No users found</p>
                     ) : searchResults.length === 0 ? (
@@ -318,11 +380,28 @@ const Messaging = () => {
                   </div>
                 )}
                 <ChatWindow.Messages messages={messages} currentUserId={user._id} />
-                <ChatWindow.Input
-                  value={msgInput}
-                  onChange={handleTyping}
-                  onSend={handleSend}
-                />
+                {(() => {
+                  // Determine if the other participant is an accepted connection
+                  // Uses case-insensitive check to handle any status casing
+                  const otherParticipant = activeChat?.participants?.find(
+                    p => (p._id || p).toString() !== user._id.toString()
+                  );
+                  const otherId = otherParticipant?._id?.toString() || otherParticipant?.toString();
+                  const isConnectionBlocked = otherId && !userConnections.includes(otherId);
+                  return (
+                    <ChatWindow.Input
+                      value={msgInput}
+                      onChange={handleTyping}
+                      onSend={handleSend}
+                      disabled={isConnectionBlocked}
+                      blockedMessage={isConnectionBlocked
+                        ? 'You must be connected to send a message to this user.'
+                        : undefined
+                      }
+                    />
+                  );
+                })()}
+
               </ChatWindow>
             ) : (
               <ChatWindow>

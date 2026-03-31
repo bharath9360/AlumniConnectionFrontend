@@ -1,9 +1,7 @@
 const express = require('express');
-const path = require('path');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
-const { profileUpload, bannerUpload } = require('../middleware/upload');
-const { getFileUrl, getUploadPath } = require('../utils/urlHelper');
+const { profileUpload, bannerUpload, uploadToCloudinary } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -16,16 +14,26 @@ router.put(
     async (req, res) => {
         try {
             if (!req.file) {
-                return res.status(400).json({ message: 'No image file provided.' });
+                return res.status(400).json({ message: 'No image provided.' });
             }
 
-            // Build full absolute URL via urlHelper so deployed HTTPS frontends never get mixed-content errors.
-            // IMPORTANT: Set BACKEND_URL in Railway/Render dashboard (e.g. https://your-app.railway.app).
-            const filePath = getFileUrl(getUploadPath('profile', req.file.filename));
+            // Upload buffer to Cloudinary — profile_pictures folder
+            // Auto crop to square, face detection, 400x400
+            const url = await uploadToCloudinary(
+                req.file.buffer,
+                'alumni/profile_pictures',
+                'image',
+                {
+                    transformation: [
+                        { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+                        { quality: 'auto', fetch_format: 'auto' }
+                    ]
+                }
+            );
 
             const user = await User.findByIdAndUpdate(
                 req.user._id,
-                { profilePic: filePath },
+                { profilePic: url },
                 { new: true, select: '-password -secretKey' }
             );
 
@@ -34,12 +42,12 @@ router.put(
             res.json({
                 success: true,
                 message: 'Profile picture updated.',
-                profilePic: filePath,
+                profilePic: url,
                 user: user.toSafeObject ? user.toSafeObject() : user
             });
         } catch (err) {
             console.error('Upload DP error:', err);
-            res.status(500).json({ message: err.message || 'Failed to upload profile picture.' });
+            res.status(500).json({ message: err.message || 'Upload failed.' });
         }
     }
 );
@@ -53,15 +61,25 @@ router.put(
     async (req, res) => {
         try {
             if (!req.file) {
-                return res.status(400).json({ message: 'No image file provided.' });
+                return res.status(400).json({ message: 'No image provided.' });
             }
 
-            // IMPORTANT: Set BACKEND_URL in Railway/Render dashboard.
-            const filePath = getFileUrl(getUploadPath('banner', req.file.filename));
+            // Upload to Cloudinary — banners folder, wide crop 1584x396 (LinkedIn ratio)
+            const url = await uploadToCloudinary(
+                req.file.buffer,
+                'alumni/banners',
+                'image',
+                {
+                    transformation: [
+                        { width: 1584, height: 396, crop: 'fill', gravity: 'auto' },
+                        { quality: 'auto', fetch_format: 'auto' }
+                    ]
+                }
+            );
 
             const user = await User.findByIdAndUpdate(
                 req.user._id,
-                { bannerPic: filePath },
+                { bannerPic: url },
                 { new: true, select: '-password -secretKey' }
             );
 
@@ -69,16 +87,43 @@ router.put(
 
             res.json({
                 success: true,
-                message: 'Banner picture updated.',
-                bannerPic: filePath,
+                message: 'Banner updated.',
+                bannerPic: url,
                 user: user.toSafeObject ? user.toSafeObject() : user
             });
         } catch (err) {
             console.error('Upload Banner error:', err);
-            res.status(500).json({ message: err.message || 'Failed to upload banner picture.' });
+            res.status(500).json({ message: err.message || 'Upload failed.' });
         }
     }
 );
+
+// ─── PUT /api/users/update-profile ──────────────────────────
+// Update the logged-in user's profile fields (text/arrays only)
+router.put('/update-profile', protect, async (req, res) => {
+    try {
+        const updates = { ...req.body };
+        // Strip sensitive / auth fields
+        ['password', 'secretKey', 'otp', 'otpExpiry', 'role', 'status', 'email'].forEach(k => delete updates[k]);
+
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            { $set: updates },
+            { new: true, runValidators: true, select: '-password -secretKey -otp -otpExpiry' }
+        );
+
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+
+        res.json({
+            success: true,
+            message: 'Profile updated.',
+            user
+        });
+    } catch (err) {
+        console.error('Update profile error:', err);
+        res.status(500).json({ message: err.message || 'Failed to update profile.' });
+    }
+});
 
 // ─── GET /api/users/:id ───────────────────────────────────────
 // Fetch any user's public profile by ID

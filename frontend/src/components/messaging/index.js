@@ -234,10 +234,25 @@ ChatWindow.Messages = function ChatWindowMessages({ messages, currentUserId }) {
     );
 };
 
-ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend }) {
+ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend, disabled, blockedMessage }) {
     const [showEmoji, setShowEmoji] = React.useState(false);
     const fileRef = React.useRef(null);
     const EMOJIS = ['😊', '😂', '❤️', '👍', '🎉', '🙏', '😍', '🔥', '👏', '😢', '😮', '🤔', '💪', '✅', '🚀', '😁', '🙌', '💯', '🤝', '😎'];
+
+    // Task 3: If this chat is blocked (not a connection), show a lock banner
+    if (disabled && blockedMessage) {
+        return (
+            <div className="px-3 py-3 bg-white border-top flex-shrink-0">
+                <div
+                    className="d-flex align-items-center gap-3 rounded-3 px-4 py-3"
+                    style={{ backgroundColor: '#fff8e1', border: '1px solid #ffe082' }}
+                >
+                    <i className="fas fa-lock text-warning flex-shrink-0"></i>
+                    <span style={{ fontSize: '0.85rem', color: '#555' }}>{blockedMessage}</span>
+                </div>
+            </div>
+        );
+    }
 
     const handleKey = e => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); }

@@ -35,6 +35,7 @@ const Avatar = ({ user, size = 38 }) => {
           src={picUrl}
           alt="Profile"
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={(e) => { e.target.style.display = 'none'; }}
         />
       ) : (
         <span style={{ fontWeight: 700, fontSize: size * 0.4, color: '#c84022' }}>
@@ -71,7 +72,7 @@ const Navbar = () => {
 
   const brandColor     = roleKey === 'admin' ? '#b22222' : '#c84022';
   const brandLabel     = roleKey === 'admin' ? 'ADMIN PANEL' : 'ALUMNI CONNECT';
-  const dashboardHome  = roleKey === 'admin' ? `/admin/home/${user?._id || user?.id}` : `/alumni/home/${user?._id || user?.id}`;
+  const dashboardHome  = roleKey === 'admin' ? `/admin/home/${user?._id || user?.id}` : roleKey === 'student' ? `/student/home/${user?._id || user?.id}` : `/alumni/home/${user?._id || user?.id}`;
   const dashboardItems = navigationConfig[userRole] || [];
 
   /* ─────────────────────────────────────────────────────────── *
@@ -165,7 +166,9 @@ const Navbar = () => {
         {user && isDashboard && (
           <div className="d-none d-lg-flex align-items-center gap-3">
             {dashboardItems.map(item => {
-              const itemPath = `${item.path}/${user?._id || user?.id}`;
+              const itemPath = item.noUserId
+                ? item.path
+                : `${item.path}/${user?._id || user?.id}`;
               const Icon     = item.icon;
               const isActive = path === itemPath || path.startsWith(itemPath + '/');
               return (

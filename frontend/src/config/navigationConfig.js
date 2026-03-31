@@ -1,40 +1,38 @@
 import {
     FaHome,
-    FaBriefcase,
-    FaCalendarAlt,
+    FaLayerGroup,
     FaBell,
     FaCommentDots,
     FaChartLine,
     FaClipboardCheck,
     FaInfoCircle,
-    FaEnvelope
+    FaEnvelope,
+    FaBriefcase
 } from 'react-icons/fa';
 
 export const navigationConfig = {
     alumni: [
-        { path: '/alumni/home', icon: FaHome, label: 'Home' },
-        { path: '/jobs', icon: FaBriefcase, label: 'Jobs' },
-        { path: '/events', icon: FaCalendarAlt, label: 'Events' },
-        { path: '/notifications', icon: FaBell, label: 'Notifications' },
-        { path: '/messaging', icon: FaCommentDots, label: 'Messaging' }
+        { path: '/alumni/home',    icon: FaHome,        label: 'Home'          },
+        { path: '/opportunities',  icon: FaLayerGroup,  label: 'Opportunities', noUserId: true },
+        { path: '/notifications',  icon: FaBell,        label: 'Notifications', noUserId: true, isNotification: true },
+        { path: '/messaging',      icon: FaCommentDots, label: 'Messaging',     noUserId: true }
     ],
     admin: [
-        { path: '/admin/home', icon: FaHome, label: 'Home' },
-        { path: '/admin/approvals', icon: FaClipboardCheck, label: 'Approvals' },
-        { path: '/admin/dashboard', icon: FaChartLine, label: 'Stats' },
-        { path: '/notifications', icon: FaBell, label: 'Alerts' },
-        { path: '/messaging', icon: FaCommentDots, label: 'Inbox' }
+        { path: '/admin/home',       icon: FaHome,           label: 'Home'      },
+        { path: '/admin/approvals',  icon: FaClipboardCheck, label: 'Approvals' },
+        { path: '/admin/dashboard',  icon: FaChartLine,      label: 'Stats'     },
+        { path: '/notifications',    icon: FaBell,           label: 'Alerts',   noUserId: true, isNotification: true },
+        { path: '/messaging',        icon: FaCommentDots,    label: 'Inbox',    noUserId: true }
     ],
     student: [
-        { path: '/student/home',           icon: FaHome,        label: 'Home'          },
-        { path: '/Student/JobSearch',      icon: FaBriefcase,   label: 'Jobs'          },
-        { path: '/student/StudentEvents',  icon: FaCalendarAlt, label: 'Events'        },
-        { path: '/notifications',          icon: FaBell,        label: 'Notifications' },
-        { path: '/messaging',              icon: FaCommentDots, label: 'Messaging'     }
+        { path: '/student/home',   icon: FaHome,        label: 'Home'          },
+        { path: '/opportunities',  icon: FaBriefcase,   label: 'Opportunities', noUserId: true },
+        { path: '/notifications',  icon: FaBell,        label: 'Notifications', noUserId: true, isNotification: true },
+        { path: '/messaging',      icon: FaCommentDots, label: 'Messaging',     noUserId: true }
     ],
     guest: [
-        { path: '/about', icon: FaInfoCircle, label: 'About' },
-        { path: '/contact', icon: FaEnvelope, label: 'Contact' }
+        { path: '/about',   icon: FaInfoCircle, label: 'About'   },
+        { path: '/contact', icon: FaEnvelope,   label: 'Contact' }
     ]
 };
 

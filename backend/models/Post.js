@@ -13,8 +13,8 @@ const postSchema = new mongoose.Schema({
   userName: { type: String, required: true },
   userRole: String,
   userPic: { type: String, default: '' },
-  content: { type: String, required: true },
-  media: { type: String, default: '' },
+  content: { type: String, default: '' },   // optional — image-only posts allowed
+  media: { type: String, default: '' },      // Multer-uploaded image URL stored here
   likes: { type: Number, default: 0 },
   likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   shares: { type: Number, default: 0 },

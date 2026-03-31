@@ -5,8 +5,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { sendOTPEmail, sendApprovalEmail } = require('../services/emailService');
 const { protect } = require('../middleware/auth');
-const { profileUpload } = require('../middleware/upload');
-const { getFileUrl, getUploadPath } = require('../utils/urlHelper');
+const { profileUpload, uploadToCloudinary } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -302,7 +301,18 @@ router.put('/profile-pic', protect, profileUpload.single('profilePic'), async (r
       return res.status(400).json({ message: 'No image file provided.' });
     }
 
-    const imageUrl = getFileUrl(getUploadPath('profile', req.file.filename));
+    // Stream buffer to Cloudinary — returns permanent HTTPS URL
+    const imageUrl = await uploadToCloudinary(
+      req.file.buffer,
+      'alumni/profile_pictures',
+      'image',
+      {
+        transformation: [
+          { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+          { quality: 'auto', fetch_format: 'auto' }
+        ]
+      }
+    );
 
     const user = await User.findByIdAndUpdate(
       req.user._id,

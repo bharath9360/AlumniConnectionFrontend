@@ -104,13 +104,13 @@ const CreatePostBox = ({ user, onPostCreated, showToast }) => {
       if (imageFile) formData.append('image', imageFile, imageFile.name || 'image.jpg');
 
       const res = await postService.createPost(formData);
-      const newPost = {
-        ...res.data.data,
-        userName: user?.name,
-        userPic: user?.profilePic || '',
-        userRole: user?.designation || user?.role || '',
-        authorId: user?._id || user?.id,
-      };
+
+      // ── FIX: Use the backend's fully-populated response directly.
+      // The backend already populates userId (name, profilePic, designation)
+      // and returns the correct `media` URL from Multer — do NOT overwrite
+      // these fields with stale AuthContext values or the image will be lost.
+      const newPost = res.data.data;
+
       onPostCreated(newPost);
       setPostText('');
       removeImage();

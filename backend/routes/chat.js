@@ -6,17 +6,25 @@ const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
-// ─── GET /api/chat/users/search — Search global users to chat with
+// ─── GET /api/chat/users/search — Search CONNECTED users only
+// Only returns users who share an 'Accepted' connection with the requester
 router.get('/users/search', protect, async (req, res) => {
   try {
+    const me = await User.findById(req.user._id).select('connections');
+    const acceptedIds = (me?.connections || [])
+      .filter(c => c.status === 'Accepted')
+      .map(c => c.userId);
+
+    if (acceptedIds.length === 0) return res.json([]);
+
     const keyword = req.query.q
-      ? {
-          name: { $regex: req.query.q, $options: 'i' }
-        }
+      ? { name: { $regex: req.query.q, $options: 'i' } }
       : {};
 
-    // Do not include the current user in search results
-    const users = await User.find({ ...keyword, _id: { $ne: req.user._id } })
+    const users = await User.find({
+      ...keyword,
+      _id: { $in: acceptedIds }  // ← only show connections
+    })
       .select('name role department presentStatus profilePic email designation company')
       .limit(20);
 
@@ -39,7 +47,7 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-// ─── POST /api/chat — Create or fetch a 1-on-1 chat
+// ─── POST /api/chat — Create or fetch a 1-on-1 chat (connections only)
 router.post('/', protect, async (req, res) => {
   const { userId } = req.body;
 
@@ -48,6 +56,19 @@ router.post('/', protect, async (req, res) => {
   }
 
   try {
+    // ── TASK 3 FIX: Verify users are accepted connections ──────────────
+    const me = await User.findById(req.user._id).select('connections');
+    const isConnected = (me?.connections || []).some(
+      c => c.userId.toString() === userId && c.status === 'Accepted'
+    );
+
+    if (!isConnected) {
+      return res.status(403).json({
+        message: 'You must be connected to send a message to this user.',
+        code: 'NOT_CONNECTED'
+      });
+    }
+
     // Check if chat already exists
     let isChat = await Chat.find({
       $and: [
@@ -75,6 +96,7 @@ router.post('/', protect, async (req, res) => {
     res.status(500).json({ message: 'Error creating chat' });
   }
 });
+
 
 // ─── GET /api/chat/:chatId/messages — Get all messages in a chat
 router.get('/:chatId/messages', protect, async (req, res) => {

@@ -1,8 +1,7 @@
 const express = require('express');
 const Post = require('../models/Post');
 const { protect, optionalAuth } = require('../middleware/auth');
-const { postUpload: upload } = require('../middleware/upload');
-const { getFileUrl, getUploadPath } = require('../utils/urlHelper');
+const { postUpload: upload, uploadToCloudinary } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -36,23 +35,45 @@ router.get('/', optionalAuth, async (req, res) => {
 router.post('/', protect, upload.single('image'), async (req, res) => {
   try {
     const { content } = req.body;
-    let mediaUrl = req.body.media || '';
 
+    // ── Upload media to Cloudinary (buffer → HTTPS URL) ──────────
+    // req.file.buffer is populated by Multer memoryStorage.
+    // The secure_url returned by Cloudinary is stored in MongoDB.
+    let mediaUrl = '';
     if (req.file) {
-      mediaUrl = getFileUrl(getUploadPath('post', req.file.filename));
+      const isVideo = req.file.mimetype.startsWith('video/');
+      mediaUrl = await uploadToCloudinary(
+        req.file.buffer,
+        'alumni/posts',
+        isVideo ? 'video' : 'image',
+        isVideo ? {
+          transformation: [
+            { quality: 'auto' }
+          ]
+        } : {
+          transformation: [
+            { width: 1200, crop: 'limit' },
+            { quality: 'auto', fetch_format: 'auto' }
+          ]
+        }
+      );
+    } else if (req.body.media) {
+      // Allow external Cloudinary URLs passed directly as a form field
+      mediaUrl = req.body.media;
     }
 
     if (!content?.trim() && !mediaUrl) {
       return res.status(400).json({ message: 'Post content or image cannot be empty.' });
     }
 
+    // ── Create the post document ──────────────────────────────
     const post = await Post.create({
       userId: req.user._id,
       userName: req.user.name,
       userRole: req.user.designation || req.user.role,
       userPic: req.user.profilePic || '',
       content: content || '',
-      media: mediaUrl
+      media: mediaUrl           // ← Multer image URL is stored here in MongoDB
     });
 
     // Notify accepted connections
@@ -87,12 +108,27 @@ router.post('/', protect, upload.single('image'), async (req, res) => {
       }
     } catch (_) {}
 
-    res.status(201).json({ success: true, data: post.toClientObject(req.user._id) });
+    // ── Return a shape consistent with GET /api/posts ────────────
+    // Re-fetch the post with the userId populated so the client object
+    // has userName / userPic from the live User document (same as feed).
+    const populatedPost = await Post.findById(post._id)
+      .populate('userId', 'name profilePic role designation');
+
+    const clientObj = populatedPost.toClientObject(req.user._id);
+    if (populatedPost.userId && typeof populatedPost.userId === 'object') {
+      clientObj.userName = populatedPost.userId.name;
+      clientObj.userPic  = populatedPost.userId.profilePic || '';
+      clientObj.userRole = populatedPost.userId.designation || populatedPost.userId.role || '';
+      clientObj.authorId = populatedPost.userId._id;
+    }
+
+    res.status(201).json({ success: true, data: clientObj });
   } catch (err) {
     console.error('Create post error:', err);
     res.status(500).json({ message: 'Failed to create post.' });
   }
 });
+
 
 // ─── PUT /api/posts/:id/like — Toggle like ────────────────────
 router.put('/:id/like', protect, async (req, res) => {

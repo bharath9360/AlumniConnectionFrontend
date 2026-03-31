@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom';
 // Unified media URL resolver — handles absolute URLs, relative paths, and missing env vars
 const resolveMediaUrl = (url) => {
     if (!url || !url.trim()) return null;
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    // Cloudinary URLs start with https — use directly
+    if (url.startsWith('https://') || url.startsWith('http://')) return url;
+    // Fallback for any legacy relative paths still in DB
     const base = process.env.REACT_APP_BACKEND_URL ||
                  (process.env.REACT_APP_API_URL || '').replace(/\/api\/?$/, '') ||
                  'http://localhost:5000';
@@ -27,6 +29,7 @@ const FeedItem = ({ post, onLike, onComment, onShare }) => {
     const authorName = post.userName  || 'Anonymous';
     const authorRole = post.userRole  || '';
     const authorPic  = post.userPic   || '';
+    const resolvedAuthorPic = resolveMediaUrl(authorPic);
 
     // ── Build image URL (handles absolute URLs and relative /uploads/... paths) ──
     const rawMedia = post.media || post.imageURL || post.image;
@@ -54,9 +57,10 @@ const FeedItem = ({ post, onLike, onComment, onShare }) => {
                         >
                             {authorPic ? (
                                 <img
-                                    src={authorPic}
+                                    src={resolvedAuthorPic}
                                     alt={authorName}
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    onError={(e) => { e.target.style.display = 'none'; }}
                                 />
                             ) : (
                                 <span>{authorName?.[0]?.toUpperCase() || '?'}</span>

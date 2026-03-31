@@ -39,14 +39,29 @@ const io = new Server(httpServer, {
 // Attach io to app so route handlers can emit events
 app.set('io', io);
 
+// ─── In-memory online user registry ──────────────────────────
+// Maps socketId → userId so we can clean up on disconnect
+const onlineUsers = new Map(); // socketId → userId
+
+/** Broadcast the current list of unique online user IDs to every client */
+const broadcastOnlineUsers = () => {
+  const uniqueIds = [...new Set(onlineUsers.values())];
+  io.emit('online_users', uniqueIds);
+};
+
 io.on('connection', (socket) => {
-  console.log(`🔌 User connected: ${socket.id}`);
 
   // User establishes their identity — joins a personal room for notifications
   socket.on('setup', (userData) => {
-    socket.join(userData._id);
+    const uid = userData?._id || userData?.id;
+    if (!uid) return;
+
+    socket.join(uid);
     socket.emit('connected');
-    console.log(`✅ User ${userData.name || userData._id} joined room`);
+
+    // Register presence
+    onlineUsers.set(socket.id, uid.toString());
+    broadcastOnlineUsers();
   });
 
   // User enters a specific chat window
@@ -83,9 +98,11 @@ io.on('connection', (socket) => {
   socket.on('stop_typing', (room) => socket.in(room).emit('stop_typing'));
 
   socket.on('disconnect', () => {
-    console.log(`🔌 User disconnected: ${socket.id}`);
+    onlineUsers.delete(socket.id);
+    broadcastOnlineUsers();
   });
 });
+
 
 // ─── Routes (must come AFTER io is attached to app) ──────────
 app.use('/api/auth', require('./routes/auth'));

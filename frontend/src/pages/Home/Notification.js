@@ -51,15 +51,6 @@ const Notification = () => {
     }
   };
 
-  const handleClearAll = async () => {
-    try {
-      await notificationService.markAllRead();
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch (err) {
-      console.error('Failed to clear all:', err);
-    }
-  };
-
   const filtered = useMemo(() => {
     const s = searchTerm.toLowerCase();
     if (!s) return notifications;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { notificationService } from '../../services/api';
+import { useSocket } from '../../context/SocketContext';
 import { FaBell, FaCheck, FaUserPlus, FaCommentDots, FaBriefcase, FaCalendarAlt, FaNewspaper } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -36,6 +37,7 @@ const NotificationDropdown = () => {
   const dropdownRef = useRef(null);
   const navigate    = useNavigate();
   const { user }    = useAuth();
+  const { socket }  = useSocket();
 
   // ── Fetch notifications from REST ──────────────────────────
   const fetchNotifications = useCallback(async () => {
@@ -46,29 +48,19 @@ const NotificationDropdown = () => {
     } catch { /* silent */ }
   }, [user]);
 
-  // ── Socket real-time listener ───────────────────────────────
+  // ── Real-time notification listener via shared SocketContext socket ───
   useEffect(() => {
-    if (!user) return;
+    if (!socket) return;
 
-    // Lazy-import socket.io-client to avoid loading it for guests
-    const { io } = require('socket.io-client');
-    const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
-    const socket = io(SOCKET_URL, { transports: ['websocket'] });
-
-    socket.on('connect', () => {
-      socket.emit('setup', user);
-    });
-
-    // Listen for real-time notifications pushed from server
-    socket.on('notification_received', (notif) => {
+    const handleNotif = (notif) => {
       setNotifications(prev => [notif, ...prev]);
       setHasNew(true);
-      // Brief bell pulse indicator
       setTimeout(() => setHasNew(false), 3000);
-    });
+    };
 
-    return () => socket.disconnect();
-  }, [user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+    socket.on('notification_received', handleNotif);
+    return () => socket.off('notification_received', handleNotif);
+  }, [socket]);
 
   // ── Initial fetch + polling (fallback every 30s) ───────────
   useEffect(() => {

@@ -11,38 +11,79 @@ import {
   FaArrowLeft
 } from 'react-icons/fa';
 
-// ── Connection button states ─────────────────────────────────
-const CONNECTION_STATES = {
-  none:      { label: 'Connect',  icon: FaUserPlus,    variant: 'btn-mamcet-red',    disabled: false },
-  pending:   { label: 'Pending',  icon: FaClock,       variant: 'btn-outline-secondary', disabled: true  },
-  connected: { label: 'Message', icon: FaCommentDots, variant: 'btn-pro-outline',    disabled: false }
-};
+// ── LinkedIn-style 4-state connection button area ──────────
+// State 1: NOT CONNECTED → solid blue "Connect"
+// State 2: REQUEST SENT  → gray "Pending" (disabled)
+// State 3: REQUEST RCVD  → "Accept" (blue) + "Reject" (gray)  [handled inline]
+// State 4: CONNECTED     → solid blue "Message"
+const ConnectButton = ({ status, isReceiver, onConnect, onMessage, onAccept, onReject, loading }) => {
+  // State 4: Connected — show Message
+  if (status === 'connected') {
+    return (
+      <motion.button
+        className="btn rounded-pill px-4 d-flex align-items-center gap-2 fw-bold"
+        style={{ fontSize: 14, backgroundColor: '#0a66c2', color: '#fff', border: 'none' }}
+        whileHover={{ scale: 1.04 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onMessage}
+        disabled={loading}
+      >
+        {loading ? <ClipLoader size={14} color="#fff" /> : <FaCommentDots size={15} />}
+        Message
+      </motion.button>
+    );
+  }
 
-const ConnectButton = ({ status, onConnect, onMessage, loading }) => {
-  let normalized = status?.toLowerCase() || 'none';
-  if (normalized === 'accepted') normalized = 'connected';
-  const cfg = CONNECTION_STATES[normalized] || CONNECTION_STATES.none;
-  const IconComp = cfg.icon;
+  // State 3: Request RECEIVED — show Accept + Reject
+  if (status === 'pending' && isReceiver) {
+    return (
+      <div className="d-flex gap-2">
+        <motion.button
+          className="btn rounded-pill px-4 d-flex align-items-center gap-2 fw-bold"
+          style={{ fontSize: 14, backgroundColor: '#0a66c2', color: '#fff', border: 'none' }}
+          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+          onClick={onAccept} disabled={loading}
+        >
+          {loading ? <ClipLoader size={14} color="#fff" /> : <FaCheckCircle size={14} />}
+          Accept
+        </motion.button>
+        <motion.button
+          className="btn btn-outline-secondary rounded-pill px-4 fw-bold"
+          style={{ fontSize: 14 }}
+          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+          onClick={onReject} disabled={loading}
+        >
+          Ignore
+        </motion.button>
+      </div>
+    );
+  }
 
-  const handleClick = () => {
-    if (status === 'connected') onMessage();
-    else if (status === 'none')  onConnect();
-  };
+  // State 2: Request SENT — show disabled Pending
+  if (status === 'pending' && !isReceiver) {
+    return (
+      <button
+        className="btn btn-outline-secondary rounded-pill px-4 d-flex align-items-center gap-2 fw-bold"
+        style={{ fontSize: 14, cursor: 'not-allowed', opacity: 0.75 }}
+        disabled
+      >
+        <FaClock size={14} /> Pending
+      </button>
+    );
+  }
 
+  // State 1: NOT CONNECTED — show Connect
   return (
     <motion.button
-      className={`btn ${cfg.variant} rounded-pill px-4 d-flex align-items-center gap-2 fw-bold`}
-      style={{ fontSize: 14 }}
-      whileHover={!cfg.disabled ? { scale: 1.04 } : {}}
-      whileTap={!cfg.disabled  ? { scale: 0.97 } : {}}
-      disabled={cfg.disabled || loading}
-      onClick={handleClick}
+      className="btn rounded-pill px-4 d-flex align-items-center gap-2 fw-bold"
+      style={{ fontSize: 14, backgroundColor: '#0a66c2', color: '#fff', border: 'none' }}
+      whileHover={{ scale: 1.04 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onConnect}
+      disabled={loading}
     >
-      {loading
-        ? <ClipLoader size={14} color="#fff" />
-        : <IconComp size={15} />
-      }
-      {cfg.label}
+      {loading ? <ClipLoader size={14} color="#fff" /> : <FaUserPlus size={15} />}
+      Connect
     </motion.button>
   );
 };
@@ -257,52 +298,22 @@ const PublicProfile = () => {
                     )}
                   </div>
 
-                  {/* Action buttons */}
+                  {/* Action buttons — exactly 4 LinkedIn states */}
                   <div className="d-flex gap-2 flex-wrap">
                     {isOwnProfile ? (
                       <Link to={`/alumni/profile/${me?._id || me?.id}`} className="btn btn-pro-outline rounded-pill px-4 fw-bold" style={{ fontSize: 14 }}>
                         Edit Profile
                       </Link>
                     ) : (
-                      <>
-                        {connStatus.toLowerCase() === 'pending' && isReceiver ? (
-                          <div className="d-flex gap-2">
-                            <button
-                              className="btn btn-success rounded-pill px-4 fw-bold d-flex align-items-center gap-2"
-                              style={{ fontSize: 14 }}
-                              onClick={handleAccept}
-                              disabled={connLoading}
-                            >
-                              <FaCheckCircle size={14} /> Accept
-                            </button>
-                            <button
-                              className="btn btn-outline-danger rounded-pill px-4 fw-bold"
-                              style={{ fontSize: 14 }}
-                              onClick={handleReject}
-                              disabled={connLoading}
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        ) : (
-                          <ConnectButton
-                            status={connStatus.toLowerCase()}
-                            onConnect={handleConnect}
-                            onMessage={handleMessage}
-                            loading={connLoading}
-                          />
-                        )}
-                        
-                        {connStatus.toLowerCase() !== 'connected' && (
-                          <button
-                            className="btn btn-outline-secondary rounded-pill px-4 fw-bold d-flex align-items-center gap-2"
-                            style={{ fontSize: 14 }}
-                            onClick={handleMessage}
-                          >
-                            <FaCommentDots size={14} /> Message
-                          </button>
-                        )}
-                      </>
+                      <ConnectButton
+                        status={connStatus}
+                        isReceiver={isReceiver}
+                        onConnect={handleConnect}
+                        onMessage={handleMessage}
+                        onAccept={handleAccept}
+                        onReject={handleReject}
+                        loading={connLoading}
+                      />
                     )}
                   </div>
                 </div>

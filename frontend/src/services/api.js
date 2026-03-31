@@ -69,6 +69,9 @@ export const userService = {
       headers: { 'Content-Type': 'multipart/form-data' }
     }),
 
+  // Update profile text/array fields
+  updateProfile: (data) => api.put('/users/update-profile', data),
+
   // Fetch any user's public profile
   getById: (userId) => api.get(`/users/${userId}`)
 };
