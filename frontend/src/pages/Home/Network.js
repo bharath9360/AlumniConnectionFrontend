@@ -389,6 +389,8 @@ const ProfileCard = ({
         border: `1px solid ${hovered ? '#d1d5db' : '#e5e7eb'}`,
         borderRadius: 12,
         transition: 'background 0.15s, border-color 0.15s',
+        maxWidth: '100%',
+        overflow: 'hidden',
       }}
     >
       {/* ── Avatar ── */}
@@ -753,7 +755,7 @@ const Network = () => {
      RENDER
   ───────────────────────────────────────────────────────────── */
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 16px 80px' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 16px 80px', width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
 
       {/* Profile Preview Modal */}
       {previewUserId && (
@@ -767,14 +769,14 @@ const Network = () => {
       )}
 
       {/* ── PAGE HEADER + TAB BAR ── */}
-      <div style={{ marginBottom: 20, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between' }}>
-        <div>
+      <div style={{ marginBottom: 20, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between', minWidth: 0 }}>
+        <div style={{ minWidth: 0 }}>
           <h1 style={{ fontWeight: 900, fontSize: 22, color: '#111827', margin: 0, letterSpacing: '-0.4px' }}>My Network</h1>
           <p style={{ color: '#6b7280', fontSize: 13, margin: '4px 0 0' }}>Discover and connect with alumni and students.</p>
         </div>
 
         {/* Tab switcher */}
-        <div style={{ display: 'flex', background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 10, padding: 4, gap: 2, flexShrink: 0 }}>
+        <div style={{ display: 'flex', background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 10, padding: 4, gap: 2, flexShrink: 0, overflowX: 'auto', maxWidth: '100%', WebkitOverflowScrolling: 'touch' }}>
           {[
             { key: 'discover',    label: 'Discover',       icon: <FiSearch size={14} /> },
             { key: 'connections', label: 'My Connections',  icon: <FiUsers size={14} /> },
@@ -805,7 +807,7 @@ const Network = () => {
       {/* ── SEARCH BAR + FILTERS Strip ── */}
       <div style={{ background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 12, marginBottom: 24, boxShadow: '0 1px 4px rgba(0,0,0,.05)' }}>
         {/* Search row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', minWidth: 0 }}>
           <FiSearch size={17} color="#9ca3af" style={{ flexShrink: 0 }} />
           <input
             value={searchInput}
@@ -814,7 +816,7 @@ const Network = () => {
             style={{
               flex: 1, border: 'none', outline: 'none',
               fontSize: 14, color: '#111827', background: 'transparent',
-              fontFamily: 'inherit',
+              fontFamily: 'inherit', minWidth: 0,
             }}
           />
           {/* Filter toggle */}
@@ -848,7 +850,7 @@ const Network = () => {
 
         {/* Filter pills row */}
         {showFilters && (
-          <div style={{ borderTop: '1px solid #f3f4f6', padding: '12px 14px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ borderTop: '1px solid #f3f4f6', padding: '12px 14px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             {/* Role */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4, display: 'block' }}>Role</label>
@@ -872,7 +874,7 @@ const Network = () => {
             </div>
 
             {/* Department */}
-            <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4, display: 'block' }}>Department</label>
               <select
                 value={deptFilter}
@@ -892,7 +894,7 @@ const Network = () => {
                 placeholder="e.g. 2024"
                 value={batchFilter}
                 onChange={e => setBatchFilter(e.target.value)}
-                style={{ width: 110, padding: '5px 10px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 12.5, color: '#374151', background: '#fff', fontFamily: 'inherit', outline: 'none' }}
+                style={{ width: '100%', maxWidth: 110, padding: '5px 10px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 12.5, color: '#374151', background: '#fff', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
           </div>
@@ -1049,18 +1051,18 @@ const Network = () => {
               <p style={{ color: '#6b7280', fontSize: 13, marginTop: 6 }}>No pending connection invitations.</p>
             </div>
           ) : (
-            <div style={{ background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 14, overflow: 'hidden', maxWidth: 720 }}>
+            <div style={{ background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 14, overflow: 'hidden', maxWidth: '100%' }}>
               <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>Pending Invitations</span>
                 <span style={{ background: '#fef2f2', color: '#c84022', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>{pendingRequests.length}</span>
               </div>
               <div className="divide-y divide-gray-100">
                 {pendingRequests.map(req => (
-                  <div key={req._id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px' }} className="hover:bg-gray-50 transition">
+                  <div key={req._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', flexWrap: 'wrap' }} className="hover:bg-gray-50 transition">
                     <img
                       src={req.sender?.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(req.sender?.name || '?')}&background=fee2e2&color=c84022`}
                       alt="avatar"
-                      style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid #fff', boxShadow: '0 1px 4px rgba(0,0,0,.1)', cursor: 'pointer' }}
+                      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid #fff', boxShadow: '0 1px 4px rgba(0,0,0,.1)', cursor: 'pointer' }}
                       onClick={() => navigate(`/profile/${req.sender?._id}`)}
                       onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(req.sender?.name || '?')}`; }}
                     />
