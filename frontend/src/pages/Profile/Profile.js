@@ -11,7 +11,7 @@ import {
   FaUserPlus, FaCommentDots, FaCheckCircle, FaClock,
   FaBriefcase, FaGraduationCap, FaMapMarkerAlt, FaEnvelope,
   FaArrowLeft, FaCamera, FaPencilAlt, FaPlus,
-  FaBuilding, FaIdBadge, FaTimes, FaEllipsisH, FaThumbsUp, FaCommentAlt
+  FaBuilding, FaIdBadge, FaTimes, FaThumbsUp, FaCommentAlt
 } from 'react-icons/fa';
 
 // ─── URL resolver helper ──────────────────────────────────────
@@ -784,13 +784,13 @@ const Profile = () => {
                             await postService.deletePost(postId);
                             setUserPosts(prev => prev.filter(p => !((p._id === postId) || (p.id === postId))));
                             showToast('Post deleted.', 'success');
-                          } catch { showToast('Failed to delete post.', 'error'); }
+                          } catch (e) { showToast('Failed to delete post.', 'error'); }
                         }}
                         onDeleteComment={async (postId, commentId) => {
                           try {
                             const res = await postService.deleteComment(postId, commentId);
                             setUserPosts(prev => prev.map(p => (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p));
-                          } catch {}
+                          } catch (e) {}
                         }}
                         onLike={async (postId) => {
                           try {
@@ -873,13 +873,13 @@ const Profile = () => {
                                 await postService.deletePost(postId);
                                 setLikedPosts(prev => prev.filter(p => !((p._id === postId) || (p.id === postId))));
                                 showToast('Post deleted.', 'success');
-                              } catch { showToast('Failed to delete post.', 'error'); }
+                              } catch (e) { showToast('Failed to delete post.', 'error'); }
                             }}
                             onDeleteComment={async (postId, commentId) => {
                               try {
                                 const res = await postService.deleteComment(postId, commentId);
                                 setLikedPosts(prev => prev.map(p => (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p));
-                              } catch {}
+                              } catch (e) {}
                             }}
                             onLike={async (postId) => {
                               try {
@@ -929,13 +929,13 @@ const Profile = () => {
                                   await postService.deletePost(postId);
                                   setCommentedPosts(prev => prev.filter(p => !((p._id === postId) || (p.id === postId))));
                                   showToast('Post deleted.', 'success');
-                                } catch { showToast('Failed to delete post.', 'error'); }
+                                } catch (e) { showToast('Failed to delete post.', 'error'); }
                               }}
                               onDeleteComment={async (postId, commentId) => {
                                 try {
                                   const res = await postService.deleteComment(postId, commentId);
                                   setCommentedPosts(prev => prev.map(p => (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p));
-                                } catch {}
+                                } catch (e) {}
                               }}
                               onLike={async (postId) => {
                                 try {

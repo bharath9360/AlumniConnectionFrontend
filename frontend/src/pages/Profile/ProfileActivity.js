@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { postService, authService } from '../../../services/api';
-import FeedItem from '../../Alumni/components/FeedItem';
+import { postService, authService } from '../../services/api';
+import FeedItem from '../Alumni/components/FeedItem';
 import { ClipLoader } from 'react-spinners';
 import { FaArrowLeft, FaThumbsUp, FaCommentAlt } from 'react-icons/fa';
 
