@@ -1,178 +1,247 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { FaUsers, FaUserPlus, FaTimes, FaTrashAlt, FaFilter, FaCheckCircle, FaBuilding, FaGraduationCap } from 'react-icons/fa';
+
+/* ─────────────────────────────────────────────────────────────
+   GROUP CONFIG PANEL — SaaS‑style member management modal
+   Inline styles · MAMCET red theme
+───────────────────────────────────────────────────────────── */
+const MAMCET_RED = '#C8102E';
 
 const GroupMemberModal = ({ group, onClose }) => {
-  const [activeTab, setActiveTab] = useState('members'); // 'members', 'bulk_add'
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('members');
+  const [members, setMembers]     = useState([]);
+  const [loading, setLoading]     = useState(true);
 
-  // Bulk add states
   const [departments, setDepartments] = useState([]);
-  const [batches, setBatches] = useState([]);
-  const [bulkFilter, setBulkFilter] = useState({ type: 'department', value: '' });
+  const [batches, setBatches]         = useState([]);
+  const [bulkFilter, setBulkFilter]   = useState({ type: 'department', value: '' });
   const [bulkLoading, setBulkLoading] = useState(false);
 
+  /* ── Fetch members ── */
   const fetchMembers = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get(`/groups/${group._id}/members`);
-      if (res.data.success) {
-        setMembers(res.data.data);
-      }
-    } catch (err) {
-      toast.error('Failed to load group members');
-    } finally {
-      setLoading(false);
-    }
+      if (res.data.success) setMembers(res.data.data);
+    } catch (e) { toast.error('Failed to load members'); }
+    finally { setLoading(false); }
   }, [group._id]);
 
   const fetchFilters = async () => {
     try {
-      const res = await api.get(`/groups/utils/departments-batches`);
+      const res = await api.get('/groups/utils/departments-batches');
       if (res.data.success) {
         setDepartments(res.data.data.departments);
         setBatches(res.data.data.batches);
       }
-    } catch (err) {
-      console.error('Failed to load filter options');
-    }
+    } catch (e) { /* silent */ }
   };
 
-  useEffect(() => {
-    fetchMembers();
-    fetchFilters();
-  }, [fetchMembers]);
+  useEffect(() => { fetchMembers(); fetchFilters(); }, [fetchMembers]);
 
+  /* ── Remove member ── */
   const handleRemoveMember = async (userId) => {
-    if (!window.confirm('Remove this member from the cohort?')) return;
+    if (!window.confirm('Remove this member?')) return;
     try {
       const res = await api.delete(`/groups/${group._id}/members/${userId}`);
       if (res.data.success) {
         toast.success('Member removed');
-        setMembers(members.filter(m => {
-           const id = m.userId?._id || m.userId;
-           return id !== userId;
-        }));
+        setMembers(prev => prev.filter(m => (m.userId?._id || m.userId) !== userId));
       }
-    } catch (err) {
-      toast.error('Failed to remove member');
-    }
+    } catch (e) { toast.error('Failed to remove'); }
   };
 
+  /* ── Bulk add ── */
   const handleBulkAdd = async () => {
-    if (!bulkFilter.value) {
-      toast.error(`Please select a ${bulkFilter.type}`);
-      return;
-    }
-    
+    if (!bulkFilter.value) return toast.error(`Select a ${bulkFilter.type}`);
     try {
       setBulkLoading(true);
       const payload = {};
       if (bulkFilter.type === 'department') payload.department = bulkFilter.value;
       if (bulkFilter.type === 'batch') payload.batch = bulkFilter.value;
-
       const res = await api.post(`/groups/${group._id}/bulk-add`, payload);
       if (res.data.success) {
         toast.success(res.data.message);
         fetchMembers();
         setActiveTab('members');
       }
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to add members');
-    } finally {
-      setBulkLoading(false);
-    }
+    } catch (e) { toast.error(e.response?.data?.message || 'Failed to add'); }
+    finally { setBulkLoading(false); }
   };
 
+  /* ── Close on backdrop ── */
+  const handleBackdrop = (e) => { if (e.target === e.currentTarget) onClose(); };
+
+  /* ── Shared styles ── */
+  const inputStyle = {
+    width: '100%', padding: '10px 14px', border: '1px solid #ddd',
+    borderRadius: 8, fontSize: 14, color: '#1f2937', background: '#fff',
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+    transition: 'border-color .15s, box-shadow .15s', appearance: 'auto',
+  };
+
+  const chipColor = group.type === 'batch' ? '#065f46' : group.type === 'department' ? '#3730a3' : '#374151';
+
+  const TABS = [
+    { key: 'members',  label: 'Members' },
+    { key: 'bulk_add', label: 'Add Users' },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden my-auto border border-gray-100 flex flex-col h-[85vh]">
-        
-        {/* Header */}
-        <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg ${
-                group.type === 'department' ? 'bg-indigo-600' :
-                group.type === 'batch' ? 'bg-emerald-600' : 'bg-gray-800'
-              }`}>
-                {group.name.charAt(0).toUpperCase()}
-             </div>
-             <div>
-                <h3 className="text-xl font-black text-gray-900 leading-tight">{group.name}</h3>
-                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mt-1">{group.type} Hub • {members.length} Active Participants</p>
-             </div>
+    <div onClick={handleBackdrop} style={{
+      position: 'fixed', inset: 0, zIndex: 1050,
+      background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 16, overflowY: 'auto',
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 600, background: '#fff',
+        borderRadius: 16, border: '1px solid #e5e7eb',
+        boxShadow: '0 20px 60px rgba(0,0,0,.18)',
+        display: 'flex', flexDirection: 'column',
+        maxHeight: '90vh', overflow: 'hidden',
+        animation: 'gmcFadeUp .2s ease',
+      }}>
+
+        {/* ── Header ── */}
+        <div style={{
+          padding: '20px 24px', borderBottom: '1px solid #f3f4f6',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+              background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 18, fontWeight: 800, color: '#374151',
+            }}>
+              {group.name.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {group.name}
+              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                <span style={{ fontSize: 12, color: '#6b7280' }}>Manage and organize participants</span>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px',
+                  borderRadius: 20, background: '#f3f4f6', color: chipColor,
+                }}>
+                  {members.length} member{members.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600">
-            <FaTimes size={18} />
-          </button>
+          <button onClick={onClose} style={{
+            border: 'none', background: 'none', cursor: 'pointer',
+            width: 32, height: 32, borderRadius: '50%', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            color: '#9ca3af', fontSize: 18, transition: '.15s', flexShrink: 0,
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#374151'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#9ca3af'; }}
+          >✕</button>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex bg-gray-50/50 p-1.5 mx-8 mt-4 rounded-xl border border-gray-100 flex-shrink-0">
-          <button
-            className={`flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'members' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            onClick={() => setActiveTab('members')}
-          >
-            Current Roster
-          </button>
-          <button
-            className={`flex-1 py-2.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'bulk_add' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            onClick={() => setActiveTab('bulk_add')}
-          >
-            Expansion Tools
-          </button>
+        {/* ── Segment Control ── */}
+        <div style={{ display: 'flex', gap: 0, margin: '0 24px', marginTop: 16, borderRadius: 8, overflow: 'hidden', border: '1px solid #ddd', flexShrink: 0 }}>
+          {TABS.map(t => {
+            const active = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                style={{
+                  flex: 1, padding: '9px 0', border: 'none',
+                  borderRight: t.key !== 'bulk_add' ? '1px solid #ddd' : 'none',
+                  background: active ? MAMCET_RED : '#fff',
+                  color: active ? '#fff' : '#6b7280',
+                  fontWeight: active ? 700 : 500, fontSize: 13,
+                  cursor: 'pointer', fontFamily: 'inherit', transition: '.15s',
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#fef2f2'; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? MAMCET_RED : '#fff'; }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-8 bg-white">
+        {/* ── Content ── */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+
+          {/* MEMBERS TAB */}
           {activeTab === 'members' && (
             loading ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-mamcet-red"></div>
-                <p className="mt-4 text-xs text-gray-400 font-bold uppercase tracking-tighter">Querying Member Registry...</p>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+                <div className="animate-spin rounded-full h-7 w-7 border-b-2" style={{ borderColor: MAMCET_RED }} />
+                <p style={{ marginTop: 12, fontSize: 12, color: '#9ca3af' }}>Loading members…</p>
               </div>
             ) : members.length === 0 ? (
-              <div className="bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-12 text-center">
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300 border border-gray-100">
-                   <FaUsers size={24} />
-                </div>
-                <h4 className="text-gray-800 font-bold">Registry Empty</h4>
-                <p className="text-xs text-gray-500 mt-2">No participants have been mapped to this cohort yet.</p>
-                <button 
+              /* Empty state */
+              <div style={{
+                textAlign: 'center', padding: '48px 16px',
+                background: '#fafafa', borderRadius: 12,
+                border: '1.5px dashed #d1d5db',
+              }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>👥</div>
+                <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#111827' }}>No Members Yet</h4>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#6b7280' }}>Switch to "Add Users" to populate this group.</p>
+                <button
                   onClick={() => setActiveTab('bulk_add')}
-                  className="mt-6 px-6 py-2 bg-gray-900 text-white rounded-lg text-xs font-bold hover:bg-gray-800 transition"
+                  style={{
+                    marginTop: 16, padding: '8px 20px', borderRadius: 8,
+                    border: 'none', background: '#111827', color: '#fff',
+                    fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+                  }}
                 >
-                  Populate Group
+                  Add Users
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {members.map((member) => (
-                  <div key={member._id} className="flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 hover:border-gray-200 transition-all shadow-sm hover:shadow-md group/item">
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <img 
-                          src={member.userId?.profilePic || 'https://ui-avatars.com/api/?name=' + (member.userId?.name || '?')} 
-                          alt="avatar" 
-                          className="w-12 h-12 rounded-xl object-cover border border-gray-200 shadow-sm"
-                        />
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"></div>
-                      </div>
-                      <div>
-                        <p className="font-black text-gray-900 text-sm tracking-tight">{member.userId?.name}</p>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
-                          {member.userId?.role} • {member.userId?.department || 'General'}
-                        </p>
+              /* Member list */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {members.map(member => (
+                  <div
+                    key={member._id}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '10px 14px', borderRadius: 10,
+                      border: '1px solid #e5e7eb', background: '#fff',
+                      transition: 'border-color .15s, box-shadow .15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,.04)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                      <img
+                        src={member.userId?.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.name || '?')}&background=fee2e2&color=c84022&size=36`}
+                        alt=""
+                        style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: '1px solid #e5e7eb' }}
+                        onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.userId?.name || '?')}`; }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {member.userId?.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                          {member.userId?.role} · {member.userId?.department || 'General'}
+                        </div>
                       </div>
                     </div>
                     <button
                       onClick={() => handleRemoveMember(member.userId?._id)}
-                      className="p-2.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/item:opacity-100"
-                      title="Remove from Group"
+                      title="Remove"
+                      style={{
+                        border: 'none', background: 'none', cursor: 'pointer',
+                        color: '#d1d5db', padding: 6, borderRadius: 6,
+                        display: 'flex', transition: '.15s', flexShrink: 0,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#dc2626'; e.currentTarget.style.background = '#fef2f2'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#d1d5db'; e.currentTarget.style.background = 'none'; }}
                     >
-                      <FaTrashAlt size={14} />
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                     </button>
                   </div>
                 ))}
@@ -180,91 +249,111 @@ const GroupMemberModal = ({ group, onClose }) => {
             )
           )}
 
+          {/* ADD USERS TAB */}
           {activeTab === 'bulk_add' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 text-white shadow-xl shadow-gray-200">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                    <FaFilter size={14} className="text-white" />
-                  </div>
-                  <h4 className="font-black text-lg tracking-tight">Expansion Protocol</h4>
-                </div>
-                <p className="text-sm text-gray-300 leading-relaxed font-medium">Select a categorization logic to automatically synchronize active users into this hub.</p>
-              </div>
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Categorization Schema</label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button 
-                      onClick={() => setBulkFilter({ type: 'department', value: '' })}
-                      className={`p-4 rounded-xl border-2 flex flex-col gap-2 transition-all ${bulkFilter.type === 'department' ? 'border-mamcet-red bg-red-50/10' : 'border-gray-100 hover:border-gray-200 bg-white'}`}
-                    >
-                       <FaBuilding size={16} className={bulkFilter.type === 'department' ? 'text-mamcet-red' : 'text-gray-400'} />
-                       <span className={`text-[10px] font-black uppercase tracking-widest ${bulkFilter.type === 'department' ? 'text-mamcet-red' : 'text-gray-500'}`}>Department Hub</span>
-                    </button>
-                    <button 
-                      onClick={() => setBulkFilter({ type: 'batch', value: '' })}
-                      className={`p-4 rounded-xl border-2 flex flex-col gap-2 transition-all ${bulkFilter.type === 'batch' ? 'border-mamcet-red bg-red-50/10' : 'border-gray-100 hover:border-gray-200 bg-white'}`}
-                    >
-                       <FaGraduationCap size={16} className={bulkFilter.type === 'batch' ? 'text-mamcet-red' : 'text-gray-400'} />
-                       <span className={`text-[10px] font-black uppercase tracking-widest ${bulkFilter.type === 'batch' ? 'text-mamcet-red' : 'text-gray-500'}`}>Yearly Batch</span>
-                    </button>
-                  </div>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">
-                    Select Targeting Parameter
-                  </label>
-                  <select
-                    className="w-full px-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-mamcet-red/20 focus:border-mamcet-red outline-none bg-gray-50/30 font-bold text-gray-700 transition-all appearance-none"
-                    value={bulkFilter.value}
-                    onChange={(e) => setBulkFilter({ ...bulkFilter, value: e.target.value })}
-                  >
-                    <option value="">-- Choose target parameter --</option>
-                    {bulkFilter.type === 'department'
-                      ? departments.map(d => <option key={d} value={d}>{d}</option>)
-                      : batches.map(b => <option key={b} value={b}>{b}</option>)
-                    }
-                  </select>
-                </div>
-
-                <div className="pt-4">
-                  <button
-                    onClick={handleBulkAdd}
-                    disabled={bulkLoading || !bulkFilter.value}
-                    className="w-full py-4 bg-mamcet-red text-white rounded-2xl font-black text-sm hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg shadow-red-100 active:scale-95"
-                  >
-                    {bulkLoading ? (
-                       <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-                    ) : (
-                      <>
-                        <FaUserPlus size={16} />
-                        Synchronize Matching Users
-                      </>
-                    )}
-                  </button>
+              {/* Step 1: Category */}
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
+                  Step 1 — Choose Category
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {[
+                    { key: 'department', title: 'Department', desc: 'Group users by dept' },
+                    { key: 'batch',      title: 'Batch Year',  desc: 'Group by graduation year' },
+                  ].map(opt => {
+                    const active = bulkFilter.type === opt.key;
+                    return (
+                      <div
+                        key={opt.key}
+                        onClick={() => setBulkFilter({ type: opt.key, value: '' })}
+                        style={{
+                          padding: '14px 16px', borderRadius: 10, cursor: 'pointer',
+                          border: `2px solid ${active ? MAMCET_RED : '#e5e7eb'}`,
+                          background: active ? '#fef2f2' : '#fff',
+                          transition: 'border-color .15s, background .15s',
+                        }}
+                        onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = '#d1d5db'; }}
+                        onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = active ? MAMCET_RED : '#e5e7eb'; }}
+                      >
+                        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: active ? MAMCET_RED : '#111827' }}>{opt.title}</h4>
+                        <p style={{ margin: '3px 0 0', fontSize: 11, color: '#9ca3af' }}>{opt.desc}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* Step 2: Target */}
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Step 2 — Select Target
+                </label>
+                <select
+                  value={bulkFilter.value}
+                  onChange={(e) => setBulkFilter({ ...bulkFilter, value: e.target.value })}
+                  onFocus={e => { e.target.style.borderColor = MAMCET_RED; e.target.style.boxShadow = `0 0 0 3px ${MAMCET_RED}18`; }}
+                  onBlur={e => { e.target.style.borderColor = '#ddd'; e.target.style.boxShadow = 'none'; }}
+                  style={inputStyle}
+                >
+                  <option value="">-- Choose {bulkFilter.type === 'department' ? 'department' : 'batch year'} --</option>
+                  {bulkFilter.type === 'department'
+                    ? departments.map(d => <option key={d} value={d}>{d}</option>)
+                    : batches.map(b => <option key={b} value={b}>{b}</option>)
+                  }
+                </select>
+              </div>
+
+              {/* Helper text */}
+              {bulkFilter.value && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '10px 14px', borderRadius: 8,
+                  background: '#fef2f2', border: '1px solid #fecaca',
+                }}>
+                  <span style={{ fontSize: 14, flexShrink: 0 }}>ℹ️</span>
+                  <p style={{ margin: 0, fontSize: 12, color: '#991b1b', lineHeight: 1.4 }}>
+                    All active users matching <strong>{bulkFilter.value}</strong> will be synced into this group.
+                  </p>
+                </div>
+              )}
+
+              {/* Step 3: Action */}
+              <button
+                onClick={handleBulkAdd}
+                disabled={bulkLoading || !bulkFilter.value}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: 10,
+                  border: 'none',
+                  background: (!bulkFilter.value || bulkLoading) ? '#d1d5db' : MAMCET_RED,
+                  color: '#fff', fontWeight: 700, fontSize: 14,
+                  cursor: (!bulkFilter.value || bulkLoading) ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  transition: 'background .15s',
+                }}
+                onMouseEnter={e => { if (bulkFilter.value && !bulkLoading) e.currentTarget.style.background = '#a50e24'; }}
+                onMouseLeave={e => { if (bulkFilter.value && !bulkLoading) e.currentTarget.style.background = MAMCET_RED; }}
+              >
+                {bulkLoading ? (
+                  <span style={{
+                    width: 16, height: 16, borderRadius: '50%', display: 'inline-block',
+                    border: '2px solid rgba(255,255,255,.3)', borderTopColor: '#fff',
+                    animation: 'gmcSpin .6s linear infinite',
+                  }} />
+                ) : null}
+                {bulkLoading ? 'Syncing…' : 'Sync Users'}
+              </button>
             </div>
           )}
         </div>
-
-        {/* Footer */}
-        <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex justify-between items-center sticky bottom-0 z-10 flex-shrink-0">
-          <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-            <FaCheckCircle className="text-mamcet-red" />
-            Registry secure
-          </div>
-          <button
-            onClick={onClose}
-            className="px-8 py-2.5 bg-white border border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-gray-50 transition active:scale-95 shadow-sm"
-          >
-            Close Panel
-          </button>
-        </div>
       </div>
+
+      <style>{`
+        @keyframes gmcFadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes gmcSpin { to { transform:rotate(360deg); } }
+      `}</style>
     </div>
   );
 };
