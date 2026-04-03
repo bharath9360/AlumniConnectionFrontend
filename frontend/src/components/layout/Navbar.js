@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import { useMessage } from '../../context/MessageContext';
 import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
 import NotificationDropdown from '../notifications/NotificationDropdown';
-import { FaSignOutAlt, FaBars, FaTimes } from 'react-icons/fa';
+import { FaSignOutAlt, FaCommentDots, FaBars, FaTimes } from 'react-icons/fa';
 import '../../styles/Navbar.css';
 
 const LOGO_URL =
@@ -223,6 +223,28 @@ const Navbar = () => {
             >
               <FaSignOutAlt size={16} />
             </button>
+          </div>
+        )}
+
+        {/* ── LOGGED IN — mobile chat icon (top nav only) ── */}
+        {user && isDashboard && (
+          <div className="d-lg-none d-flex align-items-center gap-2 ms-2">
+            <Link
+              to="/messages"
+              className="text-decoration-none position-relative"
+              style={{ color: brandColor }}
+              aria-label="Messages"
+            >
+              <FaCommentDots size={22} />
+              {totalUnreadCount > 0 && (
+                <span
+                  className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                  style={{ fontSize: '0.5rem', padding: '0.2em 0.4em', minWidth: 14, lineHeight: 1.4, fontWeight: 700 }}
+                >
+                  {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
+                </span>
+              )}
+            </Link>
           </div>
         )}
 
