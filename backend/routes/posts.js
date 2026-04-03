@@ -20,7 +20,7 @@ router.get('/', optionalAuth, async (req, res) => {
         obj.userName  = post.userId.name;
         obj.userPic   = post.userId.profilePic || '';
         obj.userRole  = post.userId.designation || post.userId.role || '';
-        obj.authorId  = post.userId._id;
+        obj.authorId  = post.userId._id.toString();
       }
       return obj;
     });
@@ -119,7 +119,7 @@ router.post('/', protect, upload.single('image'), async (req, res) => {
       clientObj.userName = populatedPost.userId.name;
       clientObj.userPic  = populatedPost.userId.profilePic || '';
       clientObj.userRole = populatedPost.userId.designation || populatedPost.userId.role || '';
-      clientObj.authorId = populatedPost.userId._id;
+      clientObj.authorId = populatedPost.userId._id.toString();
     }
 
     res.status(201).json({ success: true, data: clientObj });
@@ -150,7 +150,7 @@ router.get('/user/:userId', optionalAuth, async (req, res) => {
         obj.userName  = post.userId.name;
         obj.userPic   = post.userId.profilePic || '';
         obj.userRole  = post.userId.designation || post.userId.role || '';
-        obj.authorId  = post.userId._id;
+        obj.authorId  = post.userId._id.toString();
       }
       return obj;
     });
@@ -173,7 +173,7 @@ router.get('/activity/:userId', optionalAuth, async (req, res) => {
         obj.userName  = post.userId.name;
         obj.userPic   = post.userId.profilePic || '';
         obj.userRole  = post.userId.designation || post.userId.role || '';
-        obj.authorId  = post.userId._id;
+        obj.authorId  = post.userId._id.toString();
       }
       return obj;
     };

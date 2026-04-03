@@ -50,7 +50,7 @@ const FeedItem = ({ post, onLike, onComment, onShare, onEdit, onDelete, onDelete
         return `${Math.floor(diff / 86400)}d ago`;
     };
 
-    const isAuthor = loggedInUserId === authorId;
+    const isAuthor = !!(loggedInUserId && authorId && String(loggedInUserId) === String(authorId));
 
     return (
         <div className="dashboard-card mb-3 shadow-sm bg-white rounded-3 border-0 position-relative">
@@ -178,7 +178,8 @@ const FeedItem = ({ post, onLike, onComment, onShare, onEdit, onDelete, onDelete
 
                     <div className="comments-list">
                         {post.comments?.map((comment, idx) => {
-                            const isCommentAuthor = (comment.userId || comment.userId?._id) === loggedInUserId;
+                            const commentOwnerId = typeof comment.userId === 'object' ? (comment.userId?._id || comment.userId) : comment.userId;
+                            const isCommentAuthor = !!(loggedInUserId && commentOwnerId && String(loggedInUserId) === String(commentOwnerId));
                             return (
                                 <div key={comment._id || comment.id || idx} className="d-flex gap-2 mb-2">
                                     <div
