@@ -97,13 +97,16 @@ export const userService = {
 
 // ─── Post / Feed Service ──────────────────────────────────────
 export const postService = {
-  getFeed:       ()                    => api.get('/posts'),
-  getUserPosts:  (userId)              => api.get(`/posts/user/${userId}`),
-  createPost:    (formData)            => api.post('/posts', formData),
-  likePost:      (postId)              => api.put(`/posts/${postId}/like`),
-  addComment:    (postId, content)     => api.post(`/posts/${postId}/comment`, { content }),
-  deletePost:    (postId)              => api.delete(`/posts/${postId}`),
-  reportPost:    (postId)              => api.post(`/posts/${postId}/report`),
+  getFeed:          ()                        => api.get('/posts'),
+  getUserPosts:     (userId, limit)           => api.get(`/posts/user/${userId}`, { params: limit ? { limit } : {} }),
+  getUserActivity:  (userId, limit)           => api.get(`/posts/activity/${userId}`, { params: limit ? { limit } : {} }),
+  createPost:       (formData)                => api.post('/posts', formData),
+  editPost:         (postId, content)         => api.put(`/posts/${postId}`, { content }),
+  likePost:         (postId)                  => api.put(`/posts/${postId}/like`),
+  addComment:       (postId, content)         => api.post(`/posts/${postId}/comment`, { content }),
+  deleteComment:    (postId, commentId)       => api.delete(`/posts/${postId}/comment/${commentId}`),
+  deletePost:       (postId)                  => api.delete(`/posts/${postId}`),
+  reportPost:       (postId)                  => api.post(`/posts/${postId}/report`),
 };
 
 // ─── Job Service ──────────────────────────────────────────────

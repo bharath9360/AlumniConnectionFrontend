@@ -11,7 +11,7 @@ import {
   FaUserPlus, FaCommentDots, FaCheckCircle, FaClock,
   FaBriefcase, FaGraduationCap, FaMapMarkerAlt, FaEnvelope,
   FaArrowLeft, FaCamera, FaPencilAlt, FaPlus,
-  FaBuilding, FaIdBadge, FaTimes
+  FaBuilding, FaIdBadge, FaTimes, FaEllipsisH, FaThumbsUp, FaCommentAlt
 } from 'react-icons/fa';
 
 // ─── URL resolver helper ──────────────────────────────────────
@@ -167,8 +167,26 @@ const Profile = () => {
   const [saving, setSaving]               = useState(false);
 
   // ── User posts state ─────────────────────────────────────────
-  const [userPosts, setUserPosts]           = useState([]);
-  const [postsLoading, setPostsLoading]     = useState(false);
+  const POST_LIMIT = 5;
+  const [userPosts,      setUserPosts]      = useState([]);
+  const [postsLoading,   setPostsLoading]   = useState(false);
+  const [postsHasMore,   setPostsHasMore]   = useState(false);
+  const [showAllPosts,   setShowAllPosts]   = useState(false);
+
+  // ── Activity (likes + comments) state ───────────────────────
+  const [activityTab,        setActivityTab]       = useState('likes');
+  const [likedPosts,         setLikedPosts]         = useState([]);
+  const [commentedPosts,     setCommentedPosts]     = useState([]);
+  const [activityLoading,    setActivityLoading]    = useState(false);
+  const [likedHasMore,       setLikedHasMore]       = useState(false);
+  const [commentedHasMore,   setCommentedHasMore]   = useState(false);
+  const [showAllLikes,       setShowAllLikes]       = useState(false);
+  const [showAllComments,    setShowAllComments]    = useState(false);
+
+  // ── Edit post state ─────────────────────────────────────
+  const [editingPost,        setEditingPost]        = useState(null);  // post object
+  const [editPostContent,    setEditPostContent]    = useState('');
+  const [editPostSaving,     setEditPostSaving]     = useState(false);
 
   const showToast = (message, type = 'info') => setToast({ message, type });
 
@@ -207,19 +225,31 @@ const Profile = () => {
     };
     if (id) fetchAll();
 
-    // Fetch this user's posts (separate call so profile loads instantly)
+    // Fetch this user's posts (limit=5 preview)
     const fetchPosts = async () => {
       setPostsLoading(true);
       try {
-        const res = await postService.getUserPosts(id);
+        const res = await postService.getUserPosts(id, POST_LIMIT);
         setUserPosts(res.data.data || []);
-      } catch (_) {
-        // silently ignore — posts section just stays empty
-      } finally {
-        setPostsLoading(false);
-      }
+        setPostsHasMore(res.data.hasMore || false);
+      } catch (_) {}
+      finally { setPostsLoading(false); }
     };
     if (id) fetchPosts();
+
+    // Fetch activity (liked + commented posts, limit=5 each)
+    const fetchActivity = async () => {
+      setActivityLoading(true);
+      try {
+        const res = await postService.getUserActivity(id, POST_LIMIT);
+        setLikedPosts(res.data.likedPosts || []);
+        setCommentedPosts(res.data.commentedPosts || []);
+        setLikedHasMore(res.data.likedHasMore || false);
+        setCommentedHasMore(res.data.commentedHasMore || false);
+      } catch (_) {}
+      finally { setActivityLoading(false); }
+    };
+    if (id) fetchActivity();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, me?._id]);
 
@@ -716,49 +746,282 @@ const Profile = () => {
               </Section>
             )}
 
-            {/* ══ ACTIVITY / MY POSTS ═══════════════════════════════════ */}
-            <Section
-              title={isOwnProfile ? 'My Posts' : `Posts by ${profile.name?.split(' ')[0] || 'User'}`}
-              custom={5}
+            {/* ══ MY POSTS ════════════════════════════════════════ */}
+            <motion.div
+              className="bg-white rounded-4 shadow-sm border-0 p-4 mb-3"
+              variants={fadeUp} initial="hidden" animate="visible" custom={5}
             >
+              {/* Section header */}
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h5 className="fw-bold mb-0 text-dark">
+                  {isOwnProfile ? 'My Posts' : `Posts by ${profile.name?.split(' ')[0] || 'User'}`}
+                </h5>
+                {postsHasMore && !showAllPosts && (
+                  <button
+                    className="btn btn-link p-0 fw-semibold"
+                    style={{ fontSize: 13, color: '#c84022', textDecoration: 'none' }}
+                    onClick={() => {
+                      setShowAllPosts(true);
+                      postService.getUserPosts(id).then(r => {
+                        setUserPosts(r.data.data || []);
+                        setPostsHasMore(false);
+                      }).catch(() => {});
+                    }}
+                  >
+                    See all posts →
+                  </button>
+                )}
+              </div>
+
               {postsLoading ? (
                 <div className="d-flex justify-content-center py-4">
                   <ClipLoader color="#c84022" size={28} />
                 </div>
               ) : userPosts.length === 0 ? (
-                <div className="text-center py-3">
-                  <p className="text-muted fst-italic mb-0">
-                    {isOwnProfile ? 'You haven\'t posted anything yet.' : 'No posts yet.'}
-                  </p>
-                </div>
+                <p className="text-muted fst-italic mb-0 text-center py-3">
+                  {isOwnProfile ? "You haven't posted anything yet." : 'No posts yet.'}
+                </p>
               ) : (
                 <div className="d-flex flex-column gap-3">
                   {userPosts.map(post => (
-                    <FeedItem
-                      key={post._id || post.id}
-                      post={post}
-                      onLike={async (postId) => {
-                        try {
-                          const res = await postService.likePost(postId);
-                          setUserPosts(prev =>
-                            prev.map(p => (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p)
-                          );
-                        } catch (_) {}
-                      }}
-                      onComment={async (postId, content) => {
-                        try {
-                          const res = await postService.addComment(postId, content);
-                          setUserPosts(prev =>
-                            prev.map(p => (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p)
-                          );
-                        } catch (_) {}
-                      }}
-                      onShare={() => {}}
-                    />
+                    <div key={post._id || post.id} className="position-relative">
+                      {/* 3-dot CRUD menu — own profile only */}
+                      {isOwnProfile && (
+                        <div className="position-absolute" style={{ top: 10, right: 10, zIndex: 2 }}>
+                          <div className="dropdown">
+                            <button
+                              className="btn btn-light btn-sm rounded-circle"
+                              data-bs-toggle="dropdown"
+                              style={{ width: 30, height: 30, padding: 0, lineHeight: '28px' }}
+                            >
+                              <FaEllipsisH size={12} />
+                            </button>
+                            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" style={{ fontSize: 13 }}>
+                              <li>
+                                <button
+                                  className="dropdown-item d-flex align-items-center gap-2"
+                                  onClick={() => { setEditingPost(post); setEditPostContent(post.content || ''); }}
+                                >
+                                  <FaPencilAlt size={11} style={{ color: '#c84022' }} /> Edit Post
+                                </button>
+                              </li>
+                              <li>
+                                <button
+                                  className="dropdown-item text-danger d-flex align-items-center gap-2"
+                                  onClick={async () => {
+                                    if (!window.confirm('Delete this post?')) return;
+                                    try {
+                                      await postService.deletePost(post._id || post.id);
+                                      setUserPosts(prev => prev.filter(p => p._id !== post._id && p.id !== post.id));
+                                      showToast('Post deleted.', 'success');
+                                    } catch { showToast('Failed to delete post.', 'error'); }
+                                  }}
+                                >
+                                  <FaTimes size={11} /> Delete Post
+                                </button>
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+                      <FeedItem
+                        post={post}
+                        onLike={async (postId) => {
+                          try {
+                            const res = await postService.likePost(postId);
+                            setUserPosts(prev => prev.map(p =>
+                              (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p
+                            ));
+                          } catch (_) {}
+                        }}
+                        onComment={async (postId, content) => {
+                          try {
+                            const res = await postService.addComment(postId, content);
+                            setUserPosts(prev => prev.map(p =>
+                              (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p
+                            ));
+                          } catch (_) {}
+                        }}
+                        onShare={() => {}}
+                      />
+                    </div>
                   ))}
                 </div>
               )}
-            </Section>
+            </motion.div>
+
+            {/* ══ ACTIVITY ═════════════════════════════════════════ */}
+            <motion.div
+              className="bg-white rounded-4 shadow-sm border-0 p-4 mb-3"
+              variants={fadeUp} initial="hidden" animate="visible" custom={6}
+            >
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h5 className="fw-bold mb-0 text-dark">Activity</h5>
+              </div>
+
+              {/* Tab toggle */}
+              <div className="d-flex gap-1 mb-4">
+                {[{ key: 'likes', label: 'Likes', icon: <FaThumbsUp size={12} className="me-1" /> },
+                  { key: 'comments', label: 'Comments', icon: <FaCommentAlt size={12} className="me-1" /> }]
+                  .map(({ key, label, icon }) => (
+                    <button
+                      key={key}
+                      className="btn rounded-pill fw-semibold d-flex align-items-center"
+                      style={{
+                        fontSize: 12.5, height: 32, padding: '0 14px',
+                        backgroundColor: activityTab === key ? '#c84022' : '#f5f5f5',
+                        color: activityTab === key ? '#fff' : '#555',
+                        border: 'none', transition: 'all 0.18s'
+                      }}
+                      onClick={() => setActivityTab(key)}
+                    >
+                      {icon}{label}
+                    </button>
+                  ))
+                }
+              </div>
+
+              {activityLoading ? (
+                <div className="d-flex justify-content-center py-4">
+                  <ClipLoader color="#c84022" size={26} />
+                </div>
+              ) : activityTab === 'likes' ? (
+                <>
+                  {likedPosts.length === 0 ? (
+                    <p className="text-muted fst-italic mb-0 text-center py-2">No liked posts yet.</p>
+                  ) : (
+                    <div className="d-flex flex-column gap-3">
+                      {likedPosts.map(post => (
+                        <div key={post._id || post.id}>
+                          <div className="d-flex align-items-center gap-1 mb-1" style={{ fontSize: 11.5, color: '#c84022', fontWeight: 600 }}>
+                            <FaThumbsUp size={10} /> {
+                              isOwnProfile
+                                ? 'You liked this post'
+                                : `${profile.name?.split(' ')[0]} liked this`
+                            }
+                          </div>
+                          <FeedItem
+                            post={post}
+                            onLike={async (postId) => {
+                              try {
+                                const res = await postService.likePost(postId);
+                                setLikedPosts(prev => prev.map(p =>
+                                  (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p
+                                ));
+                              } catch (_) {}
+                            }}
+                            onComment={async (postId, content) => {
+                              try {
+                                const res = await postService.addComment(postId, content);
+                                setLikedPosts(prev => prev.map(p =>
+                                  (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p
+                                ));
+                              } catch (_) {}
+                            }}
+                            onShare={() => {}}
+                          />
+                        </div>
+                      ))}
+                      {likedHasMore && !showAllLikes && (
+                        <button
+                          className="btn btn-outline-secondary btn-sm rounded-pill w-100 mt-1"
+                          style={{ fontSize: 12 }}
+                          onClick={() => {
+                            setShowAllLikes(true);
+                            postService.getUserActivity(id).then(r => {
+                              setLikedPosts(r.data.likedPosts || []);
+                              setLikedHasMore(false);
+                            }).catch(() => {});
+                          }}
+                        >
+                          See all liked posts
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {commentedPosts.length === 0 ? (
+                    <p className="text-muted fst-italic mb-0 text-center py-2">No commented posts yet.</p>
+                  ) : (
+                    <div className="d-flex flex-column gap-3">
+                      {commentedPosts.map(post => {
+                        // Find the user's own comment(s)
+                        const myComments = (post.comments || []).filter(c =>
+                          c.userId?.toString() === id || c.userId === id
+                        );
+                        return (
+                          <div key={post._id || post.id}>
+                            {myComments.slice(0, 1).map(c => (
+                              <div key={c._id} className="d-flex justify-content-between align-items-start mb-1">
+                                <p className="mb-0" style={{ fontSize: 11.5, color: '#555', fontStyle: 'italic' }}>
+                                  <span style={{ color: '#c84022', fontWeight: 600 }}>Your comment: </span>
+                                  "{c.content.substring(0, 80)}{c.content.length > 80 ? '…' : ''}"
+                                </p>
+                                {isOwnProfile && (
+                                  <button
+                                    className="btn btn-link p-0 ms-2 text-danger"
+                                    style={{ fontSize: 11 }}
+                                    title="Delete comment"
+                                    onClick={async () => {
+                                      try {
+                                        const res = await postService.deleteComment(post._id || post.id, c._id);
+                                        setCommentedPosts(prev => prev.map(p =>
+                                          (p._id === post._id || p.id === post.id) ? { ...p, ...res.data.data } : p
+                                        ));
+                                        showToast('Comment deleted.', 'success');
+                                      } catch { showToast('Failed to delete comment.', 'error'); }
+                                    }}
+                                  >
+                                    <FaTimes size={10} />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            <FeedItem
+                              post={post}
+                              onLike={async (postId) => {
+                                try {
+                                  const res = await postService.likePost(postId);
+                                  setCommentedPosts(prev => prev.map(p =>
+                                    (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p
+                                  ));
+                                } catch (_) {}
+                              }}
+                              onComment={async (postId, content) => {
+                                try {
+                                  const res = await postService.addComment(postId, content);
+                                  setCommentedPosts(prev => prev.map(p =>
+                                    (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p
+                                  ));
+                                } catch (_) {}
+                              }}
+                              onShare={() => {}}
+                            />
+                          </div>
+                        );
+                      })}
+                      {commentedHasMore && !showAllComments && (
+                        <button
+                          className="btn btn-outline-secondary btn-sm rounded-pill w-100 mt-1"
+                          style={{ fontSize: 12 }}
+                          onClick={() => {
+                            setShowAllComments(true);
+                            postService.getUserActivity(id).then(r => {
+                              setCommentedPosts(r.data.commentedPosts || []);
+                              setCommentedHasMore(false);
+                            }).catch(() => {});
+                          }}
+                        >
+                          See all commented posts
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </motion.div>
 
           </div>{/* /col-lg-8 */}
 
@@ -1106,6 +1369,47 @@ const Profile = () => {
             </span>
           ))}
         </div>
+      </Modal>
+
+      {/* ── Edit Post Modal ────────────────────────────── */}
+      <Modal
+        isOpen={!!editingPost}
+        onClose={() => { setEditingPost(null); setEditPostContent(''); }}
+        title="Edit Post"
+        footer={
+          <button
+            className="btn btn-mamcet-red rounded-pill px-4 fw-bold d-flex align-items-center gap-2"
+            disabled={editPostSaving || !editPostContent.trim()}
+            onClick={async () => {
+              setEditPostSaving(true);
+              try {
+                const res = await postService.editPost(editingPost._id || editingPost.id, editPostContent);
+                const updated = res.data.data;
+                setUserPosts(prev => prev.map(p =>
+                  (p._id === editingPost._id || p.id === editingPost.id) ? { ...p, ...updated } : p
+                ));
+                setEditingPost(null);
+                setEditPostContent('');
+                showToast('Post updated! ✓', 'success');
+              } catch { showToast('Failed to update post.', 'error'); }
+              finally { setEditPostSaving(false); }
+            }}
+          >
+            {editPostSaving && <ClipLoader size={14} color="#fff" />} Save Changes
+          </button>
+        }
+      >
+        <textarea
+          className="form-control"
+          rows={5}
+          value={editPostContent}
+          onChange={e => setEditPostContent(e.target.value)}
+          placeholder="What do you want to share?"
+          style={{ resize: 'vertical', fontSize: 14 }}
+        />
+        <p className="extra-small text-muted mt-2 mb-0">
+          Note: Attached images cannot be changed. Only post text is editable.
+        </p>
       </Modal>
 
       {/* Toast */}

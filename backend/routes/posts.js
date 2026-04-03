@@ -133,12 +133,18 @@ router.post('/', protect, upload.single('image'), async (req, res) => {
 // ─── GET /api/posts/user/:userId — Posts by a specific user ──
 router.get('/user/:userId', optionalAuth, async (req, res) => {
   try {
-    const posts = await Post.find({ userId: req.params.userId })
+    const limit = parseInt(req.query.limit) || 0;   // 0 = no limit
+    let query = Post.find({ userId: req.params.userId })
       .sort({ createdAt: -1 })
       .populate('userId', 'name profilePic role designation');
+    if (limit > 0) query = query.limit(limit + 1);  // fetch +1 to detect hasMore
+
+    const posts = await query;
+    const hasMore = limit > 0 && posts.length > limit;
+    const trimmed = hasMore ? posts.slice(0, limit) : posts;
 
     const authUserId = req.user?._id;
-    const result = posts.map(post => {
+    const result = trimmed.map(post => {
       const obj = post.toClientObject(authUserId);
       if (post.userId && typeof post.userId === 'object') {
         obj.userName  = post.userId.name;
@@ -148,12 +154,100 @@ router.get('/user/:userId', optionalAuth, async (req, res) => {
       }
       return obj;
     });
-    res.json({ success: true, data: result });
+    res.json({ success: true, data: result, hasMore, total: posts.length });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch user posts.' });
   }
 });
 
+
+// ─── GET /api/posts/activity/:userId — Liked + Commented posts ──
+router.get('/activity/:userId', optionalAuth, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 0;
+    const authUserId = req.user?._id;
+
+    const mapPost = (post) => {
+      const obj = post.toClientObject(authUserId);
+      if (post.userId && typeof post.userId === 'object') {
+        obj.userName  = post.userId.name;
+        obj.userPic   = post.userId.profilePic || '';
+        obj.userRole  = post.userId.designation || post.userId.role || '';
+        obj.authorId  = post.userId._id;
+      }
+      return obj;
+    };
+
+    // Posts liked by this user
+    let likedQ = Post.find({ likedBy: req.params.userId })
+      .sort({ createdAt: -1 })
+      .populate('userId', 'name profilePic role designation');
+    if (limit > 0) likedQ = likedQ.limit(limit + 1);
+    const likedRaw = await likedQ;
+    const likedHasMore = limit > 0 && likedRaw.length > limit;
+    const likedPosts = (likedHasMore ? likedRaw.slice(0, limit) : likedRaw).map(mapPost);
+
+    // Posts commented on by this user
+    let commentedQ = Post.find({ 'comments.userId': req.params.userId })
+      .sort({ createdAt: -1 })
+      .populate('userId', 'name profilePic role designation');
+    if (limit > 0) commentedQ = commentedQ.limit(limit + 1);
+    const commentedRaw = await commentedQ;
+    const commentedHasMore = limit > 0 && commentedRaw.length > limit;
+    const commentedPosts = (commentedHasMore ? commentedRaw.slice(0, limit) : commentedRaw).map(mapPost);
+
+    res.json({
+      success: true,
+      likedPosts,    likedHasMore,
+      commentedPosts, commentedHasMore
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch activity.' });
+  }
+});
+
+
+// ─── PUT /api/posts/:id — Edit post content (author only) ────
+router.put('/:id', protect, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: 'Post not found.' });
+    if (post.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to edit this post.' });
+    }
+    const { content } = req.body;
+    if (!content?.trim()) return res.status(400).json({ message: 'Content cannot be empty.' });
+    post.content = content.trim();
+    await post.save();
+    res.json({ success: true, data: post.toClientObject(req.user._id) });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to edit post.' });
+  }
+});
+
+// ─── DELETE /api/posts/:postId/comment/:commentId ─────────────
+router.delete('/:postId/comment/:commentId', protect, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ message: 'Post not found.' });
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: 'Comment not found.' });
+
+    // Comment author OR post author can delete
+    const isCommentAuthor = comment.userId?.toString() === req.user._id.toString();
+    const isPostAuthor    = post.userId.toString() === req.user._id.toString();
+    if (!isCommentAuthor && !isPostAuthor && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized.' });
+    }
+
+    comment.deleteOne();
+    await post.save();
+    res.json({ success: true, data: post.toClientObject(req.user._id) });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete comment.' });
+  }
+});
 
 // ─── PUT /api/posts/:id/like — Toggle like ────────────────────
 router.put('/:id/like', protect, async (req, res) => {
