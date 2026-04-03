@@ -226,7 +226,7 @@ const Navbar = () => {
         {user && isDashboard && (
           <div className="d-lg-none d-flex align-items-center gap-2">
             <Link
-              to="/messaging"
+              to="/messages"
               className="text-decoration-none position-relative"
               style={{ color: brandColor }}
             >

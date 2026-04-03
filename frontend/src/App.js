@@ -120,6 +120,18 @@ function App() {
             </Route>
 
             {/* ════════════════════════════════════════════════════
+                Messaging — full-screen layout (NO Navbar/BottomNav)
+                Isolated just like the Admin panel above.
+            ════════════════════════════════════════════════════ */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/messages"         element={<Messaging />} />
+              <Route path="/messages/:chatId" element={<Messaging />} />
+              {/* Legacy redirects — keep old URLs working */}
+              <Route path="/messaging"          element={<Navigate to="/messages" replace />} />
+              <Route path="/messaging/:userId"  element={<Navigate to="/messages" replace />} />
+            </Route>
+
+            {/* ════════════════════════════════════════════════════
                 All other routes — use the global Navbar shell
             ════════════════════════════════════════════════════ */}
             <Route
@@ -156,7 +168,6 @@ function App() {
                         <Route path="/Student/JobSearch/:userId" element={<JobSearch />} />
                         <Route path="/student/StudentEvents/:userId" element={<StudentEvents />} />
                         <Route path="/events/:userId" element={<Events />} />
-                        <Route path="/messaging/:userId" element={<Messaging />} />
                         <Route path="/notifications/:userId" element={<Notification />} />
                       </Route>
 

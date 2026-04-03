@@ -368,11 +368,48 @@ const Messaging = () => {
         {/* ─── LEFT: Chat Sidebar ─── */}
         <div className={`msg-sidebar ${mobileView === 'chat' ? 'msg-sidebar--hidden' : ''}`}>
           <ChatSidebar>
-            <ChatSidebar.Header
-              isComposing={isComposing}
-              onCompose={() => { setIsComposing(true); setSearch(''); setSearchResults([]); }}
-              onCancel={() => { setIsComposing(false); setSearch(''); setSearchResults([]); }}
-            />
+            {/* Sidebar header with Back-to-Home button */}
+            <div className="msg-sidebar__header">
+              <div className="d-flex align-items-center gap-2">
+                {isComposing ? (
+                  <button
+                    className="msg-icon-btn"
+                    onClick={() => { setIsComposing(false); setSearch(''); setSearchResults([]); }}
+                    title="Back to chats"
+                  >
+                    <i className="fas fa-arrow-left" />
+                  </button>
+                ) : (
+                  // Back-to-home — exits full-screen messaging
+                  <button
+                    className="msg-icon-btn"
+                    onClick={() => {
+                      const role = user?.role?.toLowerCase() || 'alumni';
+                      const uid  = user?._id || user?.id;
+                      if (role === 'student')  navigate(`/student/home/${uid}`);
+                      else if (role === 'admin') navigate(`/admin/home/${uid}`);
+                      else navigate(`/alumni/home/${uid}`);
+                    }}
+                    title="Back to home"
+                    aria-label="Go back to dashboard"
+                  >
+                    <i className="fas fa-arrow-left" />
+                  </button>
+                )}
+                <h5 className="msg-sidebar__title">
+                  {isComposing ? 'New Message' : 'Messaging'}
+                </h5>
+              </div>
+              {!isComposing && (
+                <button
+                  className="msg-compose-btn"
+                  title="New message"
+                  onClick={() => { setIsComposing(true); setSearch(''); setSearchResults([]); }}
+                >
+                  <i className="fas fa-edit" />
+                </button>
+              )}
+            </div>
             <ChatSidebar.Search value={search} onChange={setSearch} />
             <ChatSidebar.List>
               {isComposing ? (

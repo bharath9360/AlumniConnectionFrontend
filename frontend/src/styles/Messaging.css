@@ -26,7 +26,7 @@
 .msg-viewport {
   display: flex;
   align-items: stretch;
-  height: calc(100dvh - 64px);
+  height: 100dvh;            /* full screen — messaging owns its own layout */
   background: var(--msg-bg);
   overflow: hidden;
   position: relative;
@@ -46,9 +46,9 @@
   box-shadow: var(--shadow-card);
 }
 
+/* Full-screen layout: no inner paddings or rounded corners */
 @media (min-width: 768px) {
-  .msg-viewport { padding: 12px 12px 0; }
-  .msg-shell { border-radius: 12px 12px 0 0; }
+  .msg-shell { border-radius: 0; }
 }
 
 /* ============================================================
@@ -1064,7 +1064,8 @@
    ============================================================ */
 @media (max-width: 991px) {
   .msg-shell { border-radius: 0; }
-  .msg-viewport { padding: 0; height: calc(100dvh - 58px); }
+  /* Full screen on mobile too — already 100dvh on viewport */
+  .msg-viewport { padding: 0; }
 
   /* Sidebar fills full screen on mobile */
   .msg-sidebar {
@@ -1101,6 +1102,7 @@
   /* Show back button on mobile chat header */
   .msg-back-btn { display: flex !important; }
 }
+
 
 @media (max-width: 575px) {
   .msg-sidebar__header { padding: 12px 14px 10px; }

@@ -7,15 +7,17 @@ import {
     FaInfoCircle,
     FaEnvelope,
     FaBriefcase,
-    FaUserFriends
+    FaUserFriends,
+    FaCommentDots
 } from 'react-icons/fa';
 
 export const navigationConfig = {
     alumni: [
-        { path: '/alumni/home',    icon: FaHome,        label: 'Home'          },
-        { path: '/network',        icon: FaUserFriends, label: 'Network',       noUserId: true },
-        { path: '/opportunities',  icon: FaLayerGroup,  label: 'Opportunities', noUserId: true },
-        { path: '/notifications',  icon: FaBell,        label: 'Notifications', noUserId: true, isNotification: true },
+        { path: '/alumni/home',    icon: FaHome,         label: 'Home'          },
+        { path: '/network',        icon: FaUserFriends,  label: 'Network',       noUserId: true },
+        { path: '/opportunities',  icon: FaLayerGroup,   label: 'Opportunities', noUserId: true },
+        { path: '/messages',       icon: FaCommentDots,  label: 'Messages',      noUserId: true, isMessaging: true },
+        { path: '/notifications',  icon: FaBell,         label: 'Notifications', noUserId: true, isNotification: true },
     ],
     admin: [
         { path: '/admin/home',       icon: FaHome,           label: 'Home'      },
@@ -24,10 +26,11 @@ export const navigationConfig = {
         { path: '/notifications',    icon: FaBell,           label: 'Alerts',   noUserId: true, isNotification: true },
     ],
     student: [
-        { path: '/student/home',   icon: FaHome,        label: 'Home'          },
-        { path: '/network',        icon: FaUserFriends, label: 'Network',       noUserId: true },
-        { path: '/opportunities',  icon: FaBriefcase,   label: 'Opportunities', noUserId: true },
-        { path: '/notifications',  icon: FaBell,        label: 'Notifications', noUserId: true, isNotification: true },
+        { path: '/student/home',   icon: FaHome,         label: 'Home'          },
+        { path: '/network',        icon: FaUserFriends,  label: 'Network',       noUserId: true },
+        { path: '/opportunities',  icon: FaBriefcase,    label: 'Opportunities', noUserId: true },
+        { path: '/messages',       icon: FaCommentDots,  label: 'Messages',      noUserId: true, isMessaging: true },
+        { path: '/notifications',  icon: FaBell,         label: 'Notifications', noUserId: true, isNotification: true },
     ],
     guest: [
         { path: '/about',   icon: FaInfoCircle, label: 'About'   },
