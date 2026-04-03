@@ -159,6 +159,7 @@ export const chatService = {
 // ─── Connections Service ──────────────────────────────────────
 export const connectionService = {
   getRequests:      ()       => api.get('/connections/requests'),
+  getSentRequests:  ()       => api.get('/connections/sent-requests'), // outgoing pending
   sendRequest:      (userId) => api.post(`/connections/request/${userId}`),
   acceptRequest:    (reqId)  => api.put(`/connections/accept/${reqId}`),
   rejectRequest:    (reqId)  => api.put(`/connections/reject/${reqId}`),

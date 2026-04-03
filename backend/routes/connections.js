@@ -8,8 +8,8 @@ const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
-// ─── GET /api/connections/requests ────────────────────────====
-// Get all pending connection requests for the logged-in user
+// ─── GET /api/connections/requests ────────────────────────────
+// Incoming: pending requests where I am the receiver
 router.get('/requests', protect, async (req, res) => {
   try {
     const requests = await ConnectionRequest.find({
@@ -21,6 +21,22 @@ router.get('/requests', protect, async (req, res) => {
   } catch (err) {
     console.error('Fetch requests error:', err);
     res.status(500).json({ message: 'Failed to fetch connection requests.', error: err.message });
+  }
+});
+
+// ─── GET /api/connections/sent-requests ───────────────────────
+// Outgoing: pending requests I have sent (so frontend can show "Pending" state)
+router.get('/sent-requests', protect, async (req, res) => {
+  try {
+    const sent = await ConnectionRequest.find({
+      sender: req.user._id,
+      status: 'Pending'
+    }).populate('receiver', 'name role department batch profilePic').lean();
+
+    res.json({ success: true, data: sent });
+  } catch (err) {
+    console.error('Fetch sent-requests error:', err);
+    res.status(500).json({ message: 'Failed to fetch sent requests.' });
   }
 });
 

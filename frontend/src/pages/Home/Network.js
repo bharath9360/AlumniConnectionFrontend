@@ -50,6 +50,13 @@ const ProfilePreviewModal = ({ userId, onClose, onConnect, actionLoading, connec
     return () => { document.body.style.overflow = ''; };
   }, []);
 
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   // Fetch full profile + connection status
   useEffect(() => {
     if (!userId) return;
@@ -337,8 +344,7 @@ const ProfilePreviewModal = ({ userId, onClose, onConnect, actionLoading, connec
 /* ─────────────────────────────────────────────────────────────
    USER CARD
 ───────────────────────────────────────────────────────────── */
-const UserCard = ({ user, type, onAction, actionLoading, connected, onPreview }) => {
-  const navigate   = useNavigate();
+const UserCard = ({ user, type, onAction, actionLoading, connected, pending, onPreview }) => {
   const picUrl     = user?.profilePic || '';
   const initials   = (user?.name || '?')[0].toUpperCase();
   const mutuals    = user?.mutualConnections || 0;
@@ -409,25 +415,32 @@ const UserCard = ({ user, type, onAction, actionLoading, connected, onPreview })
             View Profile
           </button>
 
-          {type === 'suggestion' && !connected && (
-            <button
-              disabled={actionLoading === user._id}
-              onClick={() => onAction(user._id)}
-              className="flex-1 py-1.5 px-3 bg-red-600 text-white font-semibold rounded-full text-xs hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-1"
-            >
-              {actionLoading === user._id ? 'Sending…' : <><FiUserPlus size={12} /> Connect</>}
-            </button>
-          )}
-
-          {(type === 'suggestion' && connected) && (
-            <span className="flex-1 py-1.5 px-3 border border-green-200 text-green-700 font-semibold rounded-full text-xs flex items-center justify-center gap-1">
-              <FiUserCheck size={12} /> Connected
-            </span>
+          {/* ── 3-STATE CONNECT BUTTON ── */}
+          {type === 'suggestion' && (
+            connected ? (
+              <span className="flex-1 py-1.5 px-3 border border-green-200 text-green-700 font-semibold rounded-full text-xs flex items-center justify-center gap-1">
+                <FiUserCheck size={12} /> Connected
+              </span>
+            ) : pending ? (
+              <span className="flex-1 py-1.5 px-3 border border-gray-200 text-gray-500 font-semibold rounded-full text-xs flex items-center justify-center gap-1 cursor-default">
+                <FiClock size={11}/> Pending
+              </span>
+            ) : (
+              <button
+                disabled={actionLoading === user._id}
+                onClick={() => onAction(user._id)}
+                className="flex-1 py-1.5 px-3 bg-red-600 text-white font-semibold rounded-full text-xs hover:bg-red-700 active:scale-95 transition disabled:opacity-60 flex items-center justify-center gap-1"
+              >
+                {actionLoading === user._id
+                  ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</>
+                  : <><FiUserPlus size={12} /> Connect</>}
+              </button>
+            )
           )}
 
           {type === 'connection' && (
             <button
-              onClick={() => navigate(`/messaging`)}
+              onClick={() => onPreview(user._id)}
               className="flex-1 py-1.5 px-3 bg-white border border-gray-300 text-gray-700 font-semibold rounded-full text-xs hover:bg-gray-50 transition"
             >
               Message
@@ -442,8 +455,9 @@ const UserCard = ({ user, type, onAction, actionLoading, connected, onPreview })
 /* ─────────────────────────────────────────────────────────────
    SEARCH RESULT ROW  (compact list for search mode)
 ───────────────────────────────────────────────────────────── */
-const SearchResultRow = ({ user, onConnect, actionLoading, connectedIds, onPreview }) => {
+const SearchResultRow = ({ user, onConnect, actionLoading, connectedIds, pendingIds, onPreview }) => {
   const isConn    = connectedIds.has(user._id);
+  const isPending = pendingIds.has(user._id);
   const picUrl    = user?.profilePic || '';
   const initials  = (user?.name || '?')[0].toUpperCase();
 
@@ -479,19 +493,25 @@ const SearchResultRow = ({ user, onConnect, actionLoading, connectedIds, onPrevi
         </p>
       </div>
 
-      {/* CTA */}
+      {/* 3-state CTA */}
       <div className="flex-shrink-0">
         {isConn ? (
           <span className="flex items-center gap-1 text-xs font-semibold text-green-600">
             <FiUserCheck size={13} /> Connected
           </span>
+        ) : isPending ? (
+          <span className="flex items-center gap-1 text-xs font-semibold text-gray-500">
+            <FiClock size={12} /> Pending
+          </span>
         ) : (
           <button
             disabled={actionLoading === user._id}
             onClick={() => onConnect(user._id)}
-            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-full text-xs font-semibold hover:bg-red-700 transition disabled:opacity-50"
+            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-full text-xs font-semibold hover:bg-red-700 active:scale-95 transition disabled:opacity-60"
           >
-            {actionLoading === user._id ? '…' : <><FiUserPlus size={11} /> Connect</>}
+            {actionLoading === user._id
+              ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</>
+              : <><FiUserPlus size={11} /> Connect</>}
           </button>
         )}
       </div>
@@ -528,15 +548,26 @@ const Network = () => {
   const [loading, setLoading] = useState({ discover: true, connections: false, pending: false });
   const [actionLoading, setActionLoading] = useState(null);
   const [connectedSet,  setConnectedSet]  = useState(new Set()); // IDs of confirmed connections
+  const [pendingSet,    setPendingSet]    = useState(new Set()); // IDs of users with sent pending requests
   const [previewUserId, setPreviewUserId] = useState(null);     // Quick preview modal
 
   const navigate = useNavigate();
 
-  /* ── Load pending count on mount (for dot badge) ── */
+  /* ── Load pending count on mount + build pendingSet ── */
   useEffect(() => {
     connectionService.getRequests()
-      .then(r => setPendingRequests(r.data?.data || []))
+      .then(r => {
+        const incoming = r.data?.data || [];
+        setPendingRequests(incoming);
+      })
       .catch(() => {});
+    // Also fetch sent-requests to pre-populate pendingSet
+    connectionService.getSentRequests()
+      .then(r => {
+        const sent = r.data?.data || [];
+        setPendingSet(new Set(sent.map(req => req.receiver?._id || req.receiver)));
+      })
+      .catch(() => {}); // graceful — endpoint may not exist yet
   }, []);
 
   /* ── Load connections once (to reflect in search) ── */
@@ -634,16 +665,28 @@ const Network = () => {
 
   /* ── Actions ── */
   const handleConnect = async (userId) => {
+    // Optimistic update — immediately show Pending
+    setPendingSet(prev => new Set([...prev, userId]));
     setActionLoading(userId);
     try {
       await connectionService.sendRequest(userId);
       toast.success('Connection request sent!');
-      setSuggestedAlumni(prev  => prev.filter(u => u._id !== userId));
-      setSuggestedStudents(prev => prev.filter(u => u._id !== userId));
-      // Remove from search results list too
-      setSearchResults(prev => prev.filter(u => u._id !== userId));
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send request');
+      // Roll back on failure (e.g., already sent, already connected)
+      setPendingSet(prev => { const s = new Set(prev); s.delete(userId); return s; });
+      const msg = err.response?.data?.message || 'Failed to send request';
+      // If the backend says already pending/connected, keep it honest
+      if (err.response?.status === 400) {
+        const lower = msg.toLowerCase();
+        if (lower.includes('pending') || lower.includes('already')) {
+          setPendingSet(prev => new Set([...prev, userId])); // keep pending shown
+          toast(msg, { icon: 'ℹ️' });
+        } else {
+          toast.error(msg);
+        }
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setActionLoading(null);
     }
@@ -858,6 +901,7 @@ const Network = () => {
                   onConnect={handleConnect}
                   actionLoading={actionLoading}
                   connectedIds={connectedSet}
+                  pendingIds={pendingSet}
                   onPreview={setPreviewUserId}
                 />
               ))}
@@ -892,7 +936,7 @@ const Network = () => {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {suggestedAlumni.map(u => (
-                      <UserCard key={u._id} user={u} type="suggestion" onAction={handleConnect} actionLoading={actionLoading} connected={connectedSet.has(u._id)} onPreview={setPreviewUserId} />
+                      <UserCard key={u._id} user={u} type="suggestion" onAction={handleConnect} actionLoading={actionLoading} connected={connectedSet.has(u._id)} pending={pendingSet.has(u._id)} onPreview={setPreviewUserId} />
                     ))}
                   </div>
                 )}
@@ -915,7 +959,7 @@ const Network = () => {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {suggestedStudents.map(u => (
-                      <UserCard key={u._id} user={u} type="suggestion" onAction={handleConnect} actionLoading={actionLoading} connected={connectedSet.has(u._id)} onPreview={setPreviewUserId} />
+                      <UserCard key={u._id} user={u} type="suggestion" onAction={handleConnect} actionLoading={actionLoading} connected={connectedSet.has(u._id)} pending={pendingSet.has(u._id)} onPreview={setPreviewUserId} />
                     ))}
                   </div>
                 )}
