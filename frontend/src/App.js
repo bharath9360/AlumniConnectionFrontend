@@ -25,6 +25,8 @@ import AdminLogin from './pages/Auth/AdminLogin';
 
 // Unified Profile (own-edit + public-view merged)
 import Profile from './pages/Profile/Profile';
+import ProfilePosts from './pages/Profile/ProfilePosts';
+import ProfileActivity from './pages/Profile/ProfileActivity';
 
 // Role-Specific Dashboards
 import AlumniDashboard from './pages/Alumni/AlumniDashboard';
@@ -150,6 +152,8 @@ function App() {
                       <Route path="/contact" element={<ContactUs />} />
                       <Route path="/success" element={<ResponseSubmitted />} />
                       <Route path="/profile/:id" element={<Profile />} />
+                      <Route path="/profile/:id/posts" element={<ProfilePosts />} />
+                      <Route path="/profile/:id/activity" element={<ProfileActivity />} />
 
                       {/* ── Auth Routes ───────────────────────── */}
                       <Route path="/register" element={<RoleSelection />} />

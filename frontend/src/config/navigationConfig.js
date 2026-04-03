@@ -23,7 +23,8 @@ export const navigationConfig = {
         { path: '/admin/home',       icon: FaHome,           label: 'Home'      },
         { path: '/admin/approvals',  icon: FaClipboardCheck, label: 'Approvals' },
         { path: '/admin/dashboard',  icon: FaChartLine,      label: 'Stats'     },
-        { path: '/notifications',    icon: FaBell,           label: 'Alerts',   noUserId: true, isNotification: true },
+        { path: '/messages',         icon: FaCommentDots,    label: 'Messages',  noUserId: true, isMessaging: true },
+        { path: '/notifications',    icon: FaBell,           label: 'Alerts',    noUserId: true, isNotification: true },
     ],
     student: [
         { path: '/student/home',   icon: FaHome,         label: 'Home'          },

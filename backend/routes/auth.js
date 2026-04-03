@@ -3,11 +3,38 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const Connection = require('../models/Connection');
 const { sendOTPEmail, sendApprovalEmail } = require('../services/emailService');
 const { protect } = require('../middleware/auth');
 const { profileUpload, uploadToCloudinary } = require('../middleware/upload');
 
 const router = express.Router();
+
+// ─── Helper: Auto-connect to Admin ────────────────────────────
+const ensureAdminConnection = async (userId) => {
+  try {
+    const admin = await User.findOne({ role: 'admin' });
+    if (!admin) return;
+    if (admin._id.toString() === userId.toString()) return;
+
+    const u1 = userId.toString() < admin._id.toString() ? userId : admin._id;
+    const u2 = userId.toString() < admin._id.toString() ? admin._id : userId;
+
+    const exists = await Connection.findOne({ user1: u1, user2: u2 });
+    if (!exists) {
+      await Connection.create({ user1: u1, user2: u2 });
+      
+      // Update connection counts
+      const count1 = await Connection.countDocuments({ $or: [{ user1: u1 }, { user2: u1 }] });
+      const count2 = await Connection.countDocuments({ $or: [{ user1: u2 }, { user2: u2 }] });
+      
+      await User.findByIdAndUpdate(u1, { connectionCount: count1.toString() });
+      await User.findByIdAndUpdate(u2, { connectionCount: count2.toString() });
+    }
+  } catch (err) {
+    console.error('Auto-connect admin error:', err);
+  }
+};
 
 // ─── Helper: Sign Token ───────────────────────────────────────
 const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -181,6 +208,10 @@ router.post('/verify-otp', async (req, res) => {
     pendingRegistrations.delete(email.toLowerCase());
 
     const token = signToken(user._id);
+
+    // Auto-connect to admin (fire-and-forget)
+    ensureAdminConnection(user._id);
+
     sendAuthResponse(res, 201, user, token);
 
   } catch (err) {
@@ -243,6 +274,10 @@ router.post('/login', async (req, res) => {
     const token = signToken(user._id);
     // Record last-login timestamp for analytics (fire-and-forget)
     User.findByIdAndUpdate(user._id, { lastLogin: new Date() }).catch(() => {});
+    
+    // Auto-connect to admin just in case it's a legacy user or missed
+    ensureAdminConnection(user._id);
+
     sendAuthResponse(res, 200, user, token);
   } catch (err) {
     console.error('Login error:', err);

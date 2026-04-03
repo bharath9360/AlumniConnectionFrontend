@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../../context/AuthContext';
+import { FaEllipsisH, FaPencilAlt, FaTimes, FaTrashAlt } from 'react-icons/fa';
 
 // Unified media URL resolver — handles absolute URLs, relative paths, and missing env vars
 const resolveMediaUrl = (url) => {
@@ -13,7 +15,10 @@ const resolveMediaUrl = (url) => {
     return `${base}${url}`;
 };
 
-const FeedItem = ({ post, onLike, onComment, onShare }) => {
+const FeedItem = ({ post, onLike, onComment, onShare, onEdit, onDelete, onDeleteComment }) => {
+    const { user } = useAuth();
+    const loggedInUserId = user?._id || user?.id;
+
     const [showComments, setShowComments] = useState(false);
     const [commentText, setCommentText] = useState('');
 
@@ -45,11 +50,46 @@ const FeedItem = ({ post, onLike, onComment, onShare }) => {
         return `${Math.floor(diff / 86400)}d ago`;
     };
 
+    const isAuthor = loggedInUserId === authorId;
+
     return (
-        <div className="dashboard-card mb-3 shadow-sm bg-white rounded-3 border-0">
+        <div className="dashboard-card mb-3 shadow-sm bg-white rounded-3 border-0 position-relative">
+            {/* ── Context Menu (Edit / Delete) ── */}
+            {isAuthor && (onEdit || onDelete) && (
+                <div className="position-absolute" style={{ top: 12, right: 12, zIndex: 10 }}>
+                    <div className="dropdown">
+                        <button
+                            className="btn btn-light btn-sm rounded-circle d-flex align-items-center justify-content-center"
+                            data-bs-toggle="dropdown"
+                            style={{ width: 30, height: 30, padding: 0 }}
+                        >
+                            <FaEllipsisH size={12} color="#555" />
+                        </button>
+                        <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" style={{ fontSize: 13 }}>
+                            {onEdit && (
+                                <li>
+                                    <button className="dropdown-item d-flex align-items-center gap-2" onClick={() => onEdit(post)}>
+                                        <FaPencilAlt size={11} color="#c84022" /> Edit Post
+                                    </button>
+                                </li>
+                            )}
+                            {onDelete && (
+                                <li>
+                                    <button className="dropdown-item text-danger d-flex align-items-center gap-2" onClick={async () => {
+                                        if (window.confirm('Delete this post?')) onDelete(post._id || post.id);
+                                    }}>
+                                        <FaTimes size={11} /> Delete Post
+                                    </button>
+                                </li>
+                            )}
+                        </ul>
+                    </div>
+                </div>
+            )}
+
             <div className="p-3">
                 {/* ── Post Header ── */}
-                <div className="d-flex align-items-center mb-3">
+                <div className="d-flex align-items-center mb-3 pr-4" style={{ paddingRight: '40px' }}>
                     <Link to={`/profile/${authorId}`} className="text-decoration-none d-flex align-items-center">
                         <div
                             className="me-2 bg-secondary text-white fw-bold d-flex align-items-center justify-content-center flex-shrink-0"
@@ -137,27 +177,42 @@ const FeedItem = ({ post, onLike, onComment, onShare }) => {
                     </div>
 
                     <div className="comments-list">
-                        {post.comments?.map((comment, idx) => (
-                            <div key={comment._id || comment.id || idx} className="d-flex gap-2 mb-2">
-                                <div
-                                    className="bg-light border text-dark rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                    style={{ width: '32px', height: '32px', fontSize: '13px' }}
-                                >
-                                    {comment.userPic ? (
-                                        <img src={comment.userPic} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                                    ) : (
-                                        comment.userName?.[0]?.toUpperCase() || '?'
-                                    )}
-                                </div>
-                                <div className="bg-white p-2 px-3 rounded-3 shadow-sm flex-grow-1">
-                                    <div className="d-flex justify-content-between align-items-center mb-1">
-                                        <h6 className="extra-small fw-bold mb-0">{comment.userName || 'Anonymous'}</h6>
-                                        <span className="extra-small text-muted">{timeAgo(comment.createdAt)}</span>
+                        {post.comments?.map((comment, idx) => {
+                            const isCommentAuthor = (comment.userId || comment.userId?._id) === loggedInUserId;
+                            return (
+                                <div key={comment._id || comment.id || idx} className="d-flex gap-2 mb-2">
+                                    <div
+                                        className="bg-light border text-dark rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                        style={{ width: '32px', height: '32px', fontSize: '13px', overflow: 'hidden' }}
+                                    >
+                                        {comment.userPic ? (
+                                            <img src={comment.userPic} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                            comment.userName?.[0]?.toUpperCase() || '?'
+                                        )}
                                     </div>
-                                    <p className="extra-small mb-0 text-dark">{comment.content}</p>
+                                    <div className="bg-white p-2 px-3 rounded-3 shadow-sm flex-grow-1 position-relative">
+                                        <div className="d-flex justify-content-between align-items-center mb-1">
+                                            <h6 className="extra-small fw-bold mb-0">{comment.userName || 'Anonymous'}</h6>
+                                            <div className="d-flex align-items-center gap-2">
+                                                <span className="extra-small text-muted">{timeAgo(comment.createdAt)}</span>
+                                                {isCommentAuthor && onDeleteComment && (
+                                                    <FaTrashAlt 
+                                                        className="text-danger" 
+                                                        style={{ cursor: 'pointer', fontSize: '11px' }} 
+                                                        title="Delete comment"
+                                                        onClick={() => {
+                                                            if (window.confirm('Delete comment?')) onDeleteComment(post._id || post.id, comment._id);
+                                                        }}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                        <p className="extra-small mb-0 text-dark">{comment.content}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}

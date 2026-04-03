@@ -167,11 +167,10 @@ const Profile = () => {
   const [saving, setSaving]               = useState(false);
 
   // ── User posts state ─────────────────────────────────────────
-  const POST_LIMIT = 5;
+  const POST_LIMIT = 1;
   const [userPosts,      setUserPosts]      = useState([]);
   const [postsLoading,   setPostsLoading]   = useState(false);
   const [postsHasMore,   setPostsHasMore]   = useState(false);
-  const [showAllPosts,   setShowAllPosts]   = useState(false);
 
   // ── Activity (likes + comments) state ───────────────────────
   const [activityTab,        setActivityTab]       = useState('likes');
@@ -180,8 +179,6 @@ const Profile = () => {
   const [activityLoading,    setActivityLoading]    = useState(false);
   const [likedHasMore,       setLikedHasMore]       = useState(false);
   const [commentedHasMore,   setCommentedHasMore]   = useState(false);
-  const [showAllLikes,       setShowAllLikes]       = useState(false);
-  const [showAllComments,    setShowAllComments]    = useState(false);
 
   // ── Edit post state ─────────────────────────────────────
   const [editingPost,        setEditingPost]        = useState(null);  // post object
@@ -754,22 +751,16 @@ const Profile = () => {
               {/* Section header */}
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h5 className="fw-bold mb-0 text-dark">
-                  {isOwnProfile ? 'My Posts' : `Posts by ${profile.name?.split(' ')[0] || 'User'}`}
+                  {isOwnProfile ? 'My Posts' : `Posts by ${profile?.name?.split(' ')[0] || 'User'}`}
                 </h5>
-                {postsHasMore && !showAllPosts && (
-                  <button
+                {postsHasMore && (
+                  <Link
+                    to={`/profile/${id}/posts`}
                     className="btn btn-link p-0 fw-semibold"
                     style={{ fontSize: 13, color: '#c84022', textDecoration: 'none' }}
-                    onClick={() => {
-                      setShowAllPosts(true);
-                      postService.getUserPosts(id).then(r => {
-                        setUserPosts(r.data.data || []);
-                        setPostsHasMore(false);
-                      }).catch(() => {});
-                    }}
                   >
                     See all posts →
-                  </button>
+                  </Link>
                 )}
               </div>
 
@@ -785,47 +776,22 @@ const Profile = () => {
                 <div className="d-flex flex-column gap-3">
                   {userPosts.map(post => (
                     <div key={post._id || post.id} className="position-relative">
-                      {/* 3-dot CRUD menu — own profile only */}
-                      {isOwnProfile && (
-                        <div className="position-absolute" style={{ top: 10, right: 10, zIndex: 2 }}>
-                          <div className="dropdown">
-                            <button
-                              className="btn btn-light btn-sm rounded-circle"
-                              data-bs-toggle="dropdown"
-                              style={{ width: 30, height: 30, padding: 0, lineHeight: '28px' }}
-                            >
-                              <FaEllipsisH size={12} />
-                            </button>
-                            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" style={{ fontSize: 13 }}>
-                              <li>
-                                <button
-                                  className="dropdown-item d-flex align-items-center gap-2"
-                                  onClick={() => { setEditingPost(post); setEditPostContent(post.content || ''); }}
-                                >
-                                  <FaPencilAlt size={11} style={{ color: '#c84022' }} /> Edit Post
-                                </button>
-                              </li>
-                              <li>
-                                <button
-                                  className="dropdown-item text-danger d-flex align-items-center gap-2"
-                                  onClick={async () => {
-                                    if (!window.confirm('Delete this post?')) return;
-                                    try {
-                                      await postService.deletePost(post._id || post.id);
-                                      setUserPosts(prev => prev.filter(p => p._id !== post._id && p.id !== post.id));
-                                      showToast('Post deleted.', 'success');
-                                    } catch { showToast('Failed to delete post.', 'error'); }
-                                  }}
-                                >
-                                  <FaTimes size={11} /> Delete Post
-                                </button>
-                              </li>
-                            </ul>
-                          </div>
-                        </div>
-                      )}
                       <FeedItem
                         post={post}
+                        onEdit={(p) => { setEditingPost(p); setEditPostContent(p.content || ''); }}
+                        onDelete={async (postId) => {
+                          try {
+                            await postService.deletePost(postId);
+                            setUserPosts(prev => prev.filter(p => !((p._id === postId) || (p.id === postId))));
+                            showToast('Post deleted.', 'success');
+                          } catch { showToast('Failed to delete post.', 'error'); }
+                        }}
+                        onDeleteComment={async (postId, commentId) => {
+                          try {
+                            const res = await postService.deleteComment(postId, commentId);
+                            setUserPosts(prev => prev.map(p => (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p));
+                          } catch {}
+                        }}
                         onLike={async (postId) => {
                           try {
                             const res = await postService.likePost(postId);
@@ -897,11 +863,24 @@ const Profile = () => {
                             <FaThumbsUp size={10} /> {
                               isOwnProfile
                                 ? 'You liked this post'
-                                : `${profile.name?.split(' ')[0]} liked this`
+                                : `${profile?.name?.split(' ')[0]} liked this`
                             }
                           </div>
                           <FeedItem
                             post={post}
+                            onDelete={async (postId) => {
+                              try {
+                                await postService.deletePost(postId);
+                                setLikedPosts(prev => prev.filter(p => !((p._id === postId) || (p.id === postId))));
+                                showToast('Post deleted.', 'success');
+                              } catch { showToast('Failed to delete post.', 'error'); }
+                            }}
+                            onDeleteComment={async (postId, commentId) => {
+                              try {
+                                const res = await postService.deleteComment(postId, commentId);
+                                setLikedPosts(prev => prev.map(p => (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p));
+                              } catch {}
+                            }}
                             onLike={async (postId) => {
                               try {
                                 const res = await postService.likePost(postId);
@@ -922,20 +901,14 @@ const Profile = () => {
                           />
                         </div>
                       ))}
-                      {likedHasMore && !showAllLikes && (
-                        <button
-                          className="btn btn-outline-secondary btn-sm rounded-pill w-100 mt-1"
+                      {likedHasMore && (
+                        <Link
+                          to={`/profile/${id}/activity`}
+                          className="btn btn-outline-secondary btn-sm rounded-pill w-100 mt-1 text-decoration-none"
                           style={{ fontSize: 12 }}
-                          onClick={() => {
-                            setShowAllLikes(true);
-                            postService.getUserActivity(id).then(r => {
-                              setLikedPosts(r.data.likedPosts || []);
-                              setLikedHasMore(false);
-                            }).catch(() => {});
-                          }}
                         >
                           See all liked posts
-                        </button>
+                        </Link>
                       )}
                     </div>
                   )}
@@ -947,40 +920,23 @@ const Profile = () => {
                   ) : (
                     <div className="d-flex flex-column gap-3">
                       {commentedPosts.map(post => {
-                        // Find the user's own comment(s)
-                        const myComments = (post.comments || []).filter(c =>
-                          c.userId?.toString() === id || c.userId === id
-                        );
                         return (
                           <div key={post._id || post.id}>
-                            {myComments.slice(0, 1).map(c => (
-                              <div key={c._id} className="d-flex justify-content-between align-items-start mb-1">
-                                <p className="mb-0" style={{ fontSize: 11.5, color: '#555', fontStyle: 'italic' }}>
-                                  <span style={{ color: '#c84022', fontWeight: 600 }}>Your comment: </span>
-                                  "{c.content.substring(0, 80)}{c.content.length > 80 ? '…' : ''}"
-                                </p>
-                                {isOwnProfile && (
-                                  <button
-                                    className="btn btn-link p-0 ms-2 text-danger"
-                                    style={{ fontSize: 11 }}
-                                    title="Delete comment"
-                                    onClick={async () => {
-                                      try {
-                                        const res = await postService.deleteComment(post._id || post.id, c._id);
-                                        setCommentedPosts(prev => prev.map(p =>
-                                          (p._id === post._id || p.id === post.id) ? { ...p, ...res.data.data } : p
-                                        ));
-                                        showToast('Comment deleted.', 'success');
-                                      } catch { showToast('Failed to delete comment.', 'error'); }
-                                    }}
-                                  >
-                                    <FaTimes size={10} />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
                             <FeedItem
                               post={post}
+                              onDelete={async (postId) => {
+                                try {
+                                  await postService.deletePost(postId);
+                                  setCommentedPosts(prev => prev.filter(p => !((p._id === postId) || (p.id === postId))));
+                                  showToast('Post deleted.', 'success');
+                                } catch { showToast('Failed to delete post.', 'error'); }
+                              }}
+                              onDeleteComment={async (postId, commentId) => {
+                                try {
+                                  const res = await postService.deleteComment(postId, commentId);
+                                  setCommentedPosts(prev => prev.map(p => (p._id === postId || p.id === postId) ? { ...p, ...res.data.data } : p));
+                                } catch {}
+                              }}
                               onLike={async (postId) => {
                                 try {
                                   const res = await postService.likePost(postId);
@@ -1002,20 +958,14 @@ const Profile = () => {
                           </div>
                         );
                       })}
-                      {commentedHasMore && !showAllComments && (
-                        <button
-                          className="btn btn-outline-secondary btn-sm rounded-pill w-100 mt-1"
+                      {commentedHasMore && (
+                        <Link
+                          to={`/profile/${id}/activity`}
+                          className="btn btn-outline-secondary btn-sm rounded-pill w-100 mt-1 text-decoration-none"
                           style={{ fontSize: 12 }}
-                          onClick={() => {
-                            setShowAllComments(true);
-                            postService.getUserActivity(id).then(r => {
-                              setCommentedPosts(r.data.commentedPosts || []);
-                              setCommentedHasMore(false);
-                            }).catch(() => {});
-                          }}
                         >
                           See all commented posts
-                        </button>
+                        </Link>
                       )}
                     </div>
                   )}
