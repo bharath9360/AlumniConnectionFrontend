@@ -11,7 +11,8 @@ const notificationSchema = new mongoose.Schema({
       'event', 'job', 'message', 'system',
       'connection_request', 'connection_accepted',
       'job_alert', 'event_alert',
-      'admin_approval_needed', 'account_activated'
+      'admin_approval_needed', 'account_activated',
+      'broadcast', 'role_changed', 'account_update',
     ],
     required: true
   },
@@ -29,11 +30,10 @@ const notificationSchema = new mongoose.Schema({
 });
 
 // Keep recipientId in sync with userId automatically
-notificationSchema.pre('save', function (next) {
+notificationSchema.pre('save', function () {
   if (this.isModified('userId') || this.isNew) {
     this.recipientId = this.userId;
   }
-  next();
 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

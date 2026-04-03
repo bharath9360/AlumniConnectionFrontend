@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { notificationService } from '../services/api';
 
 const SocketContext = createContext(null);
 
@@ -10,25 +11,41 @@ const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
 
 export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
-  const socketRef             = useRef(null);
-  const [socket,       setSocket]      = useState(null); // state so consumers re-render on connect
-  const [isConnected, setIsConnected] = useState(false);
-  // Full list of online user IDs — populated by server broadcast
-  const [onlineUsers, setOnlineUsers] = useState([]);
+  const socketRef              = useRef(null);
+  const [socket,        setSocket]       = useState(null);
+  const [isConnected,   setIsConnected]  = useState(false);
+  const [onlineUsers,   setOnlineUsers]  = useState([]);
 
+  // ── Shared notification state (single source of truth) ────────
+  const [notifications, setNotifications] = useState([]);
+  const [notifLoaded,   setNotifLoaded]   = useState(false);
+
+  // ── Fetch notifications from REST ──────────────────────────────
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await notificationService.getNotifications();
+      if (res.data?.data) {
+        setNotifications(res.data.data);
+        setNotifLoaded(true);
+      }
+    } catch { /* silent */ }
+  }, [user]);
+
+  // ── Socket setup ───────────────────────────────────────────────
   useEffect(() => {
     if (!user) {
-      // Disconnect if user logs out
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
         setIsConnected(false);
         setOnlineUsers([]);
       }
+      setNotifications([]);
+      setNotifLoaded(false);
       return;
     }
 
-    // Create socket connection
     const sock = io(SOCKET_URL, {
       transports: ['websocket'],
       reconnectionAttempts: 5,
@@ -36,7 +53,7 @@ export const SocketProvider = ({ children }) => {
     });
 
     socketRef.current = sock;
-    setSocket(sock); // expose as state so consumers re-render when connected
+    setSocket(sock);
 
     const doSetup = () => {
       sock.emit('setup', user);
@@ -45,11 +62,17 @@ export const SocketProvider = ({ children }) => {
 
     sock.on('connect', doSetup);
     sock.on('connected', () => setIsConnected(true));
-
-    // Re-register after reconnection so presence stays accurate
     sock.on('reconnect', doSetup);
 
-    // Server broadcasts the full list of online user IDs on every change
+    // Real-time notification push — prepend to shared list
+    sock.on('notification_received', (notif) => {
+      setNotifications(prev => {
+        // Avoid duplicates (server might emit twice on reconnect)
+        if (prev.some(n => n._id === notif._id)) return prev;
+        return [notif, ...prev];
+      });
+    });
+
     sock.on('online_users', (userIds) => {
       setOnlineUsers(Array.isArray(userIds) ? userIds : []);
     });
@@ -60,7 +83,12 @@ export const SocketProvider = ({ children }) => {
       setIsConnected(false);
     });
 
+    // Initial REST fetch + 60s polling fallback
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60_000);
+
     return () => {
+      clearInterval(interval);
       sock.disconnect();
       socketRef.current = null;
       setSocket(null);
@@ -68,25 +96,64 @@ export const SocketProvider = ({ children }) => {
       setOnlineUsers([]);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?._id]); // intentional: re-connect only on identity change, not every render
+  }, [user?._id]);
 
-  /**
-   * Helper: check if a given userId is currently online.
-   * @param {string} userId
-   * @returns {boolean}
-   */
+  // ── Shared notification actions ────────────────────────────────
+  const markOneRead = useCallback(async (id) => {
+    try {
+      await notificationService.markRead(id);
+      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+    } catch { /* silent */ }
+  }, []);
+
+  const markAllRead = useCallback(async () => {
+    try {
+      await notificationService.markAllRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch { /* silent */ }
+  }, []);
+
+  const deleteNotif = useCallback(async (id) => {
+    try {
+      await notificationService.delete(id);
+      setNotifications(prev => prev.filter(n => n._id !== id));
+    } catch { /* silent */ }
+  }, []);
+
+  const clearAll = useCallback(async () => {
+    try {
+      await notificationService.clearAll();
+      setNotifications([]);
+    } catch { /* silent */ }
+  }, []);
+
   const isOnline = (userId) => {
     if (!userId) return false;
     return onlineUsers.includes(userId.toString());
   };
 
+  // Bell badge: everything except chat notifications (those live in the sidebar)
+  const unreadCount = notifications.filter(n => !n.isRead && n.type !== 'message').length;
+  // Messaging icon badge: only message notifications
+  const unreadMessageCount = notifications.filter(n => !n.isRead && n.type === 'message').length;
+
   return (
     <SocketContext.Provider
       value={{
-        socket,           // state-tracked — consumers re-render when it's ready
+        socket,
         isConnected,
         onlineUsers,
         isOnline,
+        // Shared notification state
+        notifications,
+        unreadCount,
+        unreadMessageCount,
+        notifLoaded,
+        fetchNotifications,
+        markOneRead,
+        markAllRead,
+        deleteNotif,
+        clearAll,
       }}
     >
       {children}

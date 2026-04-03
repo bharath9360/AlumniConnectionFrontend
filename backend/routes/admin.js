@@ -5,7 +5,9 @@ const bcrypt   = require('bcryptjs');
 const User     = require('../models/User');
 const Notification = require('../models/Notification');
 const { protect, authorize } = require('../middleware/auth');
-const { sendApprovalEmail }  = require('../services/emailService');
+const { sendApprovalEmail, sendBroadcastEmail } = require('../services/emailService');
+const { runGraduationJob, promoteStudentToAlumni } = require('../jobs/graduationJob');
+const { createNotification } = require('../utils/notifyHelper');
 
 const router = express.Router();
 
@@ -157,31 +159,16 @@ router.delete('/students/:id', protect, authorize('admin'), async (req, res) => 
   }
 });
 
-// ─── PUT /api/admin/students/:id/promote ─────────────────────
-// Promote a student → alumni (changes role, clears student-only fields)
+// ─── PUT /api/admin/students/:id/promote ─────────────────────────────────
 router.put('/students/:id/promote', protect, authorize('admin'), async (req, res) => {
   try {
     const student = await User.findOne({ _id: req.params.id, role: 'student' });
     if (!student) return res.status(404).json({ message: 'Student not found.' });
 
-    // Use graduation year as pass-out batch if available
-    student.role   = 'alumni';
-    student.status = 'Active';
-    if (student.graduationYear && !student.batch) {
-      student.batch = student.graduationYear;
-    }
-    await student.save();
+    // Use the shared helper — sets role, status, batch, notification, email
+    await promoteStudentToAlumni(student);
 
-    // Notify the user
-    await Notification.create({
-      userId: student._id,
-      type: 'role_changed',
-      title: '🎓 Congratulations! You\'ve been promoted to Alumni!',
-      description: 'Your account has been upgraded. Welcome to the MAMCET Alumni network!',
-      icon: '🎓',
-    });
-
-    res.json({ success: true, message: `${student.name} promoted to alumni!` });
+    res.json({ success: true, message: `${student.name} has been promoted to Alumni!`, data: { role: 'alumni', batch: student.batch } });
   } catch (err) {
     console.error('[PUT /students/:id/promote]', err);
     res.status(500).json({ message: 'Failed to promote student.' });
@@ -559,14 +546,16 @@ router.put('/activate/:userId', protect, authorize('admin'), async (req, res) =>
     user.status = 'Active';
     await user.save();
 
-    // Notify the alumni their account was approved
-    await Notification.create({
+    // Notify the alumni their account was approved — with real-time socket push
+    const notif = await Notification.create({
       userId: user._id,
       type: 'account_activated',
       title: '🎉 Your account has been approved!',
       description: 'Welcome to MAMCET Alumni Connect! You can now log in and explore.',
       icon: '🎉',
     });
+    const io = req.app.get('io');
+    if (io) io.to(user._id.toString()).emit('notification_received', notif.toObject());
 
     // Send approval email
     try { await sendApprovalEmail(user.email, user.name); } catch (_) {}
@@ -580,8 +569,19 @@ router.put('/activate/:userId', protect, authorize('admin'), async (req, res) =>
 // ─── DELETE /api/admin/reject/:userId ────────────────────────
 router.delete('/reject/:userId', protect, authorize('admin'), async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.userId);
+    const user = await User.findById(req.params.userId);
     if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    // Notify before deleting (so we still have the userId)
+    await createNotification(req.app.get('io'), {
+      userId: user._id,
+      type: 'system',
+      title: '❌ Your account application was not approved',
+      description: 'Unfortunately your alumni registration did not meet our requirements. Contact the admin for details.',
+      icon: '🚫',
+    });
+
+    await User.findByIdAndDelete(req.params.userId);
     res.json({ success: true, message: `${user.name}'s application has been rejected and removed.` });
   } catch (err) {
     res.status(500).json({ message: 'Failed to reject user.' });
@@ -663,6 +663,390 @@ router.put('/reject-event/:id', protect, authorize('admin'), async (req, res) =>
   } catch (err) {
     res.status(500).json({ message: 'Failed to reject event.' });
   }
+});
+
+// ════════════════════════════════════════════════════════════════
+//  POST MODERATION
+// ════════════════════════════════════════════════════════════════
+
+// ─── GET /api/admin/posts ─────────────────────────────────────
+// Returns all posts (with author details) for admin moderation panel.
+// Filters: filter=all|reported|hidden|recent, search, page, limit
+router.get('/posts', protect, authorize('admin'), async (req, res) => {
+  try {
+    const Post = require('../models/Post');
+    const {
+      filter = 'all',
+      search = '',
+      page   = 1,
+      limit  = 15,
+    } = req.query;
+
+    const query = {};
+
+    if (filter === 'reported') query.reportCount = { $gt: 0 };
+    else if (filter === 'hidden')   query.isHidden = true;
+    else if (filter === 'recent')   {} // just sort createdAt desc — already default
+
+    if (search.trim()) {
+      query.$or = [
+        { userName:    { $regex: search.trim(), $options: 'i' } },
+        { content:     { $regex: search.trim(), $options: 'i' } },
+      ];
+    }
+
+    const skip  = (Number(page) - 1) * Number(limit);
+    const total = await Post.countDocuments(query);
+
+    const posts = await Post.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .populate('userId', 'name email profilePic role status department')
+      .populate('reportedBy', 'name email');
+
+    const reportedCount = await Post.countDocuments({ reportCount: { $gt: 0 } });
+    const hiddenCount   = await Post.countDocuments({ isHidden: true });
+
+    res.json({
+      success: true,
+      data: posts,
+      pagination: {
+        total,
+        page:       Number(page),
+        limit:      Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+      stats: { total, reportedCount, hiddenCount },
+    });
+  } catch (err) {
+    console.error('[GET /admin/posts]', err);
+    res.status(500).json({ message: 'Failed to fetch posts.' });
+  }
+});
+
+// ─── DELETE /api/admin/posts/:id ─────────────────────────────
+// Hard-delete a post (admin override — bypasses author check)
+router.delete('/posts/:id', protect, authorize('admin'), async (req, res) => {
+  try {
+    const Post = require('../models/Post');
+    const post = await Post.findByIdAndDelete(req.params.id);
+    if (!post) return res.status(404).json({ message: 'Post not found.' });
+    res.json({ success: true, message: 'Post permanently deleted.' });
+  } catch (err) {
+    console.error('[DELETE /admin/posts/:id]', err);
+    res.status(500).json({ message: 'Failed to delete post.' });
+  }
+});
+
+// ─── PUT /api/admin/posts/:id/hide ───────────────────────────
+// Toggle hidden status of a post (soft moderation)
+router.put('/posts/:id/hide', protect, authorize('admin'), async (req, res) => {
+  try {
+    const Post = require('../models/Post');
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: 'Post not found.' });
+
+    post.isHidden = !post.isHidden;
+    await post.save();
+
+    res.json({
+      success: true,
+      message: post.isHidden ? 'Post hidden from feed.' : 'Post restored to feed.',
+      data: { isHidden: post.isHidden },
+    });
+  } catch (err) {
+    console.error('[PUT /admin/posts/:id/hide]', err);
+    res.status(500).json({ message: 'Failed to update post visibility.' });
+  }
+});
+
+// ─── PUT /api/admin/posts/:id/dismiss-reports ────────────────
+// Clear all reports on a post (admin reviewed & dismissed)
+router.put('/posts/:id/dismiss-reports', protect, authorize('admin'), async (req, res) => {
+  try {
+    const Post = require('../models/Post');
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      { $set: { reportedBy: [], reportCount: 0 } },
+      { new: true }
+    );
+    if (!post) return res.status(404).json({ message: 'Post not found.' });
+    res.json({ success: true, message: 'Reports dismissed.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to dismiss reports.' });
+  }
+});
+
+// ─── PUT /api/admin/ban-user/:userId ─────────────────────────
+// Ban a user: set status → 'Inactive' (they cannot log in)
+router.put('/ban-user/:userId', protect, authorize('admin'), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    if (user.role === 'admin') {
+      return res.status(400).json({ message: 'Cannot ban an admin account.' });
+    }
+
+    const isBanned = user.status === 'Inactive';
+    user.status = isBanned ? 'Active' : 'Inactive';
+    await user.save();
+
+    // Notify user
+    await Notification.create({
+      userId      : user._id,
+      type        : 'account_update',
+      title       : isBanned ? '✅ Your account has been reinstated.' : '🚫 Your account has been suspended.',
+      description : isBanned
+        ? 'An admin has restored your account. You can log in again.'
+        : 'Your account has been suspended by an admin due to a policy violation.',
+      icon: isBanned ? '✅' : '🚫',
+    });
+
+    res.json({
+      success: true,
+      message: isBanned ? `${user.name} reinstated.` : `${user.name} banned.`,
+      data: { status: user.status },
+    });
+  } catch (err) {
+    console.error('[PUT /admin/ban-user]', err);
+    res.status(500).json({ message: 'Failed to update user status.' });
+  }
+});
+
+// ─── POST /api/admin/graduation/run ─────────────────────────
+// Manual trigger: promotes all eligible students (graduationYear < current year)
+router.post('/graduation/run', protect, authorize('admin'), async (req, res) => {
+  try {
+    console.log(`[Admin] Manual graduation triggered by ${req.user?.email}`);
+    const result = await runGraduationJob();
+
+    const message = result.promoted > 0
+      ? `🎓 ${result.promoted} student(s) promoted to Alumni!`
+      : 'No students eligible for graduation at this time.';
+
+    res.json({
+      success : true,
+      message,
+      data    : result,
+    });
+  } catch (err) {
+    console.error('[POST /graduation/run]', err);
+    res.status(500).json({ message: 'Graduation job failed.' });
+  }
+});
+
+// ════════════════════════════════════════════════════════════
+//  NOTIFICATION BROADCAST
+// ════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/admin/broadcast
+ *
+ * Body:
+ *   {
+ *     audience : 'all' | 'students' | 'alumni' | 'batch',
+ *     batch    : '2022'          // required when audience === 'batch'
+ *     title    : string          // required
+ *     message  : string          // required
+ *     icon     : string          // optional emoji, default '📢'
+ *     sendEmail: boolean         // optional, default false
+ *   }
+ */
+router.post('/broadcast', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { audience = 'all', batch, title, message, icon = '📢', sendEmail = false } = req.body;
+
+    if (!title?.trim() || !message?.trim()) {
+      return res.status(400).json({ message: 'Title and message are required.' });
+    }
+
+    // ── Build recipient query ──────────────────────────────
+    const query = {};
+    switch (audience) {
+      case 'students': query.role = 'student';                      break;
+      case 'alumni':   query.role = 'alumni';                       break;
+      case 'batch':    query.role = 'alumni'; query.batch = batch;  break;
+      default:         query.role = { $in: ['student', 'alumni'] }; break; // 'all'
+    }
+
+    const recipients = await User.find(query).select('_id name email');
+
+    if (recipients.length === 0) {
+      return res.json({ success: true, message: 'No recipients matched the selected audience.', data: { sent: 0 } });
+    }
+
+    // ── Create in-app notifications (bulk) ──────────────────
+    const notifDocs = recipients.map(u => ({
+      userId     : u._id,
+      type       : 'broadcast',
+      title      : title.trim(),
+      description: message.trim(),
+      icon,
+    }));
+
+    const created = await Notification.insertMany(notifDocs);
+
+    // ── Real-time socket push ────────────────────────
+    const io = req.app.get('io');
+    if (io) {
+      created.forEach((notif, i) => {
+        io.to(recipients[i]._id.toString()).emit('notification_received', notif);
+      });
+    }
+
+    // ── Optional email blast ─────────────────────────
+    let emailResult = { sent: 0, skipped: 0, failed: 0 };
+    if (sendEmail) {
+      try {
+        emailResult = await sendBroadcastEmail(
+          recipients.map(u => ({ email: u.email, name: u.name })),
+          title.trim(),
+          title.trim(),
+          message.trim()
+        );
+      } catch (emailErr) {
+        console.error('[Broadcast] Email send error:', emailErr.message);
+      }
+    }
+
+    const audienceLabel = {
+      all:      'All users',
+      students: 'All students',
+      alumni:   'All alumni',
+      batch:    `Batch ${batch}`,
+    }[audience] || audience;
+
+    console.log(`[Broadcast] "${title}" → ${recipients.length} recipients (${audienceLabel}) | email: ${JSON.stringify(emailResult)}`);
+
+    res.json({
+      success: true,
+      message: `📢 Broadcast sent to ${recipients.length} ${audienceLabel} recipient${recipients.length !== 1 ? 's' : ''}.`,
+      data: {
+        sent         : recipients.length,
+        audienceLabel,
+        emailResult,
+      },
+    });
+  } catch (err) {
+    console.error('[POST /admin/broadcast]', err);
+    res.status(500).json({ message: 'Broadcast failed. Please try again.' });
+  }
+});
+
+// ─── GET /api/admin/batches ──────────────────────────────
+// Returns distinct batch years for the batch-specific audience dropdown
+router.get('/batches', protect, authorize('admin'), async (req, res) => {
+  try {
+    const batches = await User.distinct('batch', {
+      role: 'alumni',
+      batch: { $exists: true, $ne: '', $ne: null},
+    });
+    const sorted = batches.filter(Boolean).sort((a, b) => Number(b) - Number(a));
+    res.json({ success: true, data: sorted });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch batches.' });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════
+//  ROLE MANAGEMENT
+// ════════════════════════════════════════════════════════════════
+
+// ─── GET /api/admin/users/roles — list all users with roles ──
+router.get('/users/roles', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { search = '', role = '', page = 1, limit = 10 } = req.query;
+    const query = {};
+    if (role) query.role = role;
+    if (search.trim()) {
+      query.$or = [
+        { name:  { $regex: search.trim(), $options: 'i' } },
+        { email: { $regex: search.trim(), $options: 'i' } },
+      ];
+    }
+    const skip  = (Number(page) - 1) * Number(limit);
+    const total = await User.countDocuments(query);
+    const users = await User.find(query)
+      .select('name email role status department batch profilePic createdAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    res.json({
+      success: true,
+      data: users,
+      pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch users.' });
+  }
+});
+
+// ─── PUT /api/admin/users/:id/role — change a user's role ────
+router.put('/users/:id/role', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!['student', 'alumni', 'admin'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role. Must be student, alumni, or admin.' });
+    }
+
+    const target = await User.findById(req.params.id);
+    if (!target) return res.status(404).json({ message: 'User not found.' });
+
+    // Prevent self-demotion
+    if (target._id.toString() === req.user._id.toString() && role !== 'admin') {
+      return res.status(400).json({ message: 'You cannot change your own admin role.' });
+    }
+
+    const oldRole = target.role;
+    target.role = role;
+    await target.save();
+
+    // Notify the user
+    await Notification.create({
+      userId     : target._id,
+      type       : 'role_changed',
+      title      : `Your account role has been updated to ${role}.`,
+      description: `An admin changed your role from ${oldRole} → ${role}.`,
+      icon       : '🔄',
+    });
+
+    res.json({ success: true, message: `${target.name}'s role updated to ${role}.`, data: { role } });
+  } catch (err) {
+    console.error('[PUT /admin/users/:id/role]', err);
+    res.status(500).json({ message: 'Failed to update role.' });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════
+//  SYSTEM CONFIG
+// ════════════════════════════════════════════════════════════════
+// Simple in-process store (persists while server is up).
+// For production, store in a DB collection or .env overrides.
+const _sysConfig = {
+  siteName          : 'MAMCET Alumni Connect',
+  allowAlumniJobs   : true,
+  allowAlumniEvents : true,
+  requireApproval   : true,
+  maintenanceMode   : false,
+  notifEmailEnabled : false,
+  maxUploadSizeMB   : 5,
+};
+
+// ─── GET /api/admin/system-config ────────────────────────────
+router.get('/system-config', protect, authorize('admin'), (req, res) => {
+  res.json({ success: true, data: { ..._sysConfig } });
+});
+
+// ─── PUT /api/admin/system-config ────────────────────────────
+router.put('/system-config', protect, authorize('admin'), (req, res) => {
+  const allowed = Object.keys(_sysConfig);
+  Object.entries(req.body).forEach(([k, v]) => {
+    if (allowed.includes(k)) _sysConfig[k] = v;
+  });
+  console.log('[System Config] Updated:', _sysConfig);
+  res.json({ success: true, message: 'System configuration saved.', data: { ..._sysConfig } });
 });
 
 module.exports = router;

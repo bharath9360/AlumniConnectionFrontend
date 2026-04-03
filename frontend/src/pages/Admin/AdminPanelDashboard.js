@@ -387,7 +387,7 @@ const AdminPanelDashboard = () => {
           </div>
 
           {/* Doughnut: Role split */}
-          <div className="ap-chart-card" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div className="ap-chart-card ap-doughnut-card" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             <div style={{ width: 110, height: 110, flexShrink: 0 }}>
               <Doughnut
                 data={doughnutData}
@@ -549,7 +549,7 @@ const AdminPanelDashboard = () => {
       </div>
 
       {/* ── Quick-action footer strip ─────────────────────────── */}
-      <div style={{
+      <div className="ap-quick-links-strip" style={{
         marginTop: 24,
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',

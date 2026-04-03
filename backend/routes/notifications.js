@@ -55,4 +55,24 @@ router.delete('/:id', protect, async (req, res) => {
   }
 });
 
+// ─── GET /api/notifications/unread-count — lightweight badge ─
+router.get('/unread-count', protect, async (req, res) => {
+  try {
+    const count = await Notification.countDocuments({ userId: req.user._id, isRead: false });
+    res.json({ success: true, count });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to get unread count.' });
+  }
+});
+
+// ─── DELETE /api/notifications/clear-all — wipe all ──────────
+router.delete('/clear-all', protect, async (req, res) => {
+  try {
+    await Notification.deleteMany({ userId: req.user._id });
+    res.json({ success: true, message: 'All notifications cleared.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to clear notifications.' });
+  }
+});
+
 module.exports = router;

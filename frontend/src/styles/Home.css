@@ -135,7 +135,10 @@
 .hero-landing {
   position: relative;
   height: 85vh;
-  background: url('https://res.cloudinary.com/dnby5o1lt/image/upload/v1754489527/alumni_linked_in_background_image_sgla6a.jpg') no-repeat center center/cover;
+  background-color: #0f0c1d; /* fallback if no image loads */
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
   background-attachment: fixed;
   display: flex;
   align-items: center;

@@ -36,6 +36,7 @@ import Events from './pages/Home/Events';
 import JobsAndEvents from './pages/Home/JobsAndEvents';
 import Messaging from './pages/Home/Messaging';
 import Notification from './pages/Home/Notification';
+import ConnectionRequests from './pages/Home/ConnectionRequests';
 
 // Student Pages
 import JobSearch from './pages/Student/JobSearch';
@@ -48,30 +49,32 @@ import JobVacancyList from './pages/Admin/JobVacancyList';
 import CreateJob from './pages/Admin/CreateJob';
 import CreateEvent from './pages/Admin/CreateEvent';
 import ViewProfile from './pages/Admin/ViewProfile';
-import AdminDashboard from './pages/Admin/AdminDashboard';
+import AdminApprovals from './pages/Admin/AdminApprovals';
 import AlumniManagement from './pages/Admin/AlumniManagement';
 import ReviewApplication from './pages/Admin/ReviewApplication';
 import VerificationSuccess from './pages/Admin/VerificationSuccess';
 import JobDetailsView from './pages/Admin/JobDetailsView';
 import AddAlumni from './pages/Admin/AddAlumni';
 import ViewEventDetail from './pages/Admin/ViewEventDetail';
-import AdminApprovals from './pages/Admin/AdminApprovals';
 
 // ── Admin Panel (new layout with sidebar) ────────────────────────
 import AdminLayout from './components/admin/AdminLayout';
 import AdminPanelDashboard from './pages/Admin/AdminPanelDashboard';
 import AdminAlumni from './pages/Admin/AdminAlumni';
 import AdminStudents from './pages/Admin/AdminStudents';
+import GroupManagementPanel from './pages/Admin/GroupManagementPanel';
 import AdminPosts from './pages/Admin/AdminPosts';
 import AdminJobs from './pages/Admin/AdminJobs';
 import AdminEvents from './pages/Admin/AdminEvents';
 import AdminLanding from './pages/Admin/AdminLanding';
 import AdminSettings from './pages/Admin/AdminSettings';
 import BulkImportPage from './pages/Admin/BulkImportPage';
+import AdminBroadcast from './pages/Admin/AdminBroadcast';
 
 // Global Styles
 import './styles/Global.css';
 import './styles/Dashboard.css';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // ─── Route redirect helpers ────────────────────────────────────
 // /alumni/profile/:userId or /admin/profile/:userId → /profile/:userId
@@ -99,11 +102,13 @@ function App() {
             {/* ════════════════════════════════════════════════════
                 Admin Panel — full-screen layout (no global Navbar)
             ════════════════════════════════════════════════════ */}
-            <Route element={<AdminLayout />}>
+            <Route element={<ErrorBoundary compact={false}><AdminLayout /></ErrorBoundary>}>
+              <Route path="/admin"           element={<Navigate to="/admin/analytics" replace />} />
               <Route path="/admin/dashboard"  element={<AdminPanelDashboard />} />
               <Route path="/admin/analytics"  element={<AdminPanelDashboard />} />
               <Route path="/admin/alumni"     element={<AdminAlumni />} />
               <Route path="/admin/students"   element={<AdminStudents />} />
+              <Route path="/admin/groups"     element={<GroupManagementPanel />} />
               <Route path="/admin/approvals"  element={<AdminApprovals />} />
               <Route path="/admin/posts"      element={<AdminPosts />} />
               <Route path="/admin/jobs"       element={<AdminJobs />} />
@@ -111,6 +116,7 @@ function App() {
               <Route path="/admin/landing"    element={<AdminLanding />} />
               <Route path="/admin/settings"   element={<AdminSettings />} />
               <Route path="/admin/import"     element={<BulkImportPage />} />
+              <Route path="/admin/broadcast"  element={<AdminBroadcast />} />
             </Route>
 
             {/* ════════════════════════════════════════════════════
@@ -122,6 +128,7 @@ function App() {
                 <div className="App d-flex flex-column min-vh-100">
                   <Navbar />
                   <main className="flex-grow-1 pb-lg-0 pb-5 mb-3 mb-lg-0">
+                    <ErrorBoundary compact={false}>
                     <Routes>
                       {/* ── Fully Public Routes ───────────────── */}
                       <Route path="/" element={<HomeScreen />} />
@@ -157,7 +164,7 @@ function App() {
                       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
                         <Route path="/admin/home/:userId" element={<AdminHome />} />
                         <Route path="/admin/profile/:userId" element={<NavigateToProfile />} />
-                        <Route path="/admin/dashboard/:userId" element={<AdminDashboard />} />
+                        <Route path="/admin/dashboard/:userId" element={<Navigate to="/admin/analytics" replace />} />
                         <Route path="/admin/post/:userId" element={<AdminPost />} />
                         <Route path="/admin/upcoming-events-list/:userId" element={<UpcomingEventsList />} />
                         <Route path="/admin/create-event/:userId" element={<CreateEvent />} />
@@ -181,10 +188,12 @@ function App() {
                         <Route path="/events" element={<JobsAndEvents />} />
                         <Route path="/student/StudentEvents" element={<Navigate to="/opportunities?tab=events" replace />} />
                         <Route path="/Student/JobSearch" element={<Navigate to="/opportunities?tab=jobs" replace />} />
+                        <Route path="/requests" element={<ConnectionRequests />} />
                         <Route path="/messaging" element={<Messaging />} />
                         <Route path="/notifications" element={<Notification />} />
                       </Route>
                     </Routes>
+                    </ErrorBoundary>
                   </main>
                   <BottomNav />
                 </div>
@@ -197,4 +206,4 @@ function App() {
   );
 }
 
-export default App;
+export default App;

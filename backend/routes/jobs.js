@@ -3,13 +3,26 @@ const Job = require('../models/Job');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { protect, authorize, optionalAuth } = require('../middleware/auth');
+const { createNotification } = require('../utils/notifyHelper');
 
 const router = express.Router();
 
 // ─── GET /api/jobs — All approved jobs, newest first ───────────
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const jobs = await Job.find({ status: 'Approved' }).sort({ createdAt: -1 });
+    const { type, location: loc, department, search } = req.query;
+    const query = { status: 'Approved' };
+    if (type && type !== 'All')           query.type = type;
+    if (loc && loc !== 'All')             query.location = { $regex: loc, $options: 'i' };
+    if (department && department !== 'All') query.department = { $regex: department, $options: 'i' };
+    if (search && search.trim()) {
+      query.$or = [
+        { title:   { $regex: search.trim(), $options: 'i' } },
+        { company: { $regex: search.trim(), $options: 'i' } },
+      ];
+    }
+
+    const jobs = await Job.find(query).sort({ createdAt: -1 });
     const userId = req.user?._id;
     const result = jobs.map(job => {
       const obj = job.toJSON();
@@ -32,6 +45,75 @@ router.get('/pending', protect, authorize('admin'), async (req, res) => {
     res.json({ success: true, data: jobs });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch pending jobs.' });
+  }
+});
+
+// ─── GET /api/jobs/admin/all — Admin: all jobs (any status) ──
+router.get('/admin/all', protect, authorize('admin'), async (req, res) => {
+  try {
+    const {
+      search = '', status = '', type = '',
+      page = 1, limit = 12, sort = 'createdAt', order = 'desc',
+    } = req.query;
+
+    const query = {};
+    if (status) query.status = status;
+    if (type)   query.type   = type;
+    if (search.trim()) {
+      query.$or = [
+        { title:       { $regex: search.trim(), $options: 'i' } },
+        { company:     { $regex: search.trim(), $options: 'i' } },
+        { description: { $regex: search.trim(), $options: 'i' } },
+      ];
+    }
+
+    const skip     = (Number(page) - 1) * Number(limit);
+    const sortDir  = order === 'asc' ? 1 : -1;
+    const total    = await Job.countDocuments(query);
+
+    const jobs = await Job.find(query)
+      .populate('postedBy', 'name email role')
+      .sort({ [sort]: sortDir })
+      .skip(skip)
+      .limit(Number(limit));
+
+    res.json({
+      success: true,
+      data: jobs,
+      pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch jobs.' });
+  }
+});
+
+// ─── GET /api/jobs/:id/applicants — Admin: see who applied ───
+router.get('/:id/applicants', protect, authorize('admin'), async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.id)
+      .populate('appliedBy', 'name email profilePic role department batch graduationYear');
+    if (!job) return res.status(404).json({ message: 'Job not found.' });
+    res.json({ success: true, data: job.appliedBy, total: job.appliedBy.length });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch applicants.' });
+  }
+});
+
+// ─── PUT /api/jobs/:id — Admin: edit a job ───────────────────
+router.put('/:id', protect, authorize('admin'), async (req, res) => {
+  try {
+    const allowed = ['title', 'company', 'location', 'type', 'experience', 'salary', 'description', 'skills', 'status'];
+    const updates = {};
+    allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+    if (updates.skills && !Array.isArray(updates.skills)) {
+      updates.skills = updates.skills.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    const job = await Job.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true, runValidators: true });
+    if (!job) return res.status(404).json({ message: 'Job not found.' });
+    res.json({ success: true, data: job, message: 'Job updated.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update job.' });
   }
 });
 
@@ -82,8 +164,9 @@ router.post('/', protect, async (req, res) => {
         }
       } catch (_) {}
     } else {
-      // Notify all admins to review the alumni's job
+      // Notify all admins to review the alumni's job — with real-time socket push
       try {
+        const io = req.app.get('io');
         const admins = await User.find({ role: 'admin' }).select('_id');
         const notifDocs = admins.map(a => ({
           userId: a._id,
@@ -93,7 +176,10 @@ router.post('/', protect, async (req, res) => {
           icon: '⏳',
           relatedId: job._id
         }));
-        await Notification.insertMany(notifDocs);
+        const created = await Notification.insertMany(notifDocs);
+        if (io) {
+          created.forEach(n => io.to(n.userId.toString()).emit('notification_received', n.toObject()));
+        }
       } catch (_) {}
     }
 
@@ -139,6 +225,18 @@ router.put('/:id/approve', protect, authorize('admin'), async (req, res) => {
       }
     } catch (_) {}
 
+    // Notify the job poster their submission was approved
+    if (job.postedBy) {
+      await createNotification(req.app.get('io'), {
+        userId: job.postedBy,
+        type: 'job_alert',
+        title: `✅ Your job "${job.title}" was approved`,
+        description: `Your listing at ${job.company} is now live for students and alumni.`,
+        icon: '💼',
+        relatedId: job._id,
+      });
+    }
+
     res.json({ success: true, message: 'Job approved and published.', data: job });
   } catch (err) {
     res.status(500).json({ message: 'Failed to approve job.' });
@@ -150,6 +248,19 @@ router.put('/:id/reject', protect, authorize('admin'), async (req, res) => {
   try {
     const job = await Job.findByIdAndDelete(req.params.id);
     if (!job) return res.status(404).json({ message: 'Job not found.' });
+
+    // Notify the poster their job was rejected
+    if (job.postedBy) {
+      await createNotification(req.app.get('io'), {
+        userId: job.postedBy,
+        type: 'system',
+        title: `❌ Your job "${job.title}" was not approved`,
+        description: 'Your submission did not meet our guidelines. Please review and resubmit.',
+        icon: '🚫',
+        relatedId: job._id,
+      });
+    }
+
     res.json({ success: true, message: 'Job rejected and removed.' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to reject job.' });

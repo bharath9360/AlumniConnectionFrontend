@@ -22,12 +22,25 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Determine which login page to bounce to based on stored role
+      let storedUser = null;
+      try { storedUser = JSON.parse(localStorage.getItem('alumni_user') || 'null'); } catch (_) {}
+      const role = storedUser?.role?.toLowerCase();
+
       localStorage.removeItem('alumni_token');
       localStorage.removeItem('alumni_user');
-      window.location.href = '/login';
+
+      if (role === 'admin') {
+        window.location.href = '/login/admin';
+      } else if (role === 'student') {
+        window.location.href = '/login/student';
+      } else {
+        window.location.href = '/login/alumni';
+      }
     }
     return Promise.reject(error);
   }
+
 );
 
 // ─── Auth Service ─────────────────────────────────────────────
@@ -52,7 +65,10 @@ export const authService = {
 
   // Upload profile picture as multipart/form-data
   uploadProfilePic: (formData) =>
-    api.put('/auth/profile-pic', formData)
+    api.put('/auth/profile-pic', formData),
+
+  changePassword: (oldPassword, newPassword) =>
+    api.put('/auth/change-password', { oldPassword, newPassword }),
 };
 
 // ─── User Upload Service ───────────────────────────────────────
@@ -78,92 +94,142 @@ export const userService = {
 
 // ─── Post / Feed Service ──────────────────────────────────────
 export const postService = {
-  getFeed: () => api.get('/posts'),
-  createPost: (formData) => api.post('/posts', formData),
-  likePost: (postId) => api.put(`/posts/${postId}/like`),
-  addComment: (postId, content) => api.post(`/posts/${postId}/comment`, { content }),
-  deletePost: (postId) => api.delete(`/posts/${postId}`)
+  getFeed:    ()                    => api.get('/posts'),
+  createPost: (formData)            => api.post('/posts', formData),
+  likePost:   (postId)              => api.put(`/posts/${postId}/like`),
+  addComment: (postId, content)     => api.post(`/posts/${postId}/comment`, { content }),
+  deletePost: (postId)              => api.delete(`/posts/${postId}`),
+  reportPost: (postId)              => api.post(`/posts/${postId}/report`),
 };
 
 // ─── Job Service ──────────────────────────────────────────────
 export const jobService = {
-  getJobs: () => api.get('/jobs'),
-  getPendingJobs: () => api.get('/jobs/pending'),
-  createJob: (data) => api.post('/jobs', data),
-  applyJob: (jobId) => api.put(`/jobs/${jobId}/apply`),
-  approveJob: (jobId) => api.put(`/jobs/${jobId}/approve`),
-  rejectJob: (jobId) => api.put(`/jobs/${jobId}/reject`),
-  deleteJob: (jobId) => api.delete(`/jobs/${jobId}`)
+  getJobs:        ()         => api.get('/jobs'),
+  getPendingJobs: ()         => api.get('/jobs/pending'),
+  createJob:      (data)     => api.post('/jobs', data),
+  applyJob:       (jobId)    => api.put(`/jobs/${jobId}/apply`),
+  approveJob:     (jobId)    => api.put(`/jobs/${jobId}/approve`),
+  rejectJob:      (jobId)    => api.put(`/jobs/${jobId}/reject`),
+  deleteJob:      (jobId)    => api.delete(`/jobs/${jobId}`),
+  // Admin full control
+  adminGetAll:    (params)   => api.get('/jobs/admin/all', { params }),
+  editJob:        (id, data) => api.put(`/jobs/${id}`, data),
+  getApplicants:  (id)       => api.get(`/jobs/${id}/applicants`),
 };
 
 // ─── Event Service ────────────────────────────────────────────
 export const eventService = {
-  getEvents: () => api.get('/events'),
-  getPendingEvents: () => api.get('/events/pending'),
-  createEvent: (data) => api.post('/events', data),
-  toggleRegister: (eventId) => api.put(`/events/${eventId}/register`),
-  approveEvent: (eventId) => api.put(`/events/${eventId}/approve`),
-  rejectEvent: (eventId) => api.put(`/events/${eventId}/reject`),
-  deleteEvent: (eventId) => api.delete(`/events/${eventId}`)
+  getEvents:        ()         => api.get('/events'),
+  getPendingEvents: ()         => api.get('/events/pending'),
+  createEvent:      (data)     => api.post('/events', data),
+  toggleRegister:   (eventId)  => api.put(`/events/${eventId}/register`),
+  approveEvent:     (eventId)  => api.put(`/events/${eventId}/approve`),
+  rejectEvent:      (eventId)  => api.put(`/events/${eventId}/reject`),
+  deleteEvent:      (eventId)  => api.delete(`/events/${eventId}`),
+  // Admin full control
+  adminGetAll:      (params)   => api.get('/events/admin/all', { params }),
+  editEvent:        (id, data) => api.put(`/events/${id}`, data),
+  getAttendees:     (id)       => api.get(`/events/${id}/attendees`),
 };
 
 // ─── Notification Service ─────────────────────────────────────
 export const notificationService = {
   getNotifications: () => api.get('/notifications'),
-  markRead: (id) => api.put(`/notifications/${id}/read`),
-  markAllRead: () => api.put('/notifications/read-all'),
-  delete: (id) => api.delete(`/notifications/${id}`)
+  markRead:         (id) => api.put(`/notifications/${id}/read`),
+  markAllRead:      ()  => api.put('/notifications/read-all'),
+  delete:           (id) => api.delete(`/notifications/${id}`),
+  clearAll:         ()  => api.delete('/notifications/clear-all'),
+  getUnreadCount:   ()  => api.get('/notifications/unread-count'),
 };
 
 // ─── Chat / Messaging Service ─────────────────────────────────
 export const chatService = {
-  fetchChats: () => api.get('/chat'),
-  fetchMessages: (chatId) => api.get(`/chat/${chatId}/messages`),
-  accessChat: (userId) => api.post('/chat', { userId }),
-  searchUsers: (searchQuery) => api.get(`/chat/users/search?q=${searchQuery}`),
-  sendMessage: (chatId, text) => api.post(`/chat/${chatId}/messages`, { text })
+  fetchChats:    ()              => api.get('/chat'),
+  fetchMessages: (chatId, page = 1, limit = 50) => api.get(`/chat/${chatId}/messages?page=${page}&limit=${limit}`),
+  accessChat:    (userId)        => api.post('/chat', { userId }),
+  searchUsers:   (searchQuery)   => api.get(`/chat/users/search?q=${searchQuery}`),
+  sendMessage:   (chatId, text)  => api.post(`/chat/${chatId}/messages`, { text }),
+  getUnreadCounts: ()            => api.get('/chat/unread-count'),
+  markChatRead:  (chatId)        => api.put(`/chat/${chatId}/read`),
 };
 
 // ─── Connections Service ──────────────────────────────────────
 export const connectionService = {
-  sendRequest: (userId) => api.post(`/connections/request/${userId}`),
-  acceptRequest: (userId) => api.put(`/connections/accept/${userId}`),
+  getRequests:      ()       => api.get('/connections/requests'),
+  sendRequest:      (userId) => api.post(`/connections/request/${userId}`),
+  acceptRequest:    (reqId)  => api.put(`/connections/accept/${reqId}`),
+  rejectRequest:    (reqId)  => api.put(`/connections/reject/${reqId}`),
   removeConnection: (userId) => api.delete(`/connections/remove/${userId}`),
-  getStatus: (userId) => api.get(`/connections/status/${userId}`)
+  getStatus:        (userId) => api.get(`/connections/status/${userId}`)
 };
 
 // ─── Admin Service ────────────────────────────────────────────
 export const adminService = {
-  // Existing
-  getPendingAlumni: () => api.get('/admin/pending-alumni'),
-  activateUser: (userId) => api.put(`/admin/activate/${userId}`),
-  rejectUser: (userId) => api.delete(`/admin/reject/${userId}`),
-  getStats: () => api.get('/admin/stats'),
-  getAnalytics: () => api.get('/admin/analytics'),
+  getPendingAlumni: ()           => api.get('/admin/pending-alumni'),
+  getPendingCount:  ()           => api.get('/admin/pending-alumni').then(r => (r.data?.data || r.data || []).length).catch(() => 0),
+  activateUser:     (userId)     => api.put(`/admin/activate/${userId}`),
+  rejectUser:       (userId)     => api.delete(`/admin/reject/${userId}`),
+  getStats:         ()           => api.get('/admin/stats'),
+  getAnalytics:     ()           => api.get('/admin/analytics'),
 
-  // Alumni CRUD (new)
-  getAlumni: (params) => api.get('/admin/alumni', { params }),
-  updateAlumni: (id, data) => api.put(`/admin/alumni/${id}`, data),
-  deleteAlumni: (id) => api.delete(`/admin/alumni/${id}`),
-  approveAlumni: (id) => api.put(`/admin/activate/${id}`),
-  rejectAlumni: (id) => api.put(`/admin/reject-alumni/${id}`),
+  // Alumni CRUD
+  getAlumni:        (params)     => api.get('/admin/alumni', { params }),
+  updateAlumni:     (id, data)   => api.put(`/admin/alumni/${id}`, data),
+  deleteAlumni:     (id)         => api.delete(`/admin/alumni/${id}`),
+  approveAlumni:    (id)         => api.put(`/admin/activate/${id}`),
+  rejectAlumni:     (id)         => api.put(`/admin/reject-alumni/${id}`),
+
+  // Post Moderation
+  getModerationPosts: (params)   => api.get('/admin/posts', { params }),
+  deletePost:         (id)       => api.delete(`/admin/posts/${id}`),
+  toggleHidePost:     (id)       => api.put(`/admin/posts/${id}/hide`),
+  dismissReports:     (id)       => api.put(`/admin/posts/${id}/dismiss-reports`),
+  banUser:            (userId)   => api.put(`/admin/ban-user/${userId}`),
+
+  // Broadcast
+  sendBroadcast: (data)          => api.post('/admin/broadcast', data),
+  getBatches:    ()              => api.get('/admin/batches'),
+
+  // Role Management
+  getUsersWithRoles: (params)         => api.get('/admin/users/roles', { params }),
+  updateUserRole:    (id, role)       => api.put(`/admin/users/${id}/role`, { role }),
+
+  // System Config
+  getSystemConfig:    ()             => api.get('/admin/system-config'),
+  updateSystemConfig: (data)         => api.put('/admin/system-config', data),
 };
 
-// ─── Student Service ──────────────────────────────────────────
+// ─── Landing Page CMS Service ─────────────────────────────────
+export const landingService = {
+  // Public
+  getSections:         ()              => api.get('/landing'),
+
+  // Admin
+  getAdminSections:    ()              => api.get('/landing/admin'),
+  createSection:       (data)          => api.post('/landing/admin/sections', data),
+  updateSection:       (key, data)     => api.put(`/landing/admin/sections/${key}`, data),
+  deleteSection:       (key)           => api.delete(`/landing/admin/sections/${key}`),
+  toggleSection:       (key)           => api.put(`/landing/admin/sections/${key}/toggle`),
+  reorderSections:     (orderArr)      => api.put('/landing/admin/reorder', { order: orderArr }),
+  addItem:             (key, fields)   => api.post(`/landing/admin/sections/${key}/items`, { fields }),
+  deleteItem:          (key, itemId)   => api.delete(`/landing/admin/sections/${key}/items/${itemId}`),
+};
+
+// ─── Student Admin Service ────────────────────────────────────
 export const studentAdminService = {
-  getStudents:  (params) => api.get('/admin/students', { params }),
-  addStudent:   (data)   => api.post('/admin/students', data),
-  updateStudent:(id, data) => api.put(`/admin/students/${id}`, data),
-  deleteStudent:(id)     => api.delete(`/admin/students/${id}`),
-  promoteToAlumni: (id)  => api.put(`/admin/students/${id}/promote`),
-  bulkImport: (formData) => api.post('/admin/students/bulk-import', formData, {
+  getStudents:      (params)             => api.get('/admin/students', { params }),
+  addStudent:       (data)               => api.post('/admin/students', data),
+  updateStudent:    (id, data)           => api.put(`/admin/students/${id}`, data),
+  deleteStudent:    (id)                 => api.delete(`/admin/students/${id}`),
+  promoteToAlumni:  (id)                 => api.put(`/admin/students/${id}/promote`),
+  bulkImport:       (formData)           => api.post('/admin/students/bulk-import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
-  // Unified import: preview=true → dry run, preview=false → write to DB
-  importUnified: (formData, type, preview = false) =>
+  importUnified:    (formData, type, preview = false) =>
     api.post(`/admin/import?type=${type}&preview=${preview}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  triggerGraduation: () => api.post('/admin/graduation/run'),
 };
 
 export default api;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { chatService } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
@@ -9,6 +9,8 @@ import {
   ChatWindow,
   ChatEmptyState
 } from '../../components/messaging';
+import { ChatListSkeleton, MessagesSkeleton, EmptyState } from '../../components/common/Skeletons';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 const Messaging = () => {
   const { user } = useAuth();
@@ -26,8 +28,8 @@ const Messaging = () => {
   const [isComposing, setIsComposing] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [notConnectedUser, setNotConnectedUser] = useState(null);
-  const [userConnections, setUserConnections] = useState([]);
+  const [blockedChats, setBlockedChats] = useState({});
+  const [unreadCounts, setUnreadCounts] = useState({}); // { [chatId]: number }
   const location = useLocation();
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -51,9 +53,16 @@ const Messaging = () => {
       // read the current activeChat value, never a stale closure snapshot.
       setActiveChat(prev => {
         if (prev && (prev._id === msgChatId)) {
-          // FIX 2: set messages inside the callback so we always have the
-          // latest activeChat before deciding whether to append.
           setMessages(prevMsgs => [...prevMsgs, newMessage]);
+          // Mark as read immediately since user is watching
+          chatService.markChatRead(msgChatId).catch(() => {});
+          setUnreadCounts(prev2 => ({ ...prev2, [msgChatId]: 0 }));
+        } else {
+          // Bump unread count for chats not currently open
+          setUnreadCounts(prev2 => ({
+            ...prev2,
+            [msgChatId]: (prev2[msgChatId] || 0) + 1
+          }));
         }
         return prev;
       });
@@ -103,7 +112,18 @@ const Messaging = () => {
   // ── Derive display info from a chat document ──────────────────
   // Declared here (before the fetchChats effect) to avoid TDZ error
   const enrichChat = useCallback((chat, currentUserId, onlineList = []) => {
-    const otherParticipant = chat.participants.find(p => (p._id || p) !== currentUserId);
+    if (chat.isGroupChat) {
+      return {
+        ...chat,
+        userName: chat.chatName || 'Group Chat',
+        userInitial: (chat.chatName || 'G').charAt(0).toUpperCase(),
+        userRole: 'group',
+        otherUserId: chat._id, // use chat ID for groups
+        status: 'online', // inherently active
+      };
+    }
+
+    const otherParticipant = chat.participants?.find(p => (p._id || p) !== currentUserId);
     const otherId = otherParticipant?._id?.toString() || '';
     return {
       ...chat,
@@ -141,6 +161,14 @@ const Messaging = () => {
     if (user) fetchChats();
   }, [user, location.search, enrichChat]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Fetch unread counts once chats are loaded ──────────────
+  useEffect(() => {
+    if (!user) return;
+    chatService.getUnreadCounts()
+      .then(({ data }) => setUnreadCounts(data.data || {}))
+      .catch(() => {});
+  }, [user, chats.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── FIX 3: Re-derive online status whenever onlineUsers array changes ─────
   // Subscribes to the `onlineUsers` array reference from SocketContext directly
   // instead of the `isOnline` helper — prevents stale-closure bugs.
@@ -161,46 +189,67 @@ const Messaging = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onlineUsers]); // onlineUsers is a new array reference on every backend broadcast
 
-  // ── Build accepted connection ID set from AuthContext user ────────
-  // We read directly from the user object (already in memory) instead of
-  // calling /auth/me, which may not return the connections field at all.
-  useEffect(() => {
-    if (!user) return;
-    const connections = user?.connections || [];
-    const acceptedIds = connections
-      .filter(c => (c.status || '').toLowerCase() === 'accepted')
-      .map(c => {
-        // Handle both populated ({ userId: { _id } }) and raw ({ userId: ObjectId })
-        const raw = c.userId?._id || c.userId || c.user?._id || c.user;
-        return raw?.toString();
-      })
-      .filter(Boolean);
-    setUserConnections(acceptedIds);
-  }, [user]);
 
+
+
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // ── Select a chat and load messages ──────────────────────────
   const selectChat = useCallback(async (chat) => {
-    setActiveChat(chat);
+    // Leave the previous chat room before joining the new one
+    setActiveChat(prev => {
+      if (prev?._id && prev._id !== chat._id && socketRef.current) {
+        socketRef.current.emit('leave_chat', prev._id);
+      }
+      return chat;
+    });
+
     setMobileView('chat');
     setIsComposing(false);
     setMessages([]);
+    setPage(1);
+    setHasMore(false);
+
     try {
-      const { data } = await chatService.fetchMessages(chat._id);
-      setMessages(data);
+      const { data } = await chatService.fetchMessages(chat._id, 1, 30);
+      setMessages(data.data || data);
+      setHasMore(data.hasMore || false);
+      setPage(1);
     } catch (err) {
       console.error('Failed to load messages:', err);
     }
+
     if (socketRef.current) {
       socketRef.current.emit('join_chat', chat._id);
     }
-  }, []);
+
+    // Mark all messages in this chat as read + clear local badge
+    chatService.markChatRead(chat._id).catch(() => {});
+    setUnreadCounts(prev => ({ ...prev, [chat._id]: 0 }));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadMoreMessages = async () => {
+    if (!hasMore || isLoadingMore || !activeChat) return;
+    setIsLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const { data } = await chatService.fetchMessages(activeChat._id, nextPage, 30);
+      setMessages(prev => [...(data.data || data), ...prev]);
+      setHasMore(data.hasMore || false);
+      setPage(nextPage);
+    } catch (err) {
+      console.error('Failed to load older messages:', err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   selectChatRef.current = selectChat;
 
   // ── Start new chat from user search ──────────────────────────
   const handleSelectNewUser = async (selectedUser) => {
-    setNotConnectedUser(null); // clear any previous warning
     try {
       const { data: chat } = await chatService.accessChat(selectedUser._id);
       const enriched = enrichChat(chat, user._id);
@@ -211,9 +260,9 @@ const Messaging = () => {
       });
       await selectChat(enriched);
     } catch (err) {
-      // Task 3: backend returns 403 NOT_CONNECTED — show inline warning
       if (err.response?.status === 403 || err.response?.data?.code === 'NOT_CONNECTED') {
-        setNotConnectedUser(selectedUser);
+        const fakeChatId = 'fake_' + Date.now();
+        setBlockedChats(prev => ({ ...prev, [fakeChatId]: true }));
         return;
       }
       console.error('Failed to open chat:', err);
@@ -267,6 +316,9 @@ const Messaging = () => {
         });
       }
     } catch (err) {
+      if (err.response?.status === 403 || err.response?.data?.code === 'NOT_CONNECTED') {
+        setBlockedChats(prev => ({ ...prev, [activeChat._id]: true }));
+      }
       console.error('Failed to send message:', err);
     }
   };
@@ -295,19 +347,32 @@ const Messaging = () => {
     };
   }, []);
 
-  // ── Filter sidebar chats by search ───────────────────────────
-  const filteredChats = chats.filter(c =>
-    c.userName.toLowerCase().includes(search.toLowerCase())
+  // ── Filter sidebar chats by search (memoized) ────────────────
+  const filteredChats = useMemo(() =>
+    chats.filter(c => c.userName.toLowerCase().includes(search.toLowerCase())),
+    [chats, search]
   );
 
   if (loading) return (
-    <div className="dashboard-main-bg min-vh-100 d-flex align-items-center justify-content-center">
-      <div className="spinner-border text-danger" role="status"></div>
+    <div className="messaging-viewport w-100 d-flex" style={{ backgroundColor: '#f3f2ef', height: 'calc(100dvh - 66px)' }}>
+      {/* Sidebar skeleton */}
+      <div className="border-end bg-white" style={{ width: 320, flexShrink: 0 }}>
+        <div className="p-3 border-bottom d-flex justify-content-between align-items-center">
+          <div style={{ width: 100, height: 20, backgroundColor: '#f0f0f0', borderRadius: 6 }} />
+          <div style={{ width: 24, height: 24, backgroundColor: '#f0f0f0', borderRadius: 6 }} />
+        </div>
+        <ChatListSkeleton rows={7} />
+      </div>
+      {/* Chat area skeleton */}
+      <div className="flex-grow-1 d-none d-lg-flex flex-column">
+        <div className="px-4 py-3 border-bottom bg-white" style={{ height: 65 }} />
+        <MessagesSkeleton rows={8} />
+      </div>
     </div>
   );
 
   return (
-    <div className="messaging-viewport w-100" style={{ backgroundColor: '#f3f2ef' }}>
+    <div className="messaging-viewport w-100" style={{ backgroundColor: '#f3f2ef', height: 'calc(100dvh - 66px)', position: 'relative' }}>
       <div className="container-fluid h-100 px-0 px-md-3 py-0 py-md-2 d-flex flex-column" style={{ maxWidth: '1400px', margin: '0 auto', minHeight: 0 }}>
         <div
           className="row g-0 flex-grow-1 bg-white rounded-0 rounded-md-3 overflow-hidden w-100 m-0"
@@ -330,16 +395,7 @@ const Messaging = () => {
                       Search your connections to message
                     </div>
 
-                    {/* Task 3: Not-connected warning banner */}
-                    {notConnectedUser && (
-                      <div className="mx-3 mt-2 mb-1 alert alert-warning d-flex align-items-start gap-2 py-2 px-3 rounded-3" style={{ fontSize: '0.82rem' }}>
-                        <i className="fas fa-lock-open mt-1 flex-shrink-0" style={{ color: '#c84022' }}></i>
-                        <div>
-                          <strong>Not connected with {notConnectedUser.name}</strong><br />
-                          You must be connected to send a message to this user.
-                        </div>
-                      </div>
-                    )}
+                    {/* Task 3: Not-connected warning banner handled inline if they try to send, or if we want we can show an error toast */}
 
                     {searchResults.length === 0 && search.trim().length > 0 ? (
                       <p className="text-muted text-center py-5 small">No users found</p>
@@ -378,7 +434,11 @@ const Messaging = () => {
                 ) : (
                   <>
                     {filteredChats.length === 0 ? (
-                      <p className="text-muted text-center py-5 small">No conversations yet. Click ✏️ to start one!</p>
+                      <EmptyState
+                        icon="fa-comment-slash"
+                        title={search ? 'No results found' : 'No conversations yet'}
+                        description={search ? 'Try a different name' : 'Click ✏️ to start a new message'}
+                      />
                     ) : (
                       filteredChats.map(chat => (
                         <ChatItem
@@ -386,6 +446,7 @@ const Messaging = () => {
                           chat={chat}
                           currentUserId={user._id}
                           isActive={activeChat?._id === chat._id}
+                          unreadCount={unreadCounts[chat._id] || 0}
                           onClick={() => selectChat(chat)}
                         />
                       ))
@@ -412,23 +473,28 @@ const Messaging = () => {
                     {activeChat.userName} is typing...
                   </div>
                 )}
-                <ChatWindow.Messages messages={messages} currentUserId={user._id} />
+                {messages.length === 0 && !isLoadingMore ? (
+                  <MessagesSkeleton rows={6} />
+                ) : (
+                <ChatWindow.Messages 
+                  messages={messages} 
+                  currentUserId={user._id} 
+                  hasMore={hasMore}
+                  isLoadingMore={isLoadingMore}
+                  onLoadMore={loadMoreMessages}
+                />
+                )}
                 {(() => {
-                  // Determine if the other participant is an accepted connection
-                  // Uses case-insensitive check to handle any status casing
-                  const otherParticipant = activeChat?.participants?.find(
-                    p => (p._id || p).toString() !== user._id.toString()
-                  );
-                  const otherId = otherParticipant?._id?.toString() || otherParticipant?.toString();
-                  const isConnectionBlocked = otherId && !userConnections.includes(otherId);
+                  const isBlockedLocally = blockedChats[activeChat._id];
+                  
                   return (
                     <ChatWindow.Input
                       value={msgInput}
                       onChange={handleTyping}
                       onSend={handleSend}
-                      disabled={isConnectionBlocked}
-                      blockedMessage={isConnectionBlocked
-                        ? 'You must be connected to send a message to this user.'
+                      disabled={isBlockedLocally}
+                      blockedMessage={isBlockedLocally
+                        ? 'Messaging disabled. You must be connected or in the same group.'
                         : undefined
                       }
                     />

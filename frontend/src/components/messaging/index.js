@@ -77,9 +77,10 @@ ChatSidebar.List = function ChatSidebarList({ children }) {
 /**
  * ChatItem — A single conversation row in the sidebar
  */
-export const ChatItem = ({ chat, currentUserId, isActive, onClick }) => {
+export const ChatItem = ({ chat, currentUserId, isActive, onClick, unreadCount = 0 }) => {
     const lastMsg = chat.lastMessage?.text ? chat.lastMessage : chat.messages?.[chat.messages.length - 1];
     const isMine = lastMsg?.senderId === currentUserId;
+    const hasUnread = unreadCount > 0 && !isActive;
 
     return (
         <div
@@ -87,7 +88,7 @@ export const ChatItem = ({ chat, currentUserId, isActive, onClick }) => {
             className="d-flex align-items-center gap-3 px-3 py-3 border-bottom"
             style={{
                 cursor: 'pointer',
-                backgroundColor: isActive ? '#f3f2ef' : 'white',
+                backgroundColor: isActive ? '#fdf0ec' : 'white',
                 borderLeft: isActive ? '3px solid #c84022' : '3px solid transparent',
                 transition: 'background 0.15s',
             }}
@@ -98,11 +99,15 @@ export const ChatItem = ({ chat, currentUserId, isActive, onClick }) => {
             <div className="position-relative flex-shrink-0">
                 <div
                     className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                    style={{ width: '48px', height: '48px', backgroundColor: '#c84022', fontSize: '1rem' }}
+                    style={{
+                        width: '48px', height: '48px',
+                        backgroundColor: chat.isGroupChat ? '#6f42c1' : '#c84022',
+                        fontSize: '1rem'
+                    }}
                 >
-                    {chat.userInitial}
+                    {chat.isGroupChat ? <i className="fas fa-users" style={{ fontSize: '0.9rem' }}></i> : chat.userInitial}
                 </div>
-                {chat.status === 'online' && (
+                {chat.status === 'online' && !chat.isGroupChat && (
                     <span
                         className="position-absolute border border-white rounded-circle bg-success"
                         style={{ width: '12px', height: '12px', bottom: '1px', right: '1px' }}
@@ -113,12 +118,34 @@ export const ChatItem = ({ chat, currentUserId, isActive, onClick }) => {
             {/* Name + preview */}
             <div className="flex-grow-1 overflow-hidden">
                 <div className="d-flex justify-content-between align-items-center">
-                    <span className="fw-semibold text-dark" style={{ fontSize: '0.9rem' }}>{chat.userName}</span>
-                    <span className="text-muted" style={{ fontSize: '0.72rem' }}>
-                        {lastMsg?.timestamp ? new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    <span
+                        className={`${hasUnread ? 'fw-bold text-dark' : 'fw-semibold text-dark'}`}
+                        style={{ fontSize: '0.9rem' }}
+                    >
+                        {chat.userName}
                     </span>
+                    <div className="d-flex align-items-center gap-1">
+                        <span className="text-muted" style={{ fontSize: '0.72rem' }}>
+                            {lastMsg?.timestamp ? new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                        {hasUnread && (
+                            <span
+                                className="badge rounded-pill d-flex align-items-center justify-content-center"
+                                style={{
+                                    backgroundColor: '#c84022',
+                                    color: 'white',
+                                    fontSize: '0.65rem',
+                                    minWidth: '18px',
+                                    height: '18px',
+                                    padding: '0 5px'
+                                }}
+                            >
+                                {unreadCount > 99 ? '99+' : unreadCount}
+                            </span>
+                        )}
+                    </div>
                 </div>
-                <p className="mb-0 text-muted text-truncate" style={{ fontSize: '0.8rem' }}>
+                <p className={`mb-0 text-truncate ${hasUnread ? 'fw-semibold text-dark' : 'text-muted'}`} style={{ fontSize: '0.8rem' }}>
                     {isMine ? 'You: ' : ''}{lastMsg?.text || 'Start chatting...'}
                 </p>
             </div>
@@ -219,17 +246,42 @@ ChatWindow.Header = function ChatWindowHeader({ chat, onBack, onClearChat, onDel
     );
 };
 
-ChatWindow.Messages = function ChatWindowMessages({ messages, currentUserId }) {
+ChatWindow.Messages = function ChatWindowMessages({ messages, currentUserId, onLoadMore, hasMore, isLoadingMore }) {
+    const scrollRef = useRef(null);
     const endRef = useRef(null);
-    useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+    const prevScrollHeight = useRef(null);
 
-    // Group messages by date (simple — use timestamp prefix)
+    // Auto-scroll to bottom only when new message arrives at the end
+    useEffect(() => { 
+        if (!isLoadingMore) {
+            endRef.current?.scrollIntoView({ behavior: 'auto' }); 
+        }
+    }, [messages, isLoadingMore]);
+
+    // Handle scroll to top for pagination
+    const handleScroll = (e) => {
+        if (e.target.scrollTop === 0 && hasMore && !isLoadingMore && onLoadMore) {
+            prevScrollHeight.current = e.target.scrollHeight;
+            onLoadMore();
+        }
+    };
+
+    // Maintain scroll position after prepending old messages
+    useEffect(() => {
+        if (!isLoadingMore && prevScrollHeight.current && scrollRef.current) {
+            const newScrollHeight = scrollRef.current.scrollHeight;
+            scrollRef.current.scrollTop = newScrollHeight - prevScrollHeight.current;
+            prevScrollHeight.current = null;
+        }
+    }, [messages, isLoadingMore]);
+
     return (
-        <div className="flex-grow-1 overflow-auto px-4 py-3 d-flex flex-column gap-2">
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-grow-1 overflow-auto px-2 px-md-4 py-3 d-flex flex-column gap-2">
+            {isLoadingMore && <div className="text-center py-2"><small className="text-muted spinner-border spinner-border-sm" role="status"></small></div>}
             {messages.map(msg => (
-                <ChatBubble key={msg._id || msg.id} msg={msg} isMine={msg.senderId?._id === currentUserId || msg.senderId === currentUserId} />
+                <ChatBubble key={msg._id || msg.id || Math.random()} msg={msg} isMine={msg.senderId?._id === currentUserId || msg.senderId === currentUserId} />
             ))}
-            <div ref={endRef} />
+            <div ref={endRef} style={{ height: '1px' }} />
         </div>
     );
 };
@@ -264,7 +316,7 @@ ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend, disabled,
     };
 
     return (
-        <div className="px-3 py-2 bg-white border-top flex-shrink-0">
+        <div className="px-2 px-md-3 py-2 bg-white border-top flex-shrink-0" style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}>
             {/* Emoji picker popup */}
             {showEmoji && (
                 <div
@@ -354,22 +406,27 @@ export const ChatBubble = ({ msg, isMine }) => {
     return (
         <div className={`d-flex flex-column ${isMine ? 'align-items-end' : 'align-items-start'}`}>
             <div
-                className="px-3 py-2 rounded-3"
+                className="px-3 py-2"
                 style={{
                     maxWidth: '85%',
                     backgroundColor: isMine ? '#c84022' : '#ffffff',
                     color: isMine ? 'white' : '#333',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
                     fontSize: '0.88rem',
-                    lineHeight: '1.5',
+                    lineHeight: '1.4',
                     wordBreak: 'break-word',
-                    // Bubble shape
-                    borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                    // Compact bubble shape
+                    borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                 }}
             >
                 {msg.text}
+                <div 
+                    className={`d-flex mt-1 align-items-center ${isMine ? 'justify-content-end text-white-50' : 'justify-content-start text-muted'}`} 
+                    style={{ fontSize: '0.65rem' }}
+                >
+                    {time}
+                </div>
             </div>
-            <span className="text-muted mt-1" style={{ fontSize: '0.7rem' }}>{time}</span>
         </div>
     );
 };

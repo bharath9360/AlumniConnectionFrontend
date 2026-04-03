@@ -178,6 +178,28 @@ router.post('/:id/comment', protect, async (req, res) => {
   }
 });
 
+// ─── POST /api/posts/:id/report — Report a post ──────────────
+router.post('/:id/report', protect, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: 'Post not found.' });
+
+    const userId = req.user._id;
+    const alreadyReported = post.reportedBy.some(id => id.toString() === userId.toString());
+    if (alreadyReported) {
+      return res.status(400).json({ message: 'You have already reported this post.' });
+    }
+
+    post.reportedBy.push(userId);
+    post.reportCount = post.reportedBy.length;
+    await post.save();
+
+    res.json({ success: true, message: 'Post reported. Admin will review it shortly.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to report post.' });
+  }
+});
+
 // ─── DELETE /api/posts/:id — Delete post (author only) ───────
 router.delete('/:id', protect, async (req, res) => {
   try {

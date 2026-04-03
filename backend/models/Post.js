@@ -18,7 +18,12 @@ const postSchema = new mongoose.Schema({
   likes: { type: Number, default: 0 },
   likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   shares: { type: Number, default: 0 },
-  comments: [commentSchema]
+  comments: [commentSchema],
+
+  // ── Moderation fields ─────────────────────────────────────
+  isHidden:   { type: Boolean, default: false },   // Soft-hide (admin only)
+  reportCount:{ type: Number,  default: 0 },       // Aggregate report count
+  reportedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // who reported
 }, {
   timestamps: true
 });

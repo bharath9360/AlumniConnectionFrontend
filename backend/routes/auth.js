@@ -330,4 +330,33 @@ router.put('/profile-pic', protect, profileUpload.single('profilePic'), async (r
   }
 });
 
+// ─── PUT /api/auth/change-password ───────────────────────────
+router.put('/change-password', protect, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ message: 'Old and new passwords are required.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters.' });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    const isMatch = await user.comparePassword(oldPassword);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Current password is incorrect.' });
+    }
+
+    user.password = newPassword; // hashed by pre-save hook
+    await user.save();
+
+    res.json({ success: true, message: 'Password changed successfully.' });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({ message: 'Failed to change password.' });
+  }
+});
+
 module.exports = router;

@@ -77,4 +77,49 @@ const sendApprovalEmail = async (email, name) => {
   });
 };
 
-module.exports = { sendOTPEmail, sendApprovalEmail };
+/**
+ * Send a broadcast/announcement email from admin to a list of users.
+ * @param {Array<{email:string, name:string}>} recipients
+ * @param {string} subject
+ * @param {string} title
+ * @param {string} message
+ */
+const sendBroadcastEmail = async (recipients, subject, title, message) => {
+  if (!isSmtpConfigured) {
+    console.log(`\n📢 [DEV MODE] Broadcast email skipped (no SMTP). Title: "${title}" → ${recipients.length} recipient(s)\n`);
+    return { sent: 0, skipped: recipients.length };
+  }
+
+  let sent = 0, failed = 0;
+  for (const { email, name } of recipients) {
+    try {
+      await transporter.sendMail({
+        from: `"MAMCET Alumni Connect" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: subject || title,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden">
+            <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:28px;text-align:center">
+              <h2 style="color:#fff;margin:0;font-size:20px">📢 MAMCET Alumni Connect</h2>
+              <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px">Admin Announcement</p>
+            </div>
+            <div style="padding:32px">
+              <h3 style="margin:0 0 12px;color:#1a1a2e;font-size:17px">${title}</h3>
+              <div style="font-size:14px;color:#444;line-height:1.7;white-space:pre-wrap">${message}</div>
+            </div>
+            <div style="background:#f8f8f8;padding:16px;text-align:center;font-size:11px;color:#aaa">
+              This message was sent by the MAMCET Admin team. Do not reply to this email.
+            </div>
+          </div>
+        `,
+      });
+      sent++;
+    } catch (err) {
+      console.error(`[Broadcast] Email failed for ${email}:`, err.message);
+      failed++;
+    }
+  }
+  return { sent, failed };
+};
+
+module.exports = { sendOTPEmail, sendApprovalEmail, sendBroadcastEmail };

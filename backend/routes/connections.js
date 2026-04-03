@@ -1,10 +1,28 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const ConnectionRequest = require('../models/ConnectionRequest');
+const Connection = require('../models/Connection');
 const Notification = require('../models/Notification');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
+
+// ─── GET /api/connections/requests ────────────────────────====
+// Get all pending connection requests for the logged-in user
+router.get('/requests', protect, async (req, res) => {
+  try {
+    const requests = await ConnectionRequest.find({
+      receiver: req.user._id,
+      status: 'Pending'
+    }).populate('sender', 'name role department batch profilePic');
+
+    res.json({ success: true, data: requests });
+  } catch (err) {
+    console.error('Fetch requests error:', err);
+    res.status(500).json({ message: 'Failed to fetch connection requests.', error: err.message });
+  }
+});
 
 // ─── POST /api/connections/request/:userId ────────────────────
 router.post('/request/:userId', protect, async (req, res) => {
@@ -12,7 +30,6 @@ router.post('/request/:userId', protect, async (req, res) => {
     const targetId = req.params.userId;
     const myId = req.user._id;
 
-    // ── Atlas Fix: Validate ObjectIds before querying ──────────
     if (!mongoose.Types.ObjectId.isValid(targetId)) {
       return res.status(400).json({ message: 'Invalid user ID.' });
     }
@@ -30,30 +47,37 @@ router.post('/request/:userId', protect, async (req, res) => {
     if (!me) return res.status(404).json({ message: 'Your profile was not found.' });
     if (!target) return res.status(404).json({ message: 'Target user not found.' });
 
-    // ── Atlas Fix: Ensure connections arrays are initialized ───
-    me.connections = me.connections || [];
-    target.connections = target.connections || [];
-
-    // Check if already connected or pending
-    const existingInMe = me.connections.find(c => c.userId?.toString() === targetId);
-    const existingInTarget = target.connections.find(c => c.userId?.toString() === myId.toString());
-
-    if (existingInMe || existingInTarget) {
-      return res.status(400).json({ message: 'Connection request already exists or you are already connected.' });
+    // Check if an accepted connection already exists
+    const u1 = myId.toString() < targetId ? myId : targetId;
+    const u2 = myId.toString() < targetId ? targetId : myId;
+    const existingConn = await Connection.findOne({ user1: u1, user2: u2 });
+    if (existingConn) {
+      return res.status(400).json({ message: 'You are already connected.' });
     }
 
-    // Add pending connection in both users using updateOne to avoid validation crashes
-    // on missing select:false fields (like password)
-    await Promise.all([
-      User.updateOne(
-        { _id: myId },
-        { $push: { connections: { userId: targetId, status: 'Pending' } } }
-      ),
-      User.updateOne(
-        { _id: targetId },
-        { $push: { connections: { userId: myId, status: 'Pending' } } }
-      )
-    ]);
+    // Check if a pending or rejected request already exists in either direction
+    const existingReq = await ConnectionRequest.findOne({
+      $or: [
+        { sender: myId, receiver: targetId },
+        { sender: targetId, receiver: myId }
+      ]
+    });
+
+    if (existingReq) {
+      if (existingReq.status === 'Pending') {
+        return res.status(400).json({ message: 'A pending connection request already exists.' });
+      }
+      if (existingReq.status === 'Rejected') {
+        // Technically we could allow a new request, but for simplicity we remove it and create a new one
+        await ConnectionRequest.findByIdAndDelete(existingReq._id);
+      }
+    }
+
+    const newReq = await ConnectionRequest.create({
+      sender: myId,
+      receiver: targetId,
+      status: 'Pending'
+    });
 
     // Safety check for user role
     const rawRole = req.user.role || 'alumni';
@@ -83,52 +107,48 @@ router.post('/request/:userId', protect, async (req, res) => {
   }
 });
 
-// ─── PUT /api/connections/accept/:userId ──────────────────────
-router.put('/accept/:userId', protect, async (req, res) => {
+// ─── PUT /api/connections/accept/:requestId ───────────────────
+router.put('/accept/:requestId', protect, async (req, res) => {
   try {
-    const requesterId = req.params.userId;
+    const requestId = req.params.requestId;
     const myId = req.user._id;
 
-    // ── Atlas Fix: Validate ObjectId ───────────────────────────
-    if (!mongoose.Types.ObjectId.isValid(requesterId)) {
-      return res.status(400).json({ message: 'Invalid user ID.' });
+    if (!mongoose.Types.ObjectId.isValid(requestId)) {
+      return res.status(400).json({ message: 'Invalid request ID.' });
     }
 
-    const [me, requester] = await Promise.all([
-      User.findById(myId),
-      User.findById(requesterId)
-    ]);
-
-    if (!me) return res.status(404).json({ message: 'Your profile was not found.' });
-    if (!requester) return res.status(404).json({ message: 'User not found.' });
-
-    // ── Atlas Fix: Ensure connections arrays are initialized ───
-    me.connections = me.connections || [];
-    requester.connections = requester.connections || [];
-
-    // Update status in both users
-    const myConn = me.connections.find(c => c.userId.toString() === requesterId);
-    const theirConn = requester.connections.find(c => c.userId.toString() === myId.toString());
-
-    if (!myConn || !theirConn) {
-      return res.status(400).json({ message: 'No pending connection found.' });
+    const reqDoc = await ConnectionRequest.findOne({ _id: requestId, receiver: myId, status: 'Pending' });
+    if (!reqDoc) {
+      return res.status(404).json({ message: 'Pending connection request not found or unauthorized.' });
     }
 
-    myConn.status = 'Accepted';
-    theirConn.status = 'Accepted';
+    reqDoc.status = 'Accepted';
+    await reqDoc.save();
+
+    // Create Connection Document
+    const u1 = reqDoc.sender.toString() < reqDoc.receiver.toString() ? reqDoc.sender : reqDoc.receiver;
+    const u2 = reqDoc.sender.toString() < reqDoc.receiver.toString() ? reqDoc.receiver : reqDoc.sender;
+
+    await Connection.updateOne(
+      { user1: u1, user2: u2 },
+      { $setOnInsert: { user1: u1, user2: u2 } },
+      { upsert: true }
+    );
 
     // Update connection counts
-    me.connectionCount = me.connections.filter(c => c.status === 'Accepted').length.toString();
-    requester.connectionCount = requester.connections.filter(c => c.status === 'Accepted').length.toString();
-
-    await Promise.all([
-      me.save({ validateBeforeSave: false }),
-      requester.save({ validateBeforeSave: false })
+    const [senderCount, receiverCount] = await Promise.all([
+      Connection.countDocuments({ $or: [{ user1: reqDoc.sender }, { user2: reqDoc.sender }] }),
+      Connection.countDocuments({ $or: [{ user1: reqDoc.receiver }, { user2: reqDoc.receiver }] })
     ]);
 
-    // Notify requester their connection was accepted (DB)
+    await Promise.all([
+      User.findByIdAndUpdate(reqDoc.sender, { connectionCount: senderCount.toString() }),
+      User.findByIdAndUpdate(reqDoc.receiver, { connectionCount: receiverCount.toString() })
+    ]);
+
+    // Notify requester
     const notif = await Notification.create({
-      userId: requesterId,
+      userId: reqDoc.sender,
       type: 'connection_accepted',
       title: `${req.user.name} accepted your connection request`,
       description: `You are now connected with ${req.user.name}`,
@@ -136,10 +156,9 @@ router.put('/accept/:userId', protect, async (req, res) => {
       relatedId: myId
     });
 
-    // Real-time socket push
     const io = req.app.get('io');
     if (io) {
-      io.to(requesterId.toString()).emit('notification_received', notif);
+      io.to(reqDoc.sender.toString()).emit('notification_received', notif);
     }
 
     res.json({ success: true, message: 'Connection accepted!' });
@@ -149,34 +168,62 @@ router.put('/accept/:userId', protect, async (req, res) => {
   }
 });
 
+// ─── PUT /api/connections/reject/:requestId ───────────────────
+router.put('/reject/:requestId', protect, async (req, res) => {
+  try {
+    const requestId = req.params.requestId;
+    const myId = req.user._id;
+
+    if (!mongoose.Types.ObjectId.isValid(requestId)) {
+      return res.status(400).json({ message: 'Invalid request ID.' });
+    }
+
+    const reqDoc = await ConnectionRequest.findOne({ _id: requestId, receiver: myId, status: 'Pending' });
+    if (!reqDoc) {
+      return res.status(404).json({ message: 'Pending connection request not found or unauthorized.' });
+    }
+
+    reqDoc.status = 'Rejected';
+    await reqDoc.save();
+
+    res.json({ success: true, message: 'Connection request rejected.' });
+  } catch (err) {
+    console.error('Reject connection error:', err);
+    res.status(500).json({ message: 'Failed to reject connection.' });
+  }
+});
+
 // ─── DELETE /api/connections/remove/:userId ───────────────────
 router.delete('/remove/:userId', protect, async (req, res) => {
   try {
     const targetId = req.params.userId;
     const myId = req.user._id;
 
-    // ── Atlas Fix: Validate ObjectId ───────────────────────────
     if (!mongoose.Types.ObjectId.isValid(targetId)) {
       return res.status(400).json({ message: 'Invalid user ID.' });
     }
 
-    await Promise.all([
-      User.findByIdAndUpdate(myId, { $pull: { connections: { userId: targetId } } }),
-      User.findByIdAndUpdate(targetId, { $pull: { connections: { userId: myId } } })
+    const u1 = myId.toString() < targetId ? myId : targetId;
+    const u2 = myId.toString() < targetId ? targetId : myId;
+
+    await Connection.deleteOne({ user1: u1, user2: u2 });
+    await ConnectionRequest.deleteMany({
+      $or: [
+        { sender: myId, receiver: targetId },
+        { sender: targetId, receiver: myId }
+      ]
+    });
+
+    // Update connection counts
+    const [senderCount, targetCount] = await Promise.all([
+      Connection.countDocuments({ $or: [{ user1: myId }, { user2: myId }] }),
+      Connection.countDocuments({ $or: [{ user1: targetId }, { user2: targetId }] })
     ]);
 
-    // Update both connectionCounts
-    const [me, target] = await Promise.all([User.findById(myId), User.findById(targetId)]);
-    if (me) {
-      me.connections = me.connections || [];
-      me.connectionCount = me.connections.filter(c => c.status === 'Accepted').length.toString();
-      await me.save({ validateBeforeSave: false });
-    }
-    if (target) {
-      target.connections = target.connections || [];
-      target.connectionCount = target.connections.filter(c => c.status === 'Accepted').length.toString();
-      await target.save({ validateBeforeSave: false });
-    }
+    await Promise.all([
+      User.findByIdAndUpdate(myId, { connectionCount: senderCount.toString() }),
+      User.findByIdAndUpdate(targetId, { connectionCount: targetCount.toString() })
+    ]);
 
     res.json({ success: true, message: 'Connection removed.' });
   } catch (err) {
@@ -191,35 +238,128 @@ router.get('/status/:userId', protect, async (req, res) => {
     const targetId = req.params.userId;
     const myId = req.user._id;
 
-    // ── Atlas Fix: Validate ObjectId ───────────────────────────
     if (!mongoose.Types.ObjectId.isValid(targetId)) {
       return res.status(400).json({ message: 'Invalid user ID.' });
     }
 
-    const me = await User.findById(myId).select('connections');
-
-    // ── Atlas Fix: Guard against undefined connections ─────────
-    if (!me) return res.json({ status: 'none', isReceiver: false });
-    me.connections = me.connections || [];
-
-    const conn = me.connections.find(c => c.userId.toString() === targetId);
-
-    if (!conn) return res.json({ status: 'none', isReceiver: false });
-    
     let isReceiver = false;
-    if (conn.status === 'Pending') {
-      const notif = await Notification.findOne({
-        userId: myId,
-        relatedId: targetId,
-        type: 'connection_request'
-      });
-      if (notif) isReceiver = true;
+    let requestId = null;
+
+    // Check if connected
+    const u1 = myId.toString() < targetId ? myId : targetId;
+    const u2 = myId.toString() < targetId ? targetId : myId;
+    
+    const conn = await Connection.findOne({ user1: u1, user2: u2 });
+    if (conn) {
+      return res.json({ status: 'Accepted', isReceiver: false });
     }
 
-    res.json({ status: conn.status, isReceiver });
+    // Check Requests
+    const reqDoc = await ConnectionRequest.findOne({
+      $or: [
+        { sender: myId, receiver: targetId },
+        { sender: targetId, receiver: myId }
+      ]
+    }).sort({ createdAt: -1 });
+
+    if (!reqDoc) return res.json({ status: 'none', isReceiver: false });
+
+    if (reqDoc.receiver.toString() === myId.toString()) {
+      isReceiver = true;
+      requestId = reqDoc._id; // Provide requestId for Accepting/Rejecting
+    } else {
+      requestId = reqDoc._id;
+    }
+
+    // Convert exact DB status to the frontend model
+    return res.json({ status: reqDoc.status, isReceiver, requestId });
+
   } catch (err) {
     console.error('Status fetch error:', err);
     res.status(500).json({ message: 'Failed to fetch connection status.' });
+  }
+});
+
+// ─── GET /api/connections/my-connections ─────────────────────
+// Returns confirmed connections for the logged-in user
+router.get('/my-connections', protect, async (req, res) => {
+  try {
+    const myId = req.user._id;
+    const conns = await Connection.find({
+      $or: [{ user1: myId }, { user2: myId }]
+    }).lean();
+
+    // Extract the other user's ID from each connection pair
+    const otherIds = conns.map(c =>
+      c.user1.toString() === myId.toString() ? c.user2 : c.user1
+    );
+
+    const users = await User.find({ _id: { $in: otherIds } })
+      .select('name role department batch graduationYear profilePic company designation presentStatus connectionCount')
+      .lean();
+
+    res.json({ success: true, data: users });
+  } catch (err) {
+    console.error('My-connections error:', err);
+    res.status(500).json({ message: 'Failed to fetch connections.' });
+  }
+});
+
+// ─── GET /api/connections/suggestions ────────────────────────
+// Returns paginated suggested users (alumni + students)
+// Excludes: self, already connected, pending requests, admins
+router.get('/suggestions', protect, async (req, res) => {
+  try {
+    const myId = req.user._id;
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(50, parseInt(req.query.limit) || 12);
+    const role  = req.query.role || ''; // optional filter: 'alumni' | 'student'
+    const dept  = req.query.dept || ''; // optional department filter
+
+    // 1. IDs already connected
+    const conns = await Connection.find({ $or: [{ user1: myId }, { user2: myId }] }).lean();
+    const connectedIds = conns.map(c =>
+      c.user1.toString() === myId.toString() ? c.user2.toString() : c.user1.toString()
+    );
+
+    // 2. IDs with pending requests (either direction)
+    const pendingReqs = await ConnectionRequest.find({
+      $or: [{ sender: myId }, { receiver: myId }],
+      status: 'Pending'
+    }).lean();
+    const pendingIds = pendingReqs.map(r =>
+      r.sender.toString() === myId.toString() ? r.receiver.toString() : r.sender.toString()
+    );
+
+    const excludeIds = [...new Set([myId.toString(), ...connectedIds, ...pendingIds])];
+
+    // 3. Build query
+    const query = {
+      _id: { $nin: excludeIds },
+      role: { $in: ['alumni', 'student'] },
+      status: 'Active',
+    };
+    if (role)  query.role = role;
+    if (dept)  query.department = { $regex: dept, $options: 'i' };
+
+    const total = await User.countDocuments(query);
+    const users = await User.find(query)
+      .select('name role department batch graduationYear profilePic company designation presentStatus connectionCount')
+      .sort({ connectionCount: -1, createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    res.json({
+      success: true,
+      data: users,
+      hasMore: total > page * limit,
+      page,
+      total,
+    });
+  } catch (err) {
+    console.error('Suggestions error:', err);
+    res.status(500).json({ message: 'Failed to fetch suggestions.' });
   }
 });
 

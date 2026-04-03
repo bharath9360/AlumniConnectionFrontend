@@ -6,13 +6,18 @@ import {
   FiSearch, FiPlus, FiEdit2, FiTrash2, FiUploadCloud,
   FiDownload, FiRefreshCw, FiChevronLeft, FiChevronRight,
   FiChevronUp, FiChevronDown, FiX, FiCheck, FiAlertTriangle,
-  FiUserCheck, FiUsers, FiAward, FiFileText, FiInfo,
+  FiUserCheck, FiUsers, FiAward, FiFileText, FiInfo, FiZap,
+  FiMail, FiClock, FiCalendar,
 } from 'react-icons/fi';
 
 /* ── Colour coding for avatar initials ─────────────────────── */
 const COLORS = ['#6366f1','#14b8a6','#f59e0b','#10b981',
                 '#8b5cf6','#3b82f6','#ec4899','#c84022'];
 const ac = (name='') => COLORS[name.charCodeAt(0) % COLORS.length];
+
+/* -- Grad-year overdue helper */
+const THIS_YEAR = new Date().getFullYear();
+const isOverdue = (s) => { const y = parseInt(s?.graduationYear, 10); return !isNaN(y) && y <= THIS_YEAR; };
 
 /* ── Tiny inline toast ──────────────────────────────────────── */
 let _tid = 0;
@@ -208,6 +213,99 @@ const PromoteModal = ({ student, onClose, onConfirm, saving }) => (
   </div>
 );
 
+/* ── Auto-Graduation confirm modal ───────────────────────────── */
+const GraduationModal = ({ onClose, onConfirm, running, result }) => (
+  <div className="am-modal-backdrop" onClick={!running ? onClose : undefined}>
+    <div className="am-modal" style={{ maxWidth:480 }} onClick={e => e.stopPropagation()}>
+      <div className="am-modal-header">
+        <span className="am-modal-title">
+          <FiZap size={15} color="#f59e0b" /> Run Auto-Graduation
+        </span>
+        {!running && <button className="am-modal-close" onClick={onClose}><FiX size={18} /></button>}
+      </div>
+
+      <div className="am-modal-body">
+        {!result ? (
+          <>
+            {/* Warning banner */}
+            <div style={{
+              display:'flex', gap:12, alignItems:'flex-start',
+              background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)',
+              borderRadius:10, padding:'14px 16px', marginBottom:16,
+            }}>
+              <FiAlertTriangle size={20} style={{ color:'#d97706', flexShrink:0, marginTop:2 }} />
+              <div style={{ fontSize:13.5, color:'#92400e', lineHeight:1.6 }}>
+                <strong>How it works:</strong><br />
+                This will scan all students whose <em>Expected Graduation Year</em> is
+                earlier than the current year (<strong>{new Date().getFullYear()}</strong>)
+                and automatically promote them to <strong>Alumni</strong>.
+                Each promoted user will receive an in-app congratulation notification.
+              </div>
+            </div>
+            <div style={{ fontSize:13, color:'#555', lineHeight:1.7 }}>
+              ✅ &nbsp;Role is changed from <strong>Student → Alumni</strong><br />
+              ✅ &nbsp;Graduation year is set as the pass-out batch (if not already set)<br />
+              ✅ &nbsp;In-app notification is sent to each graduate
+            </div>
+          </>
+        ) : (
+          /* Result view */
+          <div style={{
+            padding:'18px 20px', borderRadius:12,
+            background: result.data.errors?.length ? 'rgba(239,68,68,0.05)' : 'rgba(16,185,129,0.06)',
+            border: `1px solid ${result.data.errors?.length ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
+          }}>
+            <div style={{ fontSize:22, textAlign:'center', marginBottom:10 }}>
+              {result.data.promoted > 0 ? '🎓' : '✅'}
+            </div>
+            <div style={{ fontWeight:700, fontSize:15, textAlign:'center', marginBottom:14, color:'#1a1a2e' }}>
+              {result.message}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, textAlign:'center' }}>
+              {[
+                { label:'Promoted',  value: result.data.promoted,        color:'#059669', bg:'rgba(16,185,129,0.08)' },
+                { label:'Skipped',   value: result.data.skipped,         color:'#6366f1', bg:'rgba(99,102,241,0.08)' },
+                { label:'Errors',    value: result.data.errors?.length ?? 0, color:'#dc2626', bg:'rgba(239,68,68,0.08)' },
+              ].map(s => (
+                <div key={s.label} style={{ background:s.bg, borderRadius:10, padding:'10px 8px' }}>
+                  <div style={{ fontSize:22, fontWeight:800, color:s.color }}>{s.value}</div>
+                  <div style={{ fontSize:11.5, color:'#888', marginTop:2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {result.data.errors?.length > 0 && (
+              <div style={{ marginTop:12, fontSize:12, color:'#dc2626' }}>
+                {result.data.errors.slice(0,3).map((e, i) => <div key={i}>• {e}</div>)}
+                {result.data.errors.length > 3 && <div>… and {result.data.errors.length - 3} more</div>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="am-modal-footer">
+        {!result ? (
+          <>
+            <button className="am-btn am-btn-ghost" onClick={onClose} disabled={running}>Cancel</button>
+            <button
+              className="am-btn am-btn-primary"
+              onClick={onConfirm}
+              disabled={running}
+              style={{ background:'linear-gradient(135deg,#f59e0b,#d97706)', border:'none' }}
+            >
+              {running
+                ? <><ClipLoader size={14} color="#fff" /> Running…</>
+                : <><FiZap size={14} /> Run Graduation Now</>}
+            </button>
+          </>
+        ) : (
+          <button className="am-btn am-btn-ghost" onClick={onClose} style={{ margin:'0 auto' }}>Close</button>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
 /* ── Bulk Import modal ───────────────────────────────────────── */
 const BulkImportModal = ({ onClose, onImport, importing, importResult }) => {
   const fileRef = useRef(null);
@@ -378,6 +476,7 @@ const StudentManagementPanel = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [promoteTarget,setPromoteTarget]= useState(null);
   const [bulkOpen,     setBulkOpen]     = useState(false);
+  const [gradOpen,     setGradOpen]     = useState(false);
 
   /* action loading */
   const [actionId,    setActionId]    = useState(null);
@@ -387,6 +486,8 @@ const StudentManagementPanel = () => {
   const [promSaving,  setPromSaving]  = useState(false);
   const [importing,   setImporting]   = useState(false);
   const [importResult,setImportResult]= useState(null);
+  const [gradRunning, setGradRunning] = useState(false);
+  const [gradResult,  setGradResult]  = useState(null);
 
   const { toasts, add: toast } = useToast();
 
@@ -483,6 +584,23 @@ const StudentManagementPanel = () => {
     } finally { setPromSaving(false); }
   };
 
+  /* ── AUTO GRADUATION ──────────────────────────────────────── */
+  const handleGraduation = async () => {
+    setGradRunning(true);
+    try {
+      const res = await studentAdminService.triggerGraduation();
+      setGradResult(res.data);
+      toast(res.data.message, res.data.data?.promoted > 0 ? 'success' : 'info');
+      // Refresh so promoted students disappear from the list
+      if (res.data.data?.promoted > 0) fetchStudents();
+    } catch (err) {
+      toast(err.response?.data?.message || 'Graduation job failed.', 'error');
+      setGradOpen(false);
+    } finally {
+      setGradRunning(false);
+    }
+  };
+
   /* ── BULK IMPORT ───────────────────────────────────────────── */
   const handleImport = async file => {
     setImporting(true);
@@ -558,6 +676,21 @@ const StudentManagementPanel = () => {
             style={{ borderColor:'#6366f1', color:'#6366f1' }}
             onClick={() => { setImportResult(null); setBulkOpen(true); }}>
             <FiUploadCloud size={13} /> Bulk Import
+          </button>
+          <button
+            className="am-btn"
+            style={{
+              background: 'linear-gradient(135deg,#f59e0b,#d97706)',
+              color: '#fff',
+              border: 'none',
+              fontWeight: 700,
+              boxShadow: '0 2px 10px rgba(245,158,11,0.35)',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+            onClick={() => { setGradResult(null); setGradOpen(true); }}
+            title="Promote all students whose graduation year has passed"
+          >
+            <FiZap size={14} /> Run Graduation
           </button>
           <button className="am-btn am-btn-primary" onClick={() => setAddOpen(true)}>
             <FiPlus size={14} /> Add Student
@@ -673,9 +806,10 @@ const StudentManagementPanel = () => {
                   const busy     = actionId === s._id;
                   const initials = s.name?.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
                   const bg       = ac(s.name || '');
+                  const overdue  = isOverdue(s);
 
                   return (
-                    <tr key={s._id}>
+                    <tr key={s._id} style={overdue ? { background:'rgba(200,64,34,0.03)' } : {}}>
                       {/* Student */}
                       <td>
                         <div className="am-name-cell">
@@ -714,13 +848,17 @@ const StudentManagementPanel = () => {
 
                       {/* Graduation Year */}
                       <td>
-                        {s.graduationYear
-                          ? <span style={{ display:'inline-flex', alignItems:'center', gap:5,
-                              background:'rgba(16,185,129,0.08)', color:'#059669',
-                              borderRadius:20, padding:'2px 9px', fontSize:12, fontWeight:600 }}>
-                              🎓 {s.graduationYear}
-                            </span>
-                          : <span style={{ color:'#bbb' }}>—</span>}
+                        {s.graduationYear ? (
+                          <span style={{
+                            display:'inline-flex', alignItems:'center', gap:5,
+                            background: overdue ? 'rgba(200,64,34,0.1)' : 'rgba(16,185,129,0.08)',
+                            color: overdue ? '#c84022' : '#059669',
+                            borderRadius:20, padding:'2px 9px', fontSize:12, fontWeight:700,
+                          }}>
+                            {overdue ? '⚠️' : '🎓'} {s.graduationYear}
+                            {overdue && <span style={{ fontSize:10, opacity:0.85 }}>overdue</span>}
+                          </span>
+                        ) : <span style={{ color:'#bbb' }}>—</span>}
                       </td>
 
                       {/* Gender */}
@@ -734,11 +872,14 @@ const StudentManagementPanel = () => {
                         <div className="am-actions">
                           {busy ? <ClipLoader size={16} color="#6366f1" /> : (
                             <>
-                              {/* Promote */}
+                              {/* Promote — highlighted red if overdue */}
                               <button
                                 className="am-btn-icon"
-                                title="Promote to Alumni"
-                                style={{ background:'rgba(99,102,241,0.1)', color:'#6366f1' }}
+                                title={overdue ? 'Overdue — Promote to Alumni' : 'Promote to Alumni'}
+                                style={{
+                                  background: overdue ? 'rgba(200,64,34,0.12)' : 'rgba(99,102,241,0.1)',
+                                  color: overdue ? '#c84022' : '#6366f1',
+                                }}
                                 onClick={() => setPromoteTarget(s)}
                               >
                                 <FiAward size={13} />
@@ -770,6 +911,78 @@ const StudentManagementPanel = () => {
                 })}
               </tbody>
             </table>
+
+            {/* Mobile Cards */}
+            <div className="ajd-mobile-cards">
+              {rows.map(s => {
+                const overdue  = isOverdue(s);
+                const initials = s.name?.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+                const bg       = ac(s.name || '');
+                return (
+                  <div key={s._id} className="ajd-mobile-card" style={
+                    overdue ? { padding:14, borderColor:'rgba(200,64,34,0.25)' } : { padding:14 }
+                  }>
+                    <div className="ajd-mobile-card-header">
+                      <div style={{ display:'flex', alignItems:'center', gap:10, flex:1 }}>
+                        <div className="am-avatar-sm" style={{ background:bg, flexShrink:0 }}>
+                          {s.profilePic ? <img src={s.profilePic} alt={s.name} style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%' }} /> : initials}
+                        </div>
+                        <div>
+                          <div className="ajd-mobile-card-title">{s.name}</div>
+                          <div className="ajd-mobile-card-sub">
+                            <FiMail size={10} style={{ marginRight:3 }} />{s.email}
+                          </div>
+                        </div>
+                      </div>
+                      <StatusPill status={s.status} />
+                    </div>
+
+                    <div className="ajd-mobile-card-meta" style={{ marginTop:8 }}>
+                      {s.rollNumber && (
+                        <span style={{ fontFamily:'monospace', fontSize:11.5, background:'#f5f5f5',
+                          borderRadius:4, padding:'1px 5px', color:'#555' }}>{s.rollNumber}</span>
+                      )}
+                      {s.department && (
+                        <span style={{ background:'rgba(99,102,241,0.08)', color:'#6366f1',
+                          borderRadius:6, padding:'1px 7px', fontSize:11.5, fontWeight:700 }}>{s.department}</span>
+                      )}
+                      {s.batch && <span><FiCalendar size={11} /> Batch {s.batch}</span>}
+                      {s.graduationYear && (
+                        <span style={{
+                          background: overdue ? 'rgba(200,64,34,0.1)' : 'rgba(16,185,129,0.08)',
+                          color: overdue ? '#c84022' : '#059669',
+                          borderRadius:20, padding:'1px 8px', fontSize:11, fontWeight:700,
+                          display:'inline-flex', alignItems:'center', gap:3,
+                        }}>
+                          {overdue ? '⚠️' : '🎓'} Grad {s.graduationYear}{overdue ? ' (overdue)' : ''}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="ajd-mobile-card-footer">
+                      <div style={{ fontSize:11, color:'#bbb' }}>{s.gender || ''}</div>
+                      <div className="am-actions">
+                        {actionId === s._id ? <ClipLoader size={16} color="#6366f1" /> : (
+                          <>
+                            <button
+                              className="am-btn-icon"
+                              title={overdue ? 'Overdue — Promote' : 'Promote to Alumni'}
+                              style={{
+                                background: overdue ? 'rgba(200,64,34,0.12)' : 'rgba(99,102,241,0.1)',
+                                color: overdue ? '#c84022' : '#6366f1',
+                              }}
+                              onClick={() => setPromoteTarget(s)}
+                            ><FiAward size={13} /></button>
+                            <button className="am-btn-icon am-btn-icon-edit" onClick={() => setEditTarget(s)}><FiEdit2 size={13} /></button>
+                            <button className="am-btn-icon am-btn-icon-delete" onClick={() => setDeleteTarget(s)}><FiTrash2 size={13} /></button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
             {/* ── Pagination ──────────────────────────────────── */}
             <div className="am-pagination">
@@ -848,6 +1061,14 @@ const StudentManagementPanel = () => {
           onImport={handleImport}
           importing={importing}
           importResult={importResult}
+        />
+      )}
+      {gradOpen && (
+        <GraduationModal
+          onClose={() => { setGradOpen(false); setGradResult(null); }}
+          onConfirm={handleGraduation}
+          running={gradRunning}
+          result={gradResult}
         />
       )}
 

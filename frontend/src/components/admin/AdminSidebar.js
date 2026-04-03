@@ -2,9 +2,9 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  FiGrid, FiUsers, FiUserCheck, FiFileText, FiBriefcase,
+  FiUsers, FiUserCheck, FiFileText, FiBriefcase,
   FiCalendar, FiGlobe, FiSettings, FiLogOut, FiShield,
-  FiBarChart2, FiUploadCloud,
+  FiBarChart2, FiUploadCloud, FiBell, FiArrowLeft, FiHome,
 } from 'react-icons/fi';
 
 // ── Navigation items ──────────────────────────────────────────
@@ -12,8 +12,7 @@ const NAV_ITEMS = [
   {
     section: 'Main',
     items: [
-      { label: 'Dashboard',   icon: FiGrid,      to: '/admin/dashboard' },
-      { label: 'Analytics',   icon: FiBarChart2, to: '/admin/analytics' },
+      { label: 'Analytics', icon: FiBarChart2, to: '/admin/analytics' },
     ],
   },
   {
@@ -21,6 +20,7 @@ const NAV_ITEMS = [
     items: [
       { label: 'Alumni',       icon: FiUserCheck,  to: '/admin/alumni' },
       { label: 'Students',     icon: FiUsers,      to: '/admin/students' },
+      { label: 'Groups',       icon: FiUsers,      to: '/admin/groups' },
       { label: 'Approvals',    icon: FiShield,     to: '/admin/approvals', badgeKey: 'pendingApprovals' },
       { label: 'Bulk Import',  icon: FiUploadCloud,to: '/admin/import' },
     ],
@@ -28,9 +28,10 @@ const NAV_ITEMS = [
   {
     section: 'Content',
     items: [
-      { label: 'Posts',  icon: FiFileText,  to: '/admin/posts' },
-      { label: 'Jobs',   icon: FiBriefcase, to: '/admin/jobs' },
-      { label: 'Events', icon: FiCalendar,  to: '/admin/events' },
+      { label: 'Posts',     icon: FiFileText,  to: '/admin/posts' },
+      { label: 'Jobs',      icon: FiBriefcase, to: '/admin/jobs' },
+      { label: 'Events',    icon: FiCalendar,  to: '/admin/events' },
+      { label: 'Broadcast', icon: FiBell,      to: '/admin/broadcast' },
     ],
   },
   {
@@ -42,7 +43,7 @@ const NAV_ITEMS = [
   },
 ];
 
-const AdminSidebar = ({ collapsed, pendingCount = 0, onMobileClose }) => {
+const AdminSidebar = ({ collapsed, mobileOpen, pendingCount = 0, onMobileClose }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -51,10 +52,16 @@ const AdminSidebar = ({ collapsed, pendingCount = 0, onMobileClose }) => {
     navigate('/login/admin', { replace: true });
   };
 
+  const sidebarClass = [
+    'ap-sidebar',
+    collapsed ? 'collapsed' : '',
+    mobileOpen ? 'mobile-open' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <>
       {/* Sidebar */}
-      <aside className={`ap-sidebar${collapsed ? ' collapsed' : ''}`}>
+      <aside className={sidebarClass}>
         {/* Logo */}
         <div className="ap-sidebar-logo">
           <div className="ap-sidebar-logo-icon">🛡️</div>
@@ -113,6 +120,29 @@ const AdminSidebar = ({ collapsed, pendingCount = 0, onMobileClose }) => {
             </div>
           </div>
 
+          {/* Back button */}
+          <button
+            className="ap-nav-item"
+            style={{ width: '100%', border: 'none', textAlign: 'left' }}
+            onClick={() => navigate(-1)}
+            title={collapsed ? 'Go Back' : undefined}
+          >
+            <span className="ap-nav-item-icon"><FiArrowLeft size={15} /></span>
+            <span className="ap-nav-item-label" style={{ color: 'rgba(255,255,255,0.65)' }}>Go Back</span>
+          </button>
+
+          {/* Home button */}
+          <button
+            className="ap-nav-item"
+            style={{ width: '100%', border: 'none', textAlign: 'left' }}
+            onClick={() => navigate('/')}
+            title={collapsed ? 'Main Site' : undefined}
+          >
+            <span className="ap-nav-item-icon"><FiHome size={15} /></span>
+            <span className="ap-nav-item-label" style={{ color: 'rgba(255,255,255,0.65)' }}>Main Site</span>
+          </button>
+
+          {/* Logout */}
           <button
             className="ap-nav-item"
             style={{ width: '100%', border: 'none', textAlign: 'left' }}

@@ -1,187 +1,364 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { notificationService } from '../../services/api';
+import { useSocket } from '../../context/SocketContext';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ClipLoader } from 'react-spinners';
+import {
+  FaBell, FaCheck, FaUserPlus, FaCommentDots, FaBriefcase,
+  FaCalendarAlt, FaNewspaper, FaShieldAlt, FaTrashAlt,
+  FaCheckDouble, FaSearch, FaTimes, FaInbox,
+} from 'react-icons/fa';
+import { FiChevronRight, FiAlertCircle } from 'react-icons/fi';
 
+/* ─── Type config ──────────────────────────────────────────── */
+const TYPE_CONFIG = {
+  connection_request:    { icon: <FaUserPlus />,     color: '#c84022', label: 'Connection',  bg: 'rgba(200,64,34,0.1)'  },
+  connection_accepted:   { icon: <FaCheck />,        color: '#198754', label: 'Connection',  bg: 'rgba(25,135,84,0.1)'  },
+  message:               { icon: <FaCommentDots />,  color: '#0d6efd', label: 'Message',     bg: 'rgba(13,110,253,0.1)' },
+  job:                   { icon: <FaBriefcase />,    color: '#6f42c1', label: 'Job',         bg: 'rgba(111,66,193,0.1)' },
+  job_alert:             { icon: <FaBriefcase />,    color: '#6f42c1', label: 'Job',         bg: 'rgba(111,66,193,0.1)' },
+  event:                 { icon: <FaCalendarAlt />,  color: '#fd7e14', label: 'Event',       bg: 'rgba(253,126,20,0.1)' },
+  event_alert:           { icon: <FaCalendarAlt />,  color: '#fd7e14', label: 'Event',       bg: 'rgba(253,126,20,0.1)' },
+  post:                  { icon: <FaNewspaper />,    color: '#20c997', label: 'Post',        bg: 'rgba(32,201,151,0.1)' },
+  admin_approval_needed: { icon: <FaShieldAlt />,   color: '#dc3545', label: 'Approval',    bg: 'rgba(220,53,69,0.1)'  },
+  account_activated:     { icon: <FaCheck />,        color: '#198754', label: 'Account',     bg: 'rgba(25,135,84,0.1)'  },
+  broadcast:             { icon: <FaBell />,         color: '#6f42c1', label: 'Broadcast',   bg: 'rgba(111,66,193,0.1)' },
+  system:                { icon: <FiAlertCircle />,  color: '#856404', label: 'System',      bg: 'rgba(133,100,4,0.1)'  },
+};
+const getCfg  = (type) => TYPE_CONFIG[type] || { icon: <FaBell />, color: '#c84022', label: 'Alert', bg: 'rgba(200,64,34,0.08)' };
+
+/* ─── Helpers ──────────────────────────────────────────────── */
+const timeAgo = (d) => {
+  if (!d) return '';
+  const s = Math.floor((Date.now() - new Date(d)) / 1000);
+  if (s < 60)    return 'Just now';
+  if (s < 3600)  return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+};
+
+const dayLabel = (d) => {
+  if (!d) return 'Older';
+  const date = new Date(d);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const yest  = new Date(today); yest.setDate(yest.getDate() - 1);
+  const week  = new Date(today); week.setDate(week.getDate() - 7);
+  if (date >= today) return 'Today';
+  if (date >= yest)  return 'Yesterday';
+  if (date >= week)  return 'This Week';
+  return 'Older';
+};
+
+const FILTER_TABS = [
+  { id: 'all',      label: 'All' },
+  { id: 'unread',   label: 'Unread' },
+  { id: 'message',  label: 'Messages' },
+  { id: 'job',      label: 'Jobs' },
+  { id: 'event',    label: 'Events' },
+  { id: 'system',   label: 'System' },
+];
+
+const TYPE_TO_FILTER = {
+  message: 'message',
+  job: 'job', job_alert: 'job',
+  event: 'event', event_alert: 'event',
+  system: 'system', broadcast: 'system',
+  admin_approval_needed: 'system', account_activated: 'system',
+  connection_request: 'system', connection_accepted: 'system',
+};
+
+/* ─── Single notification card ─────────────────────────────── */
+const NotifCard = ({ notif, onRead, onDelete, onClick }) => {
+  const cfg = getCfg(notif.type);
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.18 }}
+      onClick={() => onClick(notif)}
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px',
+        background: '#fff', borderRadius: 14, cursor: 'pointer',
+        borderLeft: !notif.isRead ? `4px solid ${cfg.color}` : '4px solid transparent',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
+        transition: 'box-shadow 0.15s, transform 0.15s',
+        marginBottom: 8,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 6px rgba(0,0,0,0.05)'; e.currentTarget.style.transform = ''; }}
+    >
+      {/* Icon */}
+      <div style={{
+        width: 44, height: 44, borderRadius: 12,
+        background: cfg.bg, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', color: cfg.color, fontSize: 18, flexShrink: 0,
+      }}>
+        {notif.icon || cfg.icon}
+      </div>
+
+      {/* Body */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+          <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1a1a2e', flex: 1 }}>{notif.title}</span>
+          {!notif.isRead && (
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.color, flexShrink: 0, display: 'inline-block' }} />
+          )}
+          <span style={{
+            fontSize: 10.5, fontWeight: 700, color: cfg.color,
+            background: cfg.bg, borderRadius: 6, padding: '2px 7px', flexShrink: 0,
+          }}>
+            {cfg.label}
+          </span>
+        </div>
+        {notif.description && (
+          <p style={{ margin: '0 0 4px', fontSize: 12.5, color: '#666', lineHeight: 1.5 }}>{notif.description}</p>
+        )}
+        <div style={{ fontSize: 11, color: '#aaa' }}>{timeAgo(notif.createdAt)}</div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <FiChevronRight size={14} color="#ccc" />
+        {!notif.isRead && (
+          <button
+            onClick={e => { e.stopPropagation(); onRead(notif._id); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#198754', padding: 2 }}
+            title="Mark as read"
+          >
+            <FaCheck size={11} />
+          </button>
+        )}
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(notif._id); }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc3545', padding: 2 }}
+          title="Delete"
+        >
+          <FaTrashAlt size={11} />
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
+/* ─── Main Notification Page ────────────────────────────────── */
 const Notification = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { notifications, unreadCount, notifLoaded, markOneRead, markAllRead, deleteNotif, clearAll } = useSocket();
 
-  useEffect(() => {
-    const fetch = async () => {
-      try {
-        const res = await notificationService.getNotifications();
-        setNotifications(res.data.data || []);
-      } catch (err) {
-        console.error('Failed to fetch notifications:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetch();
-  }, []);
+  const [activeTab,   setActiveTab]   = useState('all');
+  const [search,      setSearch]      = useState('');
+  const [clearing,    setClearing]    = useState(false);
 
-  const handleMarkAllRead = async () => {
-    try {
-      await notificationService.markAllRead();
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch (err) {
-      console.error('Failed to mark all read:', err);
-    }
-  };
+  /* ── Navigation on click ──────────────────────────────────── */
+  const handleClick = useCallback((notif) => {
+    markOneRead(notif._id);
+    const { type, relatedId } = notif;
+    if (type === 'message')                    navigate('/messaging');
+    else if (type === 'job' || type === 'job_alert')       navigate('/opportunities?tab=jobs');
+    else if (type === 'event' || type === 'event_alert')   navigate('/opportunities?tab=events');
+    else if (type === 'connection_request' || type === 'connection_accepted')
+      navigate(relatedId ? `/profile/${relatedId}` : '/notifications');
+    else if (type === 'admin_approval_needed') navigate('/admin/approvals');
+    else if (type === 'account_activated')     navigate('/alumni/home');
+  }, [navigate, markOneRead]);
 
-  const handleMarkOneRead = async (id) => {
-    try {
-      await notificationService.markRead(id);
-      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
-    } catch (err) {
-      console.error('Failed to mark notification as read:', err);
-    }
-  };
-
-  const handleDelete = async (id, e) => {
-    e.stopPropagation();
-    try {
-      await notificationService.delete(id);
-      setNotifications(prev => prev.filter(n => n._id !== id));
-    } catch (err) {
-      console.error('Failed to delete notification:', err);
-    }
-  };
-
+  /* ── Filter + search ──────────────────────────────────────── */
   const filtered = useMemo(() => {
-    const s = searchTerm.toLowerCase();
-    if (!s) return notifications;
-    return notifications.filter(n =>
-      (n.title || '').toLowerCase().includes(s) ||
-      (n.description || '').toLowerCase().includes(s)
+    const q = search.toLowerCase();
+    return notifications.filter(n => {
+      const matchTab = activeTab === 'all'
+        ? true
+        : activeTab === 'unread'
+          ? !n.isRead
+          : TYPE_TO_FILTER[n.type] === activeTab;
+      const matchQ = !q || (n.title || '').toLowerCase().includes(q) || (n.description || '').toLowerCase().includes(q);
+      return matchTab && matchQ;
+    });
+  }, [notifications, activeTab, search]);
+
+  /* ── Group by date ────────────────────────────────────────── */
+  const groups = useMemo(() => {
+    const map = {};
+    filtered.forEach(n => {
+      const label = dayLabel(n.createdAt);
+      if (!map[label]) map[label] = [];
+      map[label].push(n);
+    });
+    const ORDER = ['Today', 'Yesterday', 'This Week', 'Older'];
+    return ORDER.filter(k => map[k]).map(k => ({ label: k, items: map[k] }));
+  }, [filtered]);
+
+  /* ── Clear all handler ────────────────────────────────────── */
+  const handleClearAll = async () => {
+    setClearing(true);
+    await clearAll();
+    setClearing(false);
+  };
+
+  /* ── Tab unread dots ──────────────────────────────────────── */
+  const tabCounts = useMemo(() => ({
+    all: notifications.filter(n => !n.isRead).length,
+    unread: notifications.filter(n => !n.isRead).length,
+    message: notifications.filter(n => !n.isRead && TYPE_TO_FILTER[n.type] === 'message').length,
+    job: notifications.filter(n => !n.isRead && TYPE_TO_FILTER[n.type] === 'job').length,
+    event: notifications.filter(n => !n.isRead && TYPE_TO_FILTER[n.type] === 'event').length,
+    system: notifications.filter(n => !n.isRead && TYPE_TO_FILTER[n.type] === 'system').length,
+  }), [notifications]);
+
+  if (!notifLoaded) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <ClipLoader color="#c84022" size={40} />
+      </div>
     );
-  }, [searchTerm, notifications]);
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
-
-  const handleItemClick = async (notif) => {
-    await handleMarkOneRead(notif._id);
-    if (notif.type === 'event') navigate('/events');
-    else if (notif.type === 'job') navigate('/jobs');
-    else if (notif.type === 'message') navigate('/messaging');
-  };
-
-  const typeIcon = (type) => {
-    if (type === 'event') return '📅';
-    if (type === 'job') return '💼';
-    if (type === 'message') return '💬';
-    return '🔔';
-  };
-
-  if (loading) return (
-    <div className="d-flex justify-content-center align-items-center min-vh-100">
-      <ClipLoader color="#c84022" size={40} />
-    </div>
-  );
+  }
 
   return (
-    <div className="dashboard-main-bg py-4 min-vh-100">
-      <div className="container" style={{ maxWidth: '800px' }}>
-
-        {/* Page Header */}
-        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-          <h2 className="fw-bold mb-0" style={{ color: '#c84022', fontSize: 'clamp(1.25rem, 5vw, 1.75rem)' }}>
-            Notifications
-            {unreadCount > 0 && (
-              <span className="badge ms-2 fw-bold" style={{ backgroundColor: '#c84022', borderRadius: '12px', fontSize: '0.65rem', verticalAlign: 'middle' }}>
-                {unreadCount}
-              </span>
-            )}
-          </h2>
-          {unreadCount > 0 && (
-            <button
-              className="btn btn-outline-danger rounded-pill px-3 py-1 flex-shrink-0"
-              style={{ fontWeight: 600, fontSize: '0.85rem' }}
-              onClick={handleMarkAllRead}
-            >
-              <i className="fas fa-check-double me-2"></i>Mark All Read
-            </button>
-          )}
-        </div>
-
-        {/* Search Bar */}
-        <div className="mb-4 position-relative">
-          <i className="fas fa-search position-absolute text-muted" style={{ left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}></i>
-          <input
-            type="text"
-            className="form-control ps-5 rounded-pill"
-            placeholder="Search notifications..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            style={{ borderColor: '#d0d0d0', backgroundColor: '#ffffff' }}
-          />
-          {searchTerm && (
-            <button className="btn btn-link position-absolute text-muted p-0" style={{ right: '14px', top: '50%', transform: 'translateY(-50%)' }} onClick={() => setSearchTerm('')}>
-              <i className="fas fa-times"></i>
-            </button>
-          )}
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="dashboard-card bg-white text-center py-5 rounded-3">
-            <div style={{ fontSize: '3rem' }} className="mb-3">🔔</div>
-            <h5 className="fw-semibold text-dark">You're all caught up!</h5>
-            <p className="text-muted mb-0">No notifications {searchTerm ? `matching "${searchTerm}"` : 'yet'}.</p>
-          </div>
-        ) : (
-          <div className="d-flex flex-column gap-2">
-            {filtered.map(notif => (
-              <div
-                key={notif._id}
-                className="dashboard-card bg-white rounded-3 p-3 d-flex align-items-start gap-3"
-                style={{
-                  cursor: 'pointer',
-                  borderLeft: !notif.isRead ? '4px solid #c84022' : '4px solid transparent',
-                  transition: 'box-shadow 0.15s, transform 0.15s'
-                }}
-                onClick={() => handleItemClick(notif)}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = ''; e.currentTarget.style.transform = ''; }}
-              >
-                <div className="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                  style={{ width: '48px', height: '48px', backgroundColor: 'rgba(200,64,34,0.08)', fontSize: '1.4rem' }}>
-                  {notif.icon || typeIcon(notif.type)}
-                </div>
-                <div className="flex-grow-1 min-w-0">
-                  <div className="d-flex align-items-center gap-2 mb-1">
-                    <h6 className="fw-bold mb-0 text-dark">{notif.title}</h6>
-                    {!notif.isRead && (
-                      <span className="rounded-circle flex-shrink-0" style={{ width: '8px', height: '8px', backgroundColor: '#c84022', display: 'inline-block' }}></span>
-                    )}
-                    <span className="badge ms-auto" style={{ fontSize: '0.65rem', backgroundColor: notif.type === 'job' ? '#0d6efd' : notif.type === 'event' ? '#198754' : '#c84022', color: 'white', borderRadius: '8px' }}>
-                      {notif.type?.toUpperCase()}
-                    </span>
-                  </div>
-                  {notif.description && (
-                    <p className="text-muted small mb-1" style={{ lineHeight: '1.4' }}>{notif.description}</p>
-                  )}
-                  <span className="extra-small text-muted">
-                    <i className="fas fa-clock me-1 text-mamcet-red"></i>
-                    {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : ''}
+    <div style={{ minHeight: '100vh', background: '#f0f2f5', paddingBottom: 40 }}>
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #c84022 100%)',
+        padding: '24px 16px 16px', color: '#fff',
+      }}>
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <FaBell size={20} />
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>
+                Notifications
+                {unreadCount > 0 && (
+                  <span style={{ marginLeft: 10, background: '#fff', color: '#c84022', borderRadius: 10, fontSize: 12, fontWeight: 800, padding: '2px 8px' }}>
+                    {unreadCount}
                   </span>
-                </div>
-                <div className="d-flex flex-column align-items-center gap-2">
-                  <i className="fas fa-chevron-right text-muted"></i>
-                  <button
-                    className="btn btn-link text-danger p-0"
-                    title="Delete"
-                    onClick={(e) => handleDelete(notif._id, e)}
-                  >
-                    <i className="fas fa-trash-alt"></i>
-                  </button>
-                </div>
-              </div>
-            ))}
+                )}
+              </h1>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} style={{
+                  display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px',
+                  background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
+                  borderRadius: 8, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}>
+                  <FaCheckDouble size={11} /> Mark all read
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button onClick={handleClearAll} disabled={clearing} style={{
+                  display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px',
+                  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: 8, color: '#ffaeae', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}>
+                  {clearing ? <ClipLoader size={10} color="#fff" /> : <FaTrashAlt size={11} />}
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* Search */}
+          <div style={{ position: 'relative' }}>
+            <FaSearch style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: 13 }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search notifications…"
+              style={{
+                width: '100%', padding: '9px 36px', borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.12)',
+                color: '#fff', fontSize: 13, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+                <FaTimes size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 16px' }}>
+        {/* ── Filter tabs ─────────────────────────────────── */}
+        <div style={{
+          display: 'flex', gap: 6, overflowX: 'auto', padding: '14px 0 12px',
+          WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+        }}>
+          {FILTER_TABS.map(tab => {
+            const cnt = tabCounts[tab.id];
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                  background: isActive ? '#c84022' : '#fff',
+                  color: isActive ? '#fff' : '#555',
+                  fontWeight: 600, fontSize: 12.5, flexShrink: 0,
+                  boxShadow: isActive ? '0 2px 10px rgba(200,64,34,0.3)' : '0 1px 4px rgba(0,0,0,0.06)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {tab.label}
+                {cnt > 0 && (
+                  <span style={{
+                    background: isActive ? 'rgba(255,255,255,0.3)' : '#c84022',
+                    color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 800,
+                    padding: '1px 6px', minWidth: 18, textAlign: 'center',
+                  }}>
+                    {cnt}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Notification list ────────────────────────────── */}
+        <AnimatePresence mode="wait">
+          {groups.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 16, boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}
+            >
+              <FaInbox size={48} color="#e0e0e0" />
+              <h4 style={{ marginTop: 16, color: '#888', fontWeight: 700 }}>
+                {search ? `No results for "${search}"` : "You're all caught up!"}
+              </h4>
+              <p style={{ color: '#bbb', fontSize: 14, margin: 0 }}>No notifications here yet.</p>
+            </motion.div>
+          ) : (
+            <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              {groups.map(group => (
+                <div key={group.label}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, color: '#aaa', textTransform: 'uppercase',
+                    letterSpacing: '0.8px', margin: '16px 0 8px', paddingLeft: 4,
+                  }}>
+                    {group.label}
+                  </div>
+                  <AnimatePresence>
+                    {group.items.map(notif => (
+                      <NotifCard
+                        key={notif._id}
+                        notif={notif}
+                        onRead={markOneRead}
+                        onDelete={deleteNotif}
+                        onClick={handleClick}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

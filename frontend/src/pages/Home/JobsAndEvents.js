@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jobService, eventService } from '../../services/api';
@@ -8,7 +8,8 @@ import Toast from '../../components/common/Toast';
 import { ClipLoader } from 'react-spinners';
 import {
   FaBriefcase, FaCalendarAlt, FaMapMarkerAlt, FaClock,
-  FaPlus, FaFilter, FaBuilding, FaSearch
+  FaPlus, FaFilter, FaBuilding, FaSearch, FaTimes,
+  FaSlidersH, FaChevronDown
 } from 'react-icons/fa';
 
 // ─── Motion preset ────────────────────────────────────────────
@@ -19,77 +20,137 @@ const fadeUp = {
 };
 
 // ─── Data constants ───────────────────────────────────────────
-const JOB_TYPES   = ['All', 'Full-time', 'Part-time', 'Internship', 'Contract', 'Remote'];
-const EVENT_TYPES = ['All', 'Networking', 'Workshop', 'Webinar', 'Seminar', 'Cultural', 'Tech Event', 'Reunion'];
+const JOB_TYPES    = ['All', 'Full-time', 'Part-time', 'Internship', 'Contract', 'Remote'];
+const EVENT_TYPES  = ['All', 'Networking', 'Workshop', 'Webinar', 'Seminar', 'Cultural', 'Tech Event', 'Reunion'];
+const DEPARTMENTS  = ['All', 'CSE', 'ECE', 'EEE', 'Mechanical', 'Civil', 'IT', 'MBA', 'Other'];
+const LOCATIONS    = ['All', 'Remote', 'Bangalore', 'Chennai', 'Hyderabad', 'Mumbai', 'Pune', 'Delhi NCR', 'Coimbatore', 'Trichy'];
+
+// ─── Shared Styles ────────────────────────────────────────────
+const accent = '#c84022';
+const accentBg = '#fff5f3';
+const accentBorder = '#f1c4b8';
+
+const pillBadge = {
+  fontSize: 11,
+  backgroundColor: accentBg,
+  color: accent,
+  border: `1px solid ${accentBorder}`,
+};
 
 // ══════════════════════════════════════════════════════════════
-// JOB CARD
+// FILTER CHIP (reusable)
 // ══════════════════════════════════════════════════════════════
-const JobCard = ({ job, onApply, canApply, canPost }) => (
+const FilterChip = ({ label, value, options, onChange }) => (
+  <div className="position-relative">
+    <select
+      className="form-select form-select-sm rounded-pill pe-4"
+      style={{
+        fontSize: 12.5,
+        borderColor: value !== 'All' ? accent : '#e0e0e0',
+        color: value !== 'All' ? accent : '#555',
+        backgroundColor: value !== 'All' ? accentBg : '#fff',
+        fontWeight: value !== 'All' ? 600 : 400,
+        height: 34,
+        minWidth: 110,
+        paddingLeft: 10,
+        cursor: 'pointer',
+      }}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      title={label}
+    >
+      {options.map(o => (
+        <option key={o} value={o}>{o === 'All' ? `${label}: All` : o}</option>
+      ))}
+    </select>
+  </div>
+);
+
+// ══════════════════════════════════════════════════════════════
+// JOB CARD — List View
+// ══════════════════════════════════════════════════════════════
+const JobCard = ({ job, onApply, canApply }) => (
   <motion.div
     layout
     variants={fadeUp}
     initial="initial"
     animate="animate"
     exit="exit"
-    className="bg-white rounded-4 shadow-sm border-0 p-4 mb-3 d-flex flex-column flex-md-row gap-3 align-items-start"
-    style={{ transition: 'box-shadow .18s' }}
-    onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,.10)'}
-    onMouseLeave={e => e.currentTarget.style.boxShadow = ''}
+    className="bg-white rounded-4 shadow-sm border-0 p-3 p-md-4 mb-3"
+    style={{ transition: 'box-shadow .18s', cursor: 'default' }}
+    whileHover={{ boxShadow: '0 6px 24px rgba(0,0,0,.08)' }}
   >
-    {/* Company icon */}
-    <div
-      className="bg-light rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-      style={{ width: 64, height: 64 }}
-    >
-      <FaBuilding style={{ fontSize: 26, color: '#c84022' }} />
-    </div>
-
-    <div className="flex-grow-1">
-      <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
-        <h5 className="fw-bold text-dark mb-0">{job.title}</h5>
-        <span className="badge rounded-pill border fw-normal px-3"
-          style={{ fontSize: 11, backgroundColor: '#fff5f3', color: '#c84022', border: '1px solid #f1c4b8' }}>
-          {job.type}
-        </span>
+    <div className="d-flex flex-column flex-md-row gap-3 align-items-start">
+      {/* Company icon */}
+      <div
+        className="bg-light rounded-3 d-flex align-items-center justify-content-center flex-shrink-0 d-none d-md-flex"
+        style={{ width: 56, height: 56 }}
+      >
+        <FaBuilding style={{ fontSize: 22, color: accent }} />
       </div>
-      <p className="fw-semibold text-muted mb-1" style={{ fontSize: 14 }}>{job.company}</p>
-      <p className="extra-small text-muted mb-2">
-        <FaMapMarkerAlt className="me-1" style={{ color: '#c84022' }} />{job.location}
-        {job.salary && <> &bull; 💰 {job.salary}</>}
-        {job.experience && <> &bull; 🎯 {job.experience}</>}
-      </p>
 
-      {(job.skills || []).length > 0 && (
-        <div className="d-flex flex-wrap gap-2 mb-3">
-          {job.skills.map((s, i) => (
-            <span key={i} className="badge bg-light text-dark border fw-normal" style={{ fontSize: 11 }}>{s}</span>
-          ))}
+      <div className="flex-grow-1 w-100">
+        {/* Title row */}
+        <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+          <div className="d-flex align-items-center gap-2">
+            <div className="d-flex d-md-none bg-light rounded-2 align-items-center justify-content-center flex-shrink-0"
+              style={{ width: 36, height: 36 }}>
+              <FaBuilding style={{ fontSize: 14, color: accent }} />
+            </div>
+            <div>
+              <h6 className="fw-bold text-dark mb-0" style={{ fontSize: 'clamp(0.9rem, 2.5vw, 1.05rem)' }}>{job.title}</h6>
+              <p className="fw-semibold text-muted mb-0" style={{ fontSize: 13 }}>{job.company}</p>
+            </div>
+          </div>
+          <span className="badge rounded-pill border fw-normal px-3" style={pillBadge}>
+            {job.type}
+          </span>
         </div>
-      )}
 
-      <div className="d-flex gap-2 flex-wrap">
-        {/* Only students can apply */}
-        {canApply && (
-          <button
-            className={`btn rounded-pill fw-bold px-4 ${job.applied ? 'btn-success' : 'btn-mamcet-red'}`}
-            style={{ fontSize: 13 }}
-            disabled={job.applied}
-            onClick={() => onApply(job)}
-          >
-            {job.applied ? '✓ Applied' : 'Apply Now'}
-          </button>
+        {/* Meta */}
+        <div className="d-flex flex-wrap gap-2 mt-2 mb-2" style={{ fontSize: 12, color: '#888' }}>
+          <span><FaMapMarkerAlt className="me-1" style={{ color: accent }} />{job.location}</span>
+          {job.salary && <span>💰 {job.salary}</span>}
+          {job.experience && <span>🎯 {job.experience}</span>}
+          {job.department && <span>🏛️ {job.department}</span>}
+          {job.timestamp && <span>🕐 {job.timestamp}</span>}
+        </div>
+
+        {/* Skills */}
+        {(job.skills || []).length > 0 && (
+          <div className="d-flex flex-wrap gap-1 mb-3">
+            {job.skills.slice(0, 5).map((s, i) => (
+              <span key={i} className="badge bg-light text-dark border fw-normal" style={{ fontSize: 10.5 }}>{s}</span>
+            ))}
+            {job.skills.length > 5 && (
+              <span className="badge bg-light text-muted border fw-normal" style={{ fontSize: 10.5 }}>+{job.skills.length - 5}</span>
+            )}
+          </div>
         )}
-        <button className="btn btn-outline-secondary rounded-pill px-4 fw-semibold" style={{ fontSize: 13 }}>
-          Save
-        </button>
+
+        {/* Actions */}
+        <div className="d-flex gap-2 flex-wrap">
+          {canApply && (
+            <button
+              className={`btn rounded-pill fw-bold px-4 ${job.applied ? 'btn-success' : 'btn-mamcet-red'}`}
+              style={{ fontSize: 12.5, height: 34 }}
+              disabled={job.applied}
+              onClick={() => onApply(job)}
+            >
+              {job.applied ? '✓ Applied' : 'Apply Now'}
+            </button>
+          )}
+          <button className="btn btn-outline-secondary rounded-pill px-3 fw-semibold" style={{ fontSize: 12.5, height: 34 }}>
+            Save
+          </button>
+        </div>
       </div>
     </div>
   </motion.div>
 );
 
 // ══════════════════════════════════════════════════════════════
-// EVENT CARD
+// EVENT CARD — Card View
 // ══════════════════════════════════════════════════════════════
 const EventCard = ({ event, onRegister, onDetail }) => (
   <motion.div
@@ -98,20 +159,22 @@ const EventCard = ({ event, onRegister, onDetail }) => (
     initial="initial"
     animate="animate"
     exit="exit"
-    className="col-md-6 col-xl-4"
+    className="col-sm-6 col-xl-4"
   >
     <div
       className="bg-white rounded-4 shadow-sm border-0 overflow-hidden h-100 d-flex flex-column"
-      style={{ transition: 'box-shadow .18s' }}
-      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,.10)'}
+      style={{ transition: 'box-shadow .18s', cursor: 'pointer' }}
+      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,.08)'}
       onMouseLeave={e => e.currentTarget.style.boxShadow = ''}
+      onClick={() => onDetail(event)}
     >
       {/* Image */}
-      <div style={{ height: 160, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ height: 150, overflow: 'hidden', position: 'relative' }}>
         <img
           src={event.image || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&q=80'}
           alt={event.title}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          loading="lazy"
         />
         <span
           className="position-absolute top-0 end-0 m-2 badge rounded-pill fw-semibold px-3"
@@ -121,23 +184,28 @@ const EventCard = ({ event, onRegister, onDetail }) => (
         </span>
       </div>
 
-      <div className="p-4 flex-grow-1 d-flex flex-column">
-        <h6 className="fw-bold text-dark mb-2" style={{ lineHeight: 1.35 }}>{event.title}</h6>
-        <p className="extra-small text-muted flex-grow-1 mb-3">
-          {event.desc?.substring(0, 90)}{event.desc?.length > 90 ? '…' : ''}
+      <div className="p-3 p-md-4 flex-grow-1 d-flex flex-column">
+        <h6 className="fw-bold text-dark mb-2" style={{ fontSize: '0.95rem', lineHeight: 1.35 }}>{event.title}</h6>
+        <p className="extra-small text-muted flex-grow-1 mb-2" style={{ lineHeight: 1.5 }}>
+          {event.desc?.substring(0, 85)}{event.desc?.length > 85 ? '…' : ''}
         </p>
-        <div className="extra-small text-muted mb-3 d-flex flex-column gap-1">
-          {event.date && <span><FaCalendarAlt className="me-1" style={{ color: '#c84022' }} />{event.date}</span>}
-          {event.time && <span><FaClock className="me-1" style={{ color: '#c84022' }} />{event.time}</span>}
-          {event.venue && <span><FaMapMarkerAlt className="me-1" style={{ color: '#c84022' }} />{event.venue}</span>}
+        <div className="d-flex flex-column gap-1 mb-3" style={{ fontSize: 11.5 }}>
+          {event.date && <span className="text-muted"><FaCalendarAlt className="me-1" style={{ color: accent }} />{event.date}</span>}
+          {event.time && <span className="text-muted"><FaClock className="me-1" style={{ color: accent }} />{event.time}</span>}
+          {event.venue && <span className="text-muted"><FaMapMarkerAlt className="me-1" style={{ color: accent }} />{event.venue}</span>}
         </div>
-        <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary rounded-pill btn-sm px-3 fw-semibold" onClick={() => onDetail(event)}>
+        <div className="d-flex gap-2 mt-auto">
+          <button
+            className="btn btn-outline-secondary rounded-pill btn-sm px-3 fw-semibold flex-grow-1"
+            style={{ fontSize: 12 }}
+            onClick={e => { e.stopPropagation(); onDetail(event); }}
+          >
             Details
           </button>
           <button
-            className={`btn rounded-pill btn-sm px-3 fw-bold ${event.registered ? 'btn-success' : 'btn-mamcet-red'}`}
-            onClick={() => onRegister(event)}
+            className={`btn rounded-pill btn-sm px-3 fw-bold flex-grow-1 ${event.registered ? 'btn-success' : 'btn-mamcet-red'}`}
+            style={{ fontSize: 12 }}
+            onClick={e => { e.stopPropagation(); onRegister(event); }}
           >
             {event.registered ? '✓ Registered' : 'Register'}
           </button>
@@ -155,22 +223,29 @@ const JobsAndEvents = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // ── Role flags ────────────────────────────────────────────────
+  // ── Role flags ────────────────────────────────────────────
   const role      = (user?.role || '').toLowerCase();
-  const canCreate = role === 'alumni' || role === 'admin';  // can post jobs / create events
-  const canApply  = role === 'student';                     // can apply to jobs
+  const canCreate = role === 'alumni' || role === 'admin';
+  const canApply  = role === 'student';
 
-  // Persist tab in URL query: /opportunities?tab=events
+  // Persist tab in URL query
   const params   = new URLSearchParams(location.search);
   const initTab  = params.get('tab') === 'events' ? 'events' : 'jobs';
 
-  const [activeTab,   setActiveTab]   = useState(initTab);
-  const [jobFilter,   setJobFilter]   = useState('All');
-  const [eventFilter, setEventFilter] = useState('All');
-  const [search,      setSearch]      = useState('');
-  const [toast,       setToast]       = useState(null);
+  const [activeTab,    setActiveTab]    = useState(initTab);
+  const [search,       setSearch]       = useState('');
+  const [showFilters,  setShowFilters]  = useState(false);
+  const [toast,        setToast]        = useState(null);
 
-  // ── Jobs state ───────────────────────────────────────────────
+  // ── JOB FILTERS ───────────────────────────────────────────
+  const [jobType,       setJobType]       = useState('All');
+  const [jobLocation,   setJobLocation]   = useState('All');
+  const [jobDepartment, setJobDepartment] = useState('All');
+
+  // ── EVENT FILTERS ─────────────────────────────────────────
+  const [eventCategory, setEventCategory] = useState('All');
+
+  // ── Jobs state ────────────────────────────────────────────
   const [jobs,          setJobs]          = useState([]);
   const [jobsLoading,   setJobsLoading]   = useState(true);
   const [selectedJob,   setSelectedJob]   = useState(null);
@@ -179,10 +254,10 @@ const JobsAndEvents = () => {
   const [jobActLoading, setJobActLoading] = useState(false);
   const [newJob,        setNewJob]        = useState({
     title: '', company: '', location: '', type: 'Full-time',
-    experience: '', salary: '', description: '', skills: ''
+    department: '', experience: '', salary: '', description: '', skills: ''
   });
 
-  // ── Events state ─────────────────────────────────────────────
+  // ── Events state ──────────────────────────────────────────
   const [events,          setEvents]          = useState([]);
   const [eventsLoading,   setEventsLoading]   = useState(true);
   const [selectedEvent,   setSelectedEvent]   = useState(null);
@@ -194,9 +269,9 @@ const JobsAndEvents = () => {
     title: '', category: 'Networking', date: '', time: '', venue: '', desc: '', image: ''
   });
 
-  const showToast = (message, type = 'success') => setToast({ message, type });
+  const showToast = useCallback((message, type = 'success') => setToast({ message, type }), []);
 
-  // ── Fetch both data sets once ─────────────────────────────────
+  // ── Fetch both data sets once ─────────────────────────────
   useEffect(() => {
     jobService.getJobs()
       .then(res => setJobs(res.data.data || []))
@@ -207,35 +282,51 @@ const JobsAndEvents = () => {
       .then(res => setEvents(res.data.data || []))
       .catch(() => showToast('Failed to load events.', 'error'))
       .finally(() => setEventsLoading(false));
-  }, []);
+  }, [showToast]);
 
-  // ── Tab switch updates URL ────────────────────────────────────
+  // ── Tab switch updates URL ────────────────────────────────
   const switchTab = (tab) => {
     setActiveTab(tab);
     setSearch('');
     navigate(`?tab=${tab}`, { replace: true });
   };
 
-  // ── Filtered lists ───────────────────────────────────────────
+  // ── Active filters count ──────────────────────────────────
+  const activeFilterCount = activeTab === 'jobs'
+    ? [jobType, jobLocation, jobDepartment].filter(v => v !== 'All').length
+    : [eventCategory].filter(v => v !== 'All').length;
+
+  const clearAllFilters = () => {
+    setSearch('');
+    if (activeTab === 'jobs') {
+      setJobType('All'); setJobLocation('All'); setJobDepartment('All');
+    } else {
+      setEventCategory('All');
+    }
+  };
+
+  // ── Filtered lists ───────────────────────────────────────
   const filteredJobs = useMemo(() => {
     const q = search.toLowerCase();
     return jobs.filter(j => {
-      const matchType   = jobFilter === 'All' || (j.type || '').toLowerCase() === jobFilter.toLowerCase();
+      const matchType   = jobType === 'All' || (j.type || '').toLowerCase() === jobType.toLowerCase();
+      const matchLoc    = jobLocation === 'All' || (j.location || '').toLowerCase().includes(jobLocation.toLowerCase());
+      const matchDept   = jobDepartment === 'All' || (j.department || '').toLowerCase().includes(jobDepartment.toLowerCase());
       const matchSearch = !q || j.title?.toLowerCase().includes(q) || j.company?.toLowerCase().includes(q);
-      return matchType && matchSearch;
+      return matchType && matchLoc && matchDept && matchSearch;
     });
-  }, [jobs, jobFilter, search]);
+  }, [jobs, jobType, jobLocation, jobDepartment, search]);
 
   const filteredEvents = useMemo(() => {
     const q = search.toLowerCase();
     return events.filter(e => {
-      const matchType   = eventFilter === 'All' || (e.category || '').toLowerCase() === eventFilter.toLowerCase();
+      const matchType   = eventCategory === 'All' || (e.category || '').toLowerCase() === eventCategory.toLowerCase();
       const matchSearch = !q || e.title?.toLowerCase().includes(q) || e.venue?.toLowerCase().includes(q);
       return matchType && matchSearch;
     });
-  }, [events, eventFilter, search]);
+  }, [events, eventCategory, search]);
 
-  // ── Job actions ───────────────────────────────────────────────
+  // ── Job actions ───────────────────────────────────────────
   const handleApply = async (job) => {
     setSelectedJob(job); setApplyOpen(true);
   };
@@ -259,13 +350,13 @@ const JobsAndEvents = () => {
       setJobs(prev => [res.data.data, ...prev]);
       setPostOpen(false);
       showToast('Job posted! 🚀');
-      setNewJob({ title: '', company: '', location: '', type: 'Full-time', experience: '', salary: '', description: '', skills: '' });
+      setNewJob({ title: '', company: '', location: '', type: 'Full-time', department: '', experience: '', salary: '', description: '', skills: '' });
     } catch (err) {
       showToast(err.response?.data?.message || 'Failed to post job.', 'error');
     } finally { setJobActLoading(false); }
   };
 
-  // ── Event actions ─────────────────────────────────────────────
+  // ── Event actions ─────────────────────────────────────────
   const handleRegister = async () => {
     if (!selectedEvent) return;
     setEvtActLoading(true);
@@ -296,116 +387,173 @@ const JobsAndEvents = () => {
 
   // ════════════════════════════════════════════════════════════
   return (
-    <div className="dashboard-main-bg min-vh-100 py-4">
+    <div className="dashboard-main-bg min-vh-100 py-3 py-md-4">
       <div className="container">
 
-        {/* ── Page header ─────────────────────────────────── */}
-        <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        {/* ── Header Row ──────────────────────────────── */}
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-3 mb-md-4">
           <div>
-            <h2 className="fw-bold mb-0 text-dark" style={{ fontSize: 'clamp(1.3rem,4vw,1.8rem)' }}>
+            <h2 className="fw-bold mb-0 text-dark" style={{ fontSize: 'clamp(1.25rem, 4vw, 1.75rem)' }}>
               {activeTab === 'jobs' ? '💼 Job Opportunities' : '🎉 Alumni Events'}
             </h2>
-            <p className="text-muted mb-0 small">
+            <p className="text-muted mb-0 small d-none d-md-block">
               {activeTab === 'jobs'
                 ? 'Explore roles shared by your alumni network'
                 : 'Discover upcoming events and networking opportunities'}
             </p>
           </div>
 
-          {/* CTA button — only alumni/admin can create */}
+          {/* CTA — only alumni/admin can create */}
           {canCreate && (
-            activeTab === 'jobs' ? (
-              <button
-                className="btn btn-mamcet-red rounded-pill px-4 fw-bold d-flex align-items-center gap-2 w-auto flex-shrink-0"
-                onClick={() => setPostOpen(true)}
-              >
-                <FaPlus size={12} /> Post a Job
-              </button>
-            ) : (
-              <button
-                className="btn btn-mamcet-red rounded-pill px-4 fw-bold d-flex align-items-center gap-2 w-auto flex-shrink-0"
-                onClick={() => setCreateOpen(true)}
-              >
-                <FaPlus size={12} /> Create Event
-              </button>
-            )
+            <button
+              className="btn btn-mamcet-red rounded-pill px-4 fw-bold d-flex align-items-center gap-2 flex-shrink-0"
+              style={{ fontSize: 13, height: 38 }}
+              onClick={() => activeTab === 'jobs' ? setPostOpen(true) : setCreateOpen(true)}
+            >
+              <FaPlus size={11} />
+              {activeTab === 'jobs' ? 'Post a Job' : 'Create Event'}
+            </button>
           )}
         </div>
 
-        {/* ── Tab toggle ──────────────────────────────────── */}
-        <div className="bg-white rounded-4 shadow-sm border-0 p-2 mb-4 d-inline-flex gap-1">
-          {[
-            { key: 'jobs',   label: 'Jobs',   icon: <FaBriefcase className="me-2" /> },
-            { key: 'events', label: 'Events', icon: <FaCalendarAlt className="me-2" /> }
-          ].map(({ key, label, icon }) => (
+        {/* ── Tab Toggle ─────────────────────────────── */}
+        <div className="d-flex align-items-center gap-3 mb-3">
+          <div className="bg-white rounded-pill shadow-sm border-0 p-1 d-inline-flex gap-1">
+            {[
+              { key: 'jobs',   label: 'Jobs',   icon: <FaBriefcase size={13} className="me-1" /> },
+              { key: 'events', label: 'Events', icon: <FaCalendarAlt size={13} className="me-1" /> }
+            ].map(({ key, label, icon }) => (
+              <button
+                key={key}
+                onClick={() => switchTab(key)}
+                className="btn rounded-pill fw-bold px-3 px-md-4 d-flex align-items-center"
+                style={{
+                  fontSize: 13,
+                  height: 36,
+                  backgroundColor: activeTab === key ? accent : 'transparent',
+                  color: activeTab === key ? '#fff' : '#666',
+                  transition: 'all 0.2s',
+                  minWidth: 90,
+                  justifyContent: 'center',
+                }}
+              >
+                {icon}{label}
+              </button>
+            ))}
+          </div>
+
+          {/* Result count */}
+          <span className="text-muted d-none d-md-inline" style={{ fontSize: 12.5 }}>
+            {activeTab === 'jobs'
+              ? `${filteredJobs.length} job${filteredJobs.length !== 1 ? 's' : ''}`
+              : `${filteredEvents.length} event${filteredEvents.length !== 1 ? 's' : ''}`
+            }
+          </span>
+        </div>
+
+        {/* ── Search + Filter Bar ────────────────────── */}
+        <div className="bg-white rounded-4 shadow-sm p-3 mb-3 mb-md-4">
+          <div className="d-flex flex-wrap gap-2 align-items-center">
+            {/* Search */}
+            <div className="position-relative flex-grow-1" style={{ minWidth: 180 }}>
+              <FaSearch className="position-absolute text-muted" style={{ left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', fontSize: 13 }} />
+              <input
+                type="text"
+                className="form-control rounded-pill ps-4 border-0 bg-light"
+                placeholder={activeTab === 'jobs' ? 'Search jobs, companies…' : 'Search events, venues…'}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ fontSize: 13, height: 36 }}
+              />
+            </div>
+
+            {/* Filter toggle button */}
             <button
-              key={key}
-              onClick={() => switchTab(key)}
-              className="btn rounded-3 fw-bold px-4"
-              style={{
-                fontSize: 14,
-                backgroundColor: activeTab === key ? '#c84022' : 'transparent',
-                color: activeTab === key ? '#fff' : '#555',
-                transition: 'all 0.2s',
-                minWidth: 110,
-              }}
+              className={`btn rounded-pill d-flex align-items-center gap-1 ${showFilters || activeFilterCount > 0 ? 'btn-mamcet-red' : 'btn-outline-secondary'}`}
+              style={{ fontSize: 12.5, height: 36, fontWeight: 600 }}
+              onClick={() => setShowFilters(!showFilters)}
             >
-              {icon}{label}
+              <FaSlidersH size={12} />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="badge rounded-pill bg-white text-danger ms-1" style={{ fontSize: 10 }}>{activeFilterCount}</span>
+              )}
+              <FaChevronDown size={9} style={{ transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
             </button>
-          ))}
-        </div>
 
-        {/* ── Search + Filter bar ──────────────────────────── */}
-        <div className="d-flex flex-wrap gap-2 mb-4">
-          {/* Search */}
-          <div className="position-relative flex-grow-1" style={{ minWidth: 220 }}>
-            <FaSearch className="position-absolute text-muted" style={{ left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', fontSize: 13 }} />
-            <input
-              type="text"
-              className="form-control rounded-pill ps-4"
-              placeholder={activeTab === 'jobs' ? 'Search jobs or companies…' : 'Search events or venues…'}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ fontSize: 13, borderColor: '#e0e0e0', height: 38 }}
-            />
+            {/* Clear all */}
+            {(activeFilterCount > 0 || search) && (
+              <button
+                className="btn btn-link text-muted p-0 d-flex align-items-center gap-1"
+                style={{ fontSize: 12, textDecoration: 'none' }}
+                onClick={clearAllFilters}
+              >
+                <FaTimes size={10} /> Clear
+              </button>
+            )}
           </div>
 
-          {/* Type filter */}
-          <div className="d-flex align-items-center gap-2">
-            <FaFilter style={{ color: '#c84022', fontSize: 13 }} />
-            <select
-              className="form-select form-select-sm rounded-pill"
-              style={{ fontSize: 13, borderColor: '#e0e0e0', minWidth: 140, height: 38 }}
-              value={activeTab === 'jobs' ? jobFilter : eventFilter}
-              onChange={e => activeTab === 'jobs' ? setJobFilter(e.target.value) : setEventFilter(e.target.value)}
-            >
-              {(activeTab === 'jobs' ? JOB_TYPES : EVENT_TYPES).map(t => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-          </div>
+          {/* ── Expandable Filter Row ─────────────────── */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div className="d-flex flex-wrap gap-2 pt-3 mt-2 border-top">
+                  {activeTab === 'jobs' ? (
+                    <>
+                      <FilterChip label="Type" value={jobType} options={JOB_TYPES} onChange={setJobType} />
+                      <FilterChip label="Location" value={jobLocation} options={LOCATIONS} onChange={setJobLocation} />
+                      <FilterChip label="Department" value={jobDepartment} options={DEPARTMENTS} onChange={setJobDepartment} />
+                    </>
+                  ) : (
+                    <>
+                      <FilterChip label="Category" value={eventCategory} options={EVENT_TYPES} onChange={setEventCategory} />
+                    </>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* ── Content ─────────────────────────────────────── */}
+        {/* ── Mobile result count ────────────────────── */}
+        <p className="text-muted d-md-none mb-2" style={{ fontSize: 12 }}>
+          {activeTab === 'jobs'
+            ? `${filteredJobs.length} result${filteredJobs.length !== 1 ? 's' : ''}`
+            : `${filteredEvents.length} result${filteredEvents.length !== 1 ? 's' : ''}`}
+        </p>
+
+        {/* ── Content ────────────────────────────────── */}
         {isLoading ? (
           <div className="d-flex justify-content-center py-5">
-            <ClipLoader color="#c84022" size={44} />
+            <ClipLoader color={accent} size={40} />
           </div>
         ) : (
           <AnimatePresence mode="wait">
-            {/* ── JOBS tab ─────────────────────────────────── */}
+            {/* ── JOBS tab ─ list view ────────────────── */}
             {activeTab === 'jobs' && (
               <motion.div key="jobs" variants={fadeUp} initial="initial" animate="animate" exit="exit">
                 {filteredJobs.length === 0 ? (
                   <div className="text-center py-5 bg-white rounded-4 shadow-sm">
                     <FaBriefcase size={40} className="text-muted mb-3 opacity-25" />
                     <p className="text-muted fw-semibold">
-                      {search || jobFilter !== 'All' ? 'No jobs match your filters.' : 'No job postings yet. Be the first to post one!'}
+                      {search || activeFilterCount > 0
+                        ? 'No jobs match your filters.'
+                        : 'No job postings yet. Be the first to post one!'}
                     </p>
+                    {(search || activeFilterCount > 0) && (
+                      <button className="btn btn-outline-secondary btn-sm rounded-pill px-4 mt-2" onClick={clearAllFilters}>
+                        Clear Filters
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  <div style={{ maxWidth: 780, margin: '0 auto' }}>
-                    <p className="extra-small text-muted mb-3">{filteredJobs.length} result{filteredJobs.length !== 1 ? 's' : ''}</p>
+                  <div style={{ maxWidth: 800, margin: '0 auto' }}>
                     <AnimatePresence>
                       {filteredJobs.map(job => (
                         <JobCard key={job._id || job.id} job={job} onApply={handleApply} canApply={canApply} />
@@ -416,32 +564,36 @@ const JobsAndEvents = () => {
               </motion.div>
             )}
 
-            {/* ── EVENTS tab ───────────────────────────────── */}
+            {/* ── EVENTS tab ─ card grid ──────────────── */}
             {activeTab === 'events' && (
               <motion.div key="events" variants={fadeUp} initial="initial" animate="animate" exit="exit">
                 {filteredEvents.length === 0 ? (
                   <div className="text-center py-5 bg-white rounded-4 shadow-sm">
                     <FaCalendarAlt size={40} className="text-muted mb-3 opacity-25" />
                     <p className="text-muted fw-semibold">
-                      {search || eventFilter !== 'All' ? 'No events match your filters.' : 'No events yet. Create the first one!'}
+                      {search || activeFilterCount > 0
+                        ? 'No events match your filters.'
+                        : 'No events yet. Create the first one!'}
                     </p>
+                    {(search || activeFilterCount > 0) && (
+                      <button className="btn btn-outline-secondary btn-sm rounded-pill px-4 mt-2" onClick={clearAllFilters}>
+                        Clear Filters
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  <>
-                    <p className="extra-small text-muted mb-3">{filteredEvents.length} result{filteredEvents.length !== 1 ? 's' : ''}</p>
-                    <div className="row g-4">
-                      <AnimatePresence>
-                        {filteredEvents.map(event => (
-                          <EventCard
-                            key={event._id || event.id}
-                            event={event}
-                            onRegister={(e) => { setSelectedEvent(e); setRegisterOpen(true); }}
-                            onDetail={(e) => { setSelectedEvent(e); setDetailOpen(true); }}
-                          />
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                  </>
+                  <div className="row g-3 g-md-4">
+                    <AnimatePresence>
+                      {filteredEvents.map(event => (
+                        <EventCard
+                          key={event._id || event.id}
+                          event={event}
+                          onRegister={e => { setSelectedEvent(e); setRegisterOpen(true); }}
+                          onDetail={e => { setSelectedEvent(e); setDetailOpen(true); }}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  </div>
                 )}
               </motion.div>
             )}
@@ -467,7 +619,7 @@ const JobsAndEvents = () => {
         </div>
         <label className="form-label extra-small fw-bold">Cover Letter / Note</label>
         <textarea className="form-control" rows={4} placeholder="Briefly mention why you are a good fit…" />
-        <p className="extra-small text-muted mt-2">Your alumni profile will be shared with the recruiter automatically.</p>
+        <p className="extra-small text-muted mt-2">Your profile will be shared with the recruiter automatically.</p>
       </Modal>
 
       {/* Post a Job */}
@@ -489,11 +641,16 @@ const JobsAndEvents = () => {
             <select className="form-select" value={newJob.type} onChange={e => setNewJob({ ...newJob, type: e.target.value })}>
               {JOB_TYPES.filter(t => t !== 'All').map(t => <option key={t}>{t}</option>)}
             </select></div>
+          <div className="col-md-6"><label className="form-label extra-small fw-bold">Department</label>
+            <select className="form-select" value={newJob.department} onChange={e => setNewJob({ ...newJob, department: e.target.value })}>
+              <option value="">Select Department</option>
+              {DEPARTMENTS.filter(d => d !== 'All').map(d => <option key={d}>{d}</option>)}
+            </select></div>
           <div className="col-md-6"><label className="form-label extra-small fw-bold">Experience</label>
             <input type="text" className="form-control" placeholder="e.g. 2-5 Years" value={newJob.experience} onChange={e => setNewJob({ ...newJob, experience: e.target.value })} /></div>
           <div className="col-md-6"><label className="form-label extra-small fw-bold">Salary Range</label>
             <input type="text" className="form-control" placeholder="e.g. 10-15 LPA" value={newJob.salary} onChange={e => setNewJob({ ...newJob, salary: e.target.value })} /></div>
-          <div className="col-12"><label className="form-label extra-small fw-bold">Skills (comma-separated)</label>
+          <div className="col-md-6"><label className="form-label extra-small fw-bold">Skills (comma-separated)</label>
             <input type="text" className="form-control" placeholder="React, Node.js, Python" value={newJob.skills} onChange={e => setNewJob({ ...newJob, skills: e.target.value })} /></div>
           <div className="col-12"><label className="form-label extra-small fw-bold">Description</label>
             <textarea className="form-control" rows={3} value={newJob.description} onChange={e => setNewJob({ ...newJob, description: e.target.value })} /></div>
@@ -507,14 +664,14 @@ const JobsAndEvents = () => {
             {selectedEvent.image && <img src={selectedEvent.image} alt={selectedEvent.title} className="w-100 rounded-3 mb-4 shadow-sm" style={{ maxHeight: 220, objectFit: 'cover' }} />}
             <h4 className="fw-bold text-dark mb-2">{selectedEvent.title}</h4>
             <div className="d-flex gap-3 mb-3 flex-wrap extra-small fw-bold text-muted">
-              <span><FaCalendarAlt className="me-1" style={{ color: '#c84022' }} />{selectedEvent.date}</span>
-              <span><FaClock className="me-1" style={{ color: '#c84022' }} />{selectedEvent.time}</span>
-              <span className="badge rounded-pill px-3" style={{ backgroundColor: '#fff5f3', color: '#c84022', border: '1px solid #f1c4b8' }}>{selectedEvent.category}</span>
+              <span><FaCalendarAlt className="me-1" style={{ color: accent }} />{selectedEvent.date}</span>
+              <span><FaClock className="me-1" style={{ color: accent }} />{selectedEvent.time}</span>
+              <span className="badge rounded-pill px-3" style={pillBadge}>{selectedEvent.category}</span>
             </div>
             <p className="text-muted mb-3">{selectedEvent.desc}</p>
             {selectedEvent.venue && (
               <div className="p-3 bg-light rounded-3 d-flex align-items-center gap-2">
-                <FaMapMarkerAlt style={{ color: '#c84022', fontSize: 20 }} />
+                <FaMapMarkerAlt style={{ color: accent, fontSize: 20 }} />
                 <div><p className="mb-0 extra-small text-muted">{selectedEvent.venue}</p></div>
               </div>
             )}

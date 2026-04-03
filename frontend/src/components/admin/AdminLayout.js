@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { adminService } from '../../services/api';
 import AdminSidebar from './AdminSidebar';
 import AdminTopbar from './AdminTopbar';
 import '../../styles/AdminPanel.css';
@@ -9,15 +10,17 @@ import '../../styles/AdminPanel.css';
  * AdminLayout
  * -----------
  * Persistent shell for all /admin/* routes.
+ * - Fetches live pending approvals count every 60 s
  * - Collapsible sidebar (desktop toggle + mobile overlay)
  * - Sticky topbar with profile dropdown
  * - <Outlet /> renders the active page content
  * - Guards: only 'admin' role can access
  */
-const AdminLayout = ({ pendingCount = 0 }) => {
+const AdminLayout = () => {
   const { user, userRole } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed,    setCollapsed]    = useState(false);
+  const [mobileOpen,   setMobileOpen]   = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   // ── Auth guard ─────────────────────────────────────────────
   if (!user) return <Navigate to="/login/admin" replace />;
@@ -26,6 +29,22 @@ const AdminLayout = ({ pendingCount = 0 }) => {
     if (userRole === 'student') return <Navigate to={`/student/home/${uid}`} replace />;
     return <Navigate to={`/alumni/home/${uid}`} replace />;
   }
+
+  // ── Live pending count ─────────────────────────────────────
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const refreshPending = useCallback(async () => {
+    try {
+      const count = await adminService.getPendingCount();
+      setPendingCount(typeof count === 'number' ? count : 0);
+    } catch (_) {}
+  }, []);
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    refreshPending();
+    const id = setInterval(refreshPending, 60_000); // refresh every minute
+    return () => clearInterval(id);
+  }, [refreshPending]);
 
   const toggleSidebar = () => {
     if (window.innerWidth <= 768) {

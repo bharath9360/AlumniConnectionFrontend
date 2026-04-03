@@ -78,11 +78,7 @@ const userSchema = new mongoose.Schema({
   experience: [experienceSchema],
   education: [educationSchema],
 
-  // LinkedIn-style connections
-  connections: [{
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    status: { type: String, enum: ['Pending', 'Accepted'], default: 'Pending' }
-  }],
+  // Legacy field removed: connections collection is used now
 
   // Account status
   status: {

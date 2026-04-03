@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
 import NotificationDropdown from '../notifications/NotificationDropdown';
 import { FaSignOutAlt, FaCommentDots, FaBars, FaTimes } from 'react-icons/fa';
@@ -52,6 +53,7 @@ const Navbar = () => {
   const path      = location.pathname;
   const navigate  = useNavigate();
   const { user, userRole, logout } = useAuth();
+  const { unreadMessageCount = 0 } = useSocket();
   const roleKey   = getUserRoleKey(user);
 
   // used for the pre‑login mobile menu
@@ -175,7 +177,7 @@ const Navbar = () => {
                 <Link
                   key={item.path}
                   to={itemPath}
-                  className="d-flex flex-column align-items-center text-decoration-none"
+                  className="d-flex flex-column align-items-center text-decoration-none position-relative"
                   style={{
                     color: isActive ? '#b22222' : '#555',
                     fontWeight: 700,
@@ -185,7 +187,17 @@ const Navbar = () => {
                     transition: '0.2s',
                   }}
                 >
-                  {Icon && <Icon size={18} className="mb-1" />}
+                  <div className="position-relative">
+                    {Icon && <Icon size={18} className="mb-1" />}
+                    {item.isMessaging && unreadMessageCount > 0 && (
+                      <span
+                        className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                        style={{ fontSize: '0.5rem', padding: '0.2em 0.4em', minWidth: 14, lineHeight: 1.4, fontWeight: 700 }}
+                      >
+                        {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-uppercase">{item.label}</span>
                 </Link>
               );
@@ -214,11 +226,19 @@ const Navbar = () => {
         {user && isDashboard && (
           <div className="d-lg-none d-flex align-items-center gap-2">
             <Link
-              to={`/messaging/${user?._id || user?.id}`}
-              className="text-decoration-none"
+              to="/messaging"
+              className="text-decoration-none position-relative"
               style={{ color: brandColor }}
             >
               <FaCommentDots size={22} />
+              {unreadMessageCount > 0 && (
+                <span
+                  className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                  style={{ fontSize: '0.5rem', padding: '0.2em 0.4em', minWidth: 14, lineHeight: 1.4, fontWeight: 700 }}
+                >
+                  {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                </span>
+              )}
             </Link>
           </div>
         )}

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
-import { notificationService } from '../../services/api';
 import '../../styles/Navbar.css';
 
 const BottomNav = () => {
@@ -10,31 +10,16 @@ const BottomNav = () => {
     const path = location.pathname;
     const { user } = useAuth();
 
-    const [unreadCount, setUnreadCount] = useState(0);
+    const { unreadCount, unreadMessageCount } = useSocket();
 
     const isLandingPage = path === '/';
     const isAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/signup');
     const isDashboard = user && !isLandingPage && !isAuthPage;
 
-    // Fetch unread notification count when the bottom nav is visible
-    useEffect(() => {
-        if (!isDashboard) return;
-        const fetchUnread = async () => {
-            try {
-                const res = await notificationService.getNotifications();
-                const data = res.data?.data || [];
-                setUnreadCount(data.filter(n => !n.isRead).length);
-            } catch { /* silent */ }
-        };
-        fetchUnread();
-        const interval = setInterval(fetchUnread, 30000);
-        return () => clearInterval(interval);
-    }, [isDashboard]);
-
     if (!isDashboard) return null;
 
     const roleKey  = getUserRoleKey(user);
-    const navItems = (navigationConfig[roleKey] || []).filter(item => item.label !== 'Messaging');
+    const navItems = navigationConfig[roleKey] || [];
 
     return (
         <div
@@ -64,18 +49,22 @@ const BottomNav = () => {
                         {/* Icon + unread badge overlay for notification items */}
                         <div className="position-relative d-inline-block">
                             {IconComponent && <IconComponent size={22} />}
+                            {/* Bell badge: non-message notifications */}
                             {isNotifItem && unreadCount > 0 && (
                                 <span
                                     className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                                    style={{
-                                        fontSize: '0.55rem',
-                                        padding: '0.22em 0.44em',
-                                        minWidth: 16,
-                                        lineHeight: 1.4,
-                                        fontWeight: 700,
-                                    }}
+                                    style={{ fontSize: '0.55rem', padding: '0.22em 0.44em', minWidth: 16, lineHeight: 1.4, fontWeight: 700 }}
                                 >
                                     {unreadCount > 9 ? '9+' : unreadCount}
+                                </span>
+                            )}
+                            {/* Messaging badge: unread chat messages */}
+                            {item.isMessaging && unreadMessageCount > 0 && (
+                                <span
+                                    className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                    style={{ fontSize: '0.55rem', padding: '0.22em 0.44em', minWidth: 16, lineHeight: 1.4, fontWeight: 700 }}
+                                >
+                                    {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
                                 </span>
                             )}
                         </div>

@@ -15,8 +15,10 @@ const PAGE_TITLES = {
   '/admin/posts':      'Post Moderation',
   '/admin/jobs':       'Job Management',
   '/admin/events':     'Event Management',
-  '/admin/landing':    'Landing Page',
+  '/admin/landing':    'Landing Page CMS',
   '/admin/settings':   'Settings',
+  '/admin/import':     'Bulk Import',
+  '/admin/broadcast':  'Notification Broadcast',
 };
 
 const AdminTopbar = ({ onToggleSidebar, pendingCount = 0 }) => {

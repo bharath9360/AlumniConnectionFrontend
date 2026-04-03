@@ -152,6 +152,7 @@ const Profile = () => {
   // ── Connection state ─────────────────────────────────────────
   const [connStatus, setConnStatus]   = useState('none');
   const [isReceiver, setIsReceiver]   = useState(false);
+  const [requestId, setRequestId]       = useState(null);
   const [connLoading, setConnLoading] = useState(false);
 
   // ── Edit-modal state ─────────────────────────────────────────
@@ -187,8 +188,10 @@ const Profile = () => {
             if (raw === 'accepted') raw = 'connected';
             setConnStatus(raw);
             setIsReceiver(statusRes.data.isReceiver || false);
+            setRequestId(statusRes.data.requestId || null);
           } catch (_) {
             setConnStatus('none');
+            setRequestId(null);
           }
         }
       } catch (err) {
@@ -306,9 +309,10 @@ const Profile = () => {
   };
 
   const handleAccept = async () => {
+    if (!requestId) return;
     setConnLoading(true);
     try {
-      await connectionService.acceptRequest(id);
+      await connectionService.acceptRequest(requestId);
       setConnStatus('connected');
       setIsReceiver(false);
       showToast('Connection accepted! 🎉', 'success');
@@ -317,13 +321,14 @@ const Profile = () => {
   };
 
   const handleReject = async () => {
+    if (!requestId) return;
     setConnLoading(true);
     try {
-      await connectionService.removeConnection(id);
+      await connectionService.rejectRequest(requestId);
       setConnStatus('none');
       setIsReceiver(false);
-      showToast('Request removed.', 'info');
-    } catch { showToast('Failed to reject.', 'error'); }
+      showToast('Request ignored.', 'info');
+    } catch { showToast('Failed to ignore.', 'error'); }
     finally { setConnLoading(false); }
   };
 
