@@ -241,6 +241,8 @@ router.post('/login', async (req, res) => {
     }
 
     const token = signToken(user._id);
+    // Record last-login timestamp for analytics (fire-and-forget)
+    User.findByIdAndUpdate(user._id, { lastLogin: new Date() }).catch(() => {});
     sendAuthResponse(res, 200, user, token);
   } catch (err) {
     console.error('Login error:', err);
@@ -274,6 +276,8 @@ router.put('/profile', protect, async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found.' });
     
     const token = signToken(user._id);
+    // Record last-login timestamp for analytics (fire-and-forget)
+    User.findByIdAndUpdate(user._id, { lastLogin: new Date() }).catch(() => {});
     sendAuthResponse(res, 200, user, token);
   } catch (err) {
     console.error('Profile update error:', err);
@@ -323,6 +327,8 @@ router.put('/profile-pic', protect, profileUpload.single('profilePic'), async (r
     if (!user) return res.status(404).json({ message: 'User not found.' });
 
     const token = signToken(user._id);
+    // Record last-login timestamp for analytics (fire-and-forget)
+    User.findByIdAndUpdate(user._id, { lastLogin: new Date() }).catch(() => {});
     sendAuthResponse(res, 200, user, token);
   } catch (err) {
     console.error('Profile pic upload error:', err);

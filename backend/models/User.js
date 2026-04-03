@@ -87,6 +87,9 @@ const userSchema = new mongoose.Schema({
     default: 'Active'
   },
 
+  // Session tracking (used for "active users" analytics)
+  lastLogin: { type: Date, default: null },
+
   // OTP verification (student & admin sign-up)
   otp: { type: String, select: false },
   otpExpiry: { type: Date, select: false },
@@ -96,6 +99,14 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// ── Performance indexes for admin analytics queries ───────────
+userSchema.index({ role: 1 });
+userSchema.index({ role: 1, status: 1 });
+userSchema.index({ role: 1, department: 1 });
+userSchema.index({ role: 1, batch: 1 });
+userSchema.index({ lastLogin: 1 });
+userSchema.index({ createdAt: -1 });
 
 // Hash password before save
 userSchema.pre('save', async function () {

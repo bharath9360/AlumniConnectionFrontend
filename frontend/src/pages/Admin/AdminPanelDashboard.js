@@ -33,56 +33,6 @@ const PALETTE = {
   pink:   '#ec4899',
 };
 
-// ── Dummy fallback data (shown when real data is absent) ──────
-const DUMMY_ANALYTICS = {
-  kpis: {
-    totalStudents:   142,
-    totalAlumni:     318,
-    activeUsers:     412,
-    pendingApprovals: 7,
-    totalPosts:       89,
-  },
-  departmentDistribution: [
-    { department: 'CSE',   count: 135 },
-    { department: 'ECE',   count: 102 },
-    { department: 'IT',    count:  88 },
-    { department: 'MECH',  count:  76 },
-    { department: 'EEE',   count:  59 },
-    { department: 'CIVIL', count:  43 },
-    { department: 'MBA',   count:  28 },
-    { department: 'MCA',   count:  19 },
-  ],
-  yearWiseAlumni: [
-    { year: '2017', count:  18 },
-    { year: '2018', count:  34 },
-    { year: '2019', count:  47 },
-    { year: '2020', count:  52 },
-    { year: '2021', count:  63 },
-    { year: '2022', count:  71 },
-    { year: '2023', count:  58 },
-    { year: '2024', count:  45 },
-  ],
-  recentActivity: {
-    registrations: [
-      { _id: '1', name: 'Aarav Sharma',   role: 'alumni',  department: 'CSE', status: 'Active',  createdAt: new Date(Date.now() - 3600000).toISOString() },
-      { _id: '2', name: 'Priya Nair',     role: 'student', department: 'ECE', status: 'Active',  createdAt: new Date(Date.now() - 7200000).toISOString() },
-      { _id: '3', name: 'Karthik Raj',    role: 'alumni',  department: 'IT',  status: 'Pending', createdAt: new Date(Date.now() - 10800000).toISOString() },
-      { _id: '4', name: 'Divya Mehta',    role: 'alumni',  department: 'MECH',status: 'Pending', createdAt: new Date(Date.now() - 14400000).toISOString() },
-      { _id: '5', name: 'Sanjay Kumar',   role: 'student', department: 'EEE', status: 'Active',  createdAt: new Date(Date.now() - 21600000).toISOString() },
-    ],
-    posts: [
-      { _id: 'p1', author: { name: 'Aarav Sharma', role: 'alumni' },  content: 'Excited to share my internship experience at Google!',     createdAt: new Date(Date.now() - 1800000).toISOString() },
-      { _id: 'p2', author: { name: 'Admin',         role: 'admin' },   content: 'Upcoming Alumni Meet 2025 — Register before March 30th.',   createdAt: new Date(Date.now() - 5400000).toISOString() },
-      { _id: 'p3', author: { name: 'Priya Nair',    role: 'alumni' },  content: 'Looking for referrals in Amazon SDE-1 openings.',           createdAt: new Date(Date.now() - 9000000).toISOString() },
-    ],
-    jobs: [
-      { _id: 'j1', title: 'Frontend Developer', company: 'Zoho',    status: 'Pending',  postedBy: { name: 'Karthik Raj' }, createdAt: new Date(Date.now() - 3600000).toISOString() },
-      { _id: 'j2', title: 'Data Analyst',        company: 'TCS',     status: 'Approved', postedBy: { name: 'Divya Mehta' }, createdAt: new Date(Date.now() - 7200000).toISOString() },
-      { _id: 'j3', title: 'DevOps Engineer',     company: 'Infosys', status: 'Pending',  postedBy: { name: 'Sanjay Kumar'}, createdAt: new Date(Date.now() - 18000000).toISOString() },
-    ],
-  },
-};
-
 // ── Helpers ───────────────────────────────────────────────────
 const timeAgo = (dateStr) => {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -174,10 +124,8 @@ const AdminPanelDashboard = () => {
       const res = await adminService.getAnalytics();
       setData(res.data.data);
     } catch (err) {
-      // Gracefully fall back to dummy data so the layout always looks good
-      console.warn('[AdminDashboard] API unavailable — using demo data.', err.message);
-      setData(DUMMY_ANALYTICS);
-      setError('Could not reach the server. Showing demo data.');
+      console.error('[AdminDashboard] Failed to load analytics:', err.message);
+      setError('Could not reach the server. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -189,6 +137,22 @@ const AdminPanelDashboard = () => {
     return (
       <div className="ap-loader">
         <ClipLoader color="#c84022" size={44} />
+      </div>
+    );
+  }
+
+  // Full error state (no data at all)
+  if (error && !data) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, gap: 16 }}>
+        <FiAlertCircle size={42} color="#c84022" />
+        <div style={{ fontSize: 15, color: '#555', textAlign: 'center', maxWidth: 360 }}>{error}</div>
+        <button
+          onClick={fetchAnalytics}
+          style={{ background: '#c84022', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -313,7 +277,7 @@ const AdminPanelDashboard = () => {
           label="Active Users"
           value={kpis.activeUsers}
           iconBg={PALETTE.green}
-          delta="Verified accounts"
+          delta="Active in last 7 days"
           deltaColor={PALETTE.green}
           link="/admin/alumni"
         />
