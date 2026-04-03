@@ -33,9 +33,10 @@ const DEPARTMENTS = [
    USER CARD
 ───────────────────────────────────────────────────────────── */
 const UserCard = ({ user, type, onAction, actionLoading, connected }) => {
-  const navigate = useNavigate();
-  const picUrl   = user?.profilePic || '';
-  const initials = (user?.name || '?')[0].toUpperCase();
+  const navigate   = useNavigate();
+  const picUrl     = user?.profilePic || '';
+  const initials   = (user?.name || '?')[0].toUpperCase();
+  const mutuals    = user?.mutualConnections || 0;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col h-full">
@@ -84,6 +85,14 @@ const UserCard = ({ user, type, onAction, actionLoading, connected }) => {
         {/* Designation (student higher-ed) */}
         {user.role === 'student' && user.designation && (
           <p className="text-[11px] text-gray-400 mt-1 line-clamp-1">{user.designation}</p>
+        )}
+
+        {/* Mutual connections badge */}
+        {mutuals > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+            <FiUsers size={10} />
+            <span>{mutuals} mutual connection{mutuals !== 1 ? 's' : ''}</span>
+          </div>
         )}
 
         {/* Actions */}
@@ -280,8 +289,8 @@ const Network = () => {
     setLoading(p => ({ ...p, discover: true }));
     try {
       const [alumniRes, stdRes] = await Promise.all([
-        connectionService.getSuggestions({ role: 'alumni', limit: 12 }),
-        connectionService.getSuggestions({ role: 'student', limit: 12 }),
+        connectionService.getSuggestions({ role: 'alumni', limit: 20 }),
+        connectionService.getSuggestions({ role: 'student', limit: 20 }),
       ]);
       setSuggestedAlumni(alumniRes.data?.data || []);
       setSuggestedStudents(stdRes.data?.data || []);

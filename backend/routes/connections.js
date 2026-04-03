@@ -306,61 +306,120 @@ router.get('/my-connections', protect, async (req, res) => {
 });
 
 // ─── GET /api/connections/suggestions ────────────────────────
-// Returns paginated suggested users (alumni + students)
-// Excludes: self, already connected, pending requests, admins
+// Smart suggestion engine — scored by:
+//   +40  same department
+//   +30  same batch
+//   +10  each mutual connection (capped at +50)
+//   fallback: random active alumni/students
+// Excludes: self, already connected, pending requests, admins, inactive
 router.get('/suggestions', protect, async (req, res) => {
   try {
-    const myId = req.user._id;
-    const page  = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit = Math.min(50, parseInt(req.query.limit) || 12);
-    const role  = req.query.role || ''; // optional filter: 'alumni' | 'student'
-    const dept  = req.query.dept || ''; // optional department filter
+    const myId     = req.user._id;
+    const me       = req.user;                         // populated by protect middleware
+    const roleFilter = req.query.role || '';           // optional: 'alumni' | 'student'
+    const limit      = Math.min(50, parseInt(req.query.limit) || 20);
 
-    // 1. IDs already connected
-    const conns = await Connection.find({ $or: [{ user1: myId }, { user2: myId }] }).lean();
-    const connectedIds = conns.map(c =>
+    // ── 1. Build exclusion list ───────────────────────────────
+    const [myConns, pendingReqs] = await Promise.all([
+      Connection.find({ $or: [{ user1: myId }, { user2: myId }] }).lean(),
+      ConnectionRequest.find({
+        $or: [{ sender: myId }, { receiver: myId }],
+        status: 'Pending'
+      }).lean()
+    ]);
+
+    const connectedIds = myConns.map(c =>
       c.user1.toString() === myId.toString() ? c.user2.toString() : c.user1.toString()
     );
-
-    // 2. IDs with pending requests (either direction)
-    const pendingReqs = await ConnectionRequest.find({
-      $or: [{ sender: myId }, { receiver: myId }],
-      status: 'Pending'
-    }).lean();
     const pendingIds = pendingReqs.map(r =>
       r.sender.toString() === myId.toString() ? r.receiver.toString() : r.sender.toString()
     );
+    const excludeSet = new Set([myId.toString(), ...connectedIds, ...pendingIds]);
 
-    const excludeIds = [...new Set([myId.toString(), ...connectedIds, ...pendingIds])];
+    // ── 2. Build mutual-connection map ───────────────────────
+    // My connections' connection lists → who they know (potential mutuals)
+    const mutualMap = {}; // userId → mutual count
+    if (connectedIds.length > 0) {
+      const friendConns = await Connection.find({
+        $or: [
+          { user1: { $in: connectedIds } },
+          { user2: { $in: connectedIds } }
+        ]
+      }).lean();
 
-    // 3. Build query
-    const query = {
-      _id: { $nin: excludeIds },
+      for (const fc of friendConns) {
+        const other = connectedIds.includes(fc.user1.toString()) ? fc.user2.toString() : fc.user1.toString();
+        if (!excludeSet.has(other)) {
+          mutualMap[other] = (mutualMap[other] || 0) + 1;
+        }
+      }
+    }
+
+    // ── 3. Fetch candidate pool ──────────────────────────────
+    const baseQuery = {
+      _id: { $nin: [...excludeSet] },
       role: { $in: ['alumni', 'student'] },
       status: 'Active',
     };
-    if (role)  query.role = role;
-    if (dept)  query.department = { $regex: dept, $options: 'i' };
+    if (roleFilter && ['alumni', 'student'].includes(roleFilter)) {
+      baseQuery.role = roleFilter;
+    }
 
-    const total = await User.countDocuments(query);
-    const users = await User.find(query)
+    // Fetch generously – we'll score + sort + slice in memory
+    const poolSize = Math.min(300, limit * 15);
+    const candidates = await User.find(baseQuery)
       .select('name role department batch graduationYear profilePic company designation presentStatus connectionCount')
-      .sort({ connectionCount: -1, createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
+      .limit(poolSize)
       .lean();
+
+    // ── 4. Score each candidate ──────────────────────────────
+    const myDept  = (me.department  || '').toLowerCase().trim();
+    const myBatch = (me.batch       || '').toLowerCase().trim();
+
+    const scored = candidates.map(u => {
+      let score = 0;
+
+      // Same department (+40)
+      if (myDept && (u.department || '').toLowerCase().trim() === myDept) {
+        score += 40;
+      }
+
+      // Same batch (+30)
+      if (myBatch && (u.batch || '').toLowerCase().trim() === myBatch) {
+        score += 30;
+      }
+
+      // Mutual connections (+10 each, cap at +50)
+      const mutuals = mutualMap[u._id.toString()] || 0;
+      score += Math.min(50, mutuals * 10);
+
+      // Tiebreaker: more connected users rank slightly higher
+      score += Math.min(10, parseInt(u.connectionCount) || 0);
+
+      return { ...u, _score: score, _mutualCount: mutuals };
+    });
+
+    // ── 5. Sort by score desc, shuffle equal-scored groups for variety ──
+    scored.sort((a, b) => {
+      if (b._score !== a._score) return b._score - a._score;
+      return Math.random() - 0.5; // random tiebreak for variety
+    });
+
+    const results = scored.slice(0, limit).map(({ _score, _mutualCount, ...u }) => ({
+      ...u,
+      mutualConnections: _mutualCount,
+    }));
 
     res.json({
       success: true,
-      data: users,
-      hasMore: total > page * limit,
-      page,
-      total,
+      data: results,
+      total: results.length,
     });
   } catch (err) {
-    console.error('Suggestions error:', err);
+    console.error('Smart suggestions error:', err);
     res.status(500).json({ message: 'Failed to fetch suggestions.' });
   }
 });
 
 module.exports = router;
+
