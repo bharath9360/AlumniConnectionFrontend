@@ -8,8 +8,18 @@ const groupSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Batch', 'Department', 'Custom'],
+    enum: ['batch', 'department', 'custom'],
     required: true,
+  },
+  department: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  passoutYear: {
+    type: String,
+    trim: true,
+    default: ''
   },
   description: {
     type: String,

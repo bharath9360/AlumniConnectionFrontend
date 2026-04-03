@@ -8,10 +8,10 @@ const { protect, authorize } = require('../middleware/auth');
 const router = express.Router();
 
 // ─── POST /api/groups ──────────────────────────────────
-// Create a new group
+// Create a new group with automatic membership logic
 router.post('/', protect, authorize('admin'), async (req, res) => {
   try {
-    const { name, type, description } = req.body;
+    const { name, type, description, department, passoutYear, members } = req.body;
 
     if (!name || !type) {
       return res.status(400).json({ message: 'Name and type are required' });
@@ -19,20 +19,63 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
 
     const group = await Group.create({
       name,
-      type,
+      type: type.toLowerCase(),
       description,
+      department,
+      passoutYear,
       adminId: req.user.id
     });
+
+    // ── Auto-membership Logic ─────────────────────────────
+    let userIds = [];
+    if (type.toLowerCase() === 'batch') {
+      // Find users matching department and batch (passoutYear)
+      const users = await User.find({ 
+        department, 
+        batch: passoutYear, 
+        status: 'Active' 
+      }).select('_id');
+      userIds = users.map(u => u._id);
+    } else if (type.toLowerCase() === 'department') {
+      // Find users matching department
+      const users = await User.find({ 
+        department, 
+        status: 'Active' 
+      }).select('_id');
+      userIds = users.map(u => u._id);
+    } else if (type.toLowerCase() === 'custom' && Array.isArray(members)) {
+      // Use provided member list
+      userIds = members;
+    }
+
+    // Insert into GroupMember collection if any users found
+    if (userIds.length > 0) {
+      const memberDocs = userIds.map(userId => ({
+        groupId: group._id,
+        userId
+      }));
+      
+      // insertMany with ordered:false to ignore index errors if duplicate IDs were somehow passed
+      await GroupMember.insertMany(memberDocs, { ordered: false })
+        .catch(e => console.log('Partial insertion of group members'));
+    }
 
     // Spawn the bonded Group Chat document
     await Chat.create({
       isGroupChat: true,
       chatName: name,
       groupRef: group._id,
-      participants: [] // empty because membership is computed dynamically via GroupMember
+      participants: userIds 
     });
 
-    res.status(201).json({ success: true, data: group });
+    res.status(201).json({ 
+      success: true, 
+      data: group, 
+      memberCount: userIds.length,
+      message: userIds.length > 0 
+        ? `Group created with ${userIds.length} members auto-added.` 
+        : 'Group created (no matching members found).'
+    });
   } catch (err) {
     console.error('[POST /groups]', err);
     res.status(500).json({ message: 'Failed to create group' });
