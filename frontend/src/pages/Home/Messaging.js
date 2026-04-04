@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { chatService, connectionService } from '../../services/api';
+import { chatService, connectionService, mentorshipService } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { useMessage } from '../../context/MessageContext';
@@ -310,6 +310,35 @@ const Messaging = () => {
     }
   };
 
+  // ── Send image ────────────────────────────────────────────────
+  const handleImageSend = async (file, caption) => {
+    if (!activeChat || !file) return;
+    try {
+      // If it's a mentorship chat, use the dedicated endpoint
+      if (activeChat.isMentorshipChat) {
+        const fd = new FormData();
+        fd.append('image', file);
+        if (caption) fd.append('caption', caption);
+        const { data } = await mentorshipService.uploadChatImage(activeChat._id, fd);
+        setMessages(prev => [...prev, data.data]);
+      } else {
+        // For regular chats, upload via mentorship image endpoint (reuses Cloudinary)
+        const fd = new FormData();
+        fd.append('image', file);
+        if (caption) fd.append('caption', caption);
+        const { data } = await mentorshipService.uploadChatImage(activeChat._id, fd);
+        setMessages(prev => [...prev, data.data]);
+      }
+      setChats(prev => prev.map(c =>
+        c._id === activeChat._id
+          ? { ...c, lastMessage: { text: '📷 Image', senderId: user._id, timestamp: new Date() } }
+          : c
+      ));
+    } catch (err) {
+      console.error('Failed to send image:', err);
+    }
+  };
+
   // ── Typing indicator ──────────────────────────────────────────
   const handleTyping = (value) => {
     setMsgInput(value);
@@ -509,6 +538,7 @@ const Messaging = () => {
                 value={msgInput}
                 onChange={handleTyping}
                 onSend={handleSend}
+                onImageSend={handleImageSend}
                 disabled={isBlockedLocally}
                 blockedMessage={
                   isBlockedLocally

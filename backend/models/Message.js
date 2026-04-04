@@ -13,7 +13,16 @@ const messageSchema = new mongoose.Schema({
   },
   text: {
     type: String,
-    required: true
+    default: ''
+  },
+  image: {
+    type: String,
+    default: ''     // Cloudinary URL if message contains an image
+  },
+  messageType: {
+    type: String,
+    enum: ['text', 'image', 'mixed'],
+    default: 'text'
   },
   isRead: {
     type: Boolean,

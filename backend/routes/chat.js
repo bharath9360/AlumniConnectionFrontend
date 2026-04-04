@@ -206,20 +206,19 @@ router.get('/:chatId/messages', protect, validateObjectId('chatId'), paginationG
   }
 });
 
-// ─── POST /api/chat/:chatId/messages — Send a new message
+// ─── POST /api/chat/:chatId/messages — Send a new message (text, image, or both)
 router.post(
   '/:chatId/messages',
   protect,
   validateObjectId('chatId'),
-  requireFields('text'),
-  maxLength({ text: 2000 }),
   async (req, res) => {
-  const { text } = req.body;
+  const { text, image } = req.body;
   const { chatId } = req.params;
   const myId = req.user._id;
 
-  if (!text || !chatId) {
-    return res.status(400).json({ message: 'Invalid data passed into request' });
+  // At least text or image must be provided
+  if (!text && !image) {
+    return res.status(400).json({ message: 'Message must contain text or an image.' });
   }
 
   try {
@@ -237,29 +236,41 @@ router.post(
          return res.status(403).json({ message: 'Not authorized.' });
       }
       
-      // Strict block check on message send attempt
-      const targetUserId = chat.participants.find(p => p.toString() !== myId.toString());
-      if (targetUserId) {
-         const targetUser = await User.findById(targetUserId).select('role');
-         const hasPerm = await checkMessagingPermission(myId, targetUserId, req.user.role, targetUser?.role);
-         if (!hasPerm) {
-           return res.status(403).json({ message: 'You no longer have messaging permission with this user.', code: 'NOT_CONNECTED' });
-         }
+      // Skip permission check for mentorship chats (they bypass connection requirement)
+      if (!chat.isMentorshipChat) {
+        // Strict block check on message send attempt
+        const targetUserId = chat.participants.find(p => p.toString() !== myId.toString());
+        if (targetUserId) {
+           const targetUser = await User.findById(targetUserId).select('role');
+           const hasPerm = await checkMessagingPermission(myId, targetUserId, req.user.role, targetUser?.role);
+           if (!hasPerm) {
+             return res.status(403).json({ message: 'You no longer have messaging permission with this user.', code: 'NOT_CONNECTED' });
+           }
+        }
       }
     }
 
+    // Determine message type
+    let messageType = 'text';
+    if (image && text) messageType = 'mixed';
+    else if (image)    messageType = 'image';
+
     let message = await Message.create({
       senderId: req.user._id,
-      text,
+      text: text || '',
+      image: image || '',
+      messageType,
       chatId
     });
 
     message = await message.populate('senderId', 'name profilePic');
     message = await message.populate('chatId');
 
+    const displayText = messageType === 'image' ? '📷 Image' : (text || '').substring(0, 60);
+
     await Chat.findByIdAndUpdate(chatId, {
       lastMessage: {
-        text: text,
+        text: displayText,
         senderId: req.user._id,
         timestamp: new Date()
       },
@@ -271,7 +282,7 @@ router.post(
     const isUserActiveInChat = req.app.get('isUserActiveInChat');
     const senderId = req.user._id.toString();
     const senderName = req.user.name || 'Someone';
-    const preview = text.substring(0, 60);
+    const preview = displayText;
 
     // Determine recipients (participants minus sender, or group members)
     let recipientIds = [];

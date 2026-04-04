@@ -16,8 +16,13 @@ const mentorshipSessionSchema = new mongoose.Schema({
     ref: 'MentorshipRequest',
     required: true
   },
+  chatId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Chat'
+  },
   topic: { type: String, default: '' },
   notes: { type: String, default: '' },  // Mentor can add session notes
+  resources: [{ type: String }],         // URLs/links mentor shares
   status: {
     type: String,
     enum: ['active', 'completed'],

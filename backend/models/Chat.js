@@ -4,6 +4,8 @@ const chatSchema = new mongoose.Schema({
   isGroupChat: { type: Boolean, default: false },
   chatName: { type: String, trim: true },
   groupRef: { type: mongoose.Schema.Types.ObjectId, ref: 'Group' },
+  isMentorshipChat: { type: Boolean, default: false },
+  mentorshipSessionRef: { type: mongoose.Schema.Types.ObjectId, ref: 'MentorshipSession' },
   participants: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'

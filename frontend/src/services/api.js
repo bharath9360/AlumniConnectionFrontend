@@ -263,6 +263,9 @@ export const mentorshipService = {
   completeSession:     (id, data)=> api.put(`/mentorship/session/${id}/complete`, data),
   submitFeedback:      (id, data)=> api.put(`/mentorship/session/${id}/feedback`, data),
   updateNotes:         (id, data)=> api.put(`/mentorship/session/${id}/notes`, data),
+  uploadChatImage:     (chatId, formData) => api.post(`/mentorship/chat/${chatId}/image`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 };
 
 export default api;

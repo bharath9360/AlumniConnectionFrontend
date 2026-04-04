@@ -3,16 +3,19 @@ const router = express.Router();
 const Mentor = require('../models/Mentor');
 const MentorshipRequest = require('../models/MentorshipRequest');
 const MentorshipSession = require('../models/MentorshipSession');
+const Chat = require('../models/Chat');
+const Message = require('../models/Message');
 const User = require('../models/User');
-const { protect, authorize } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 const { createNotification } = require('../utils/notifyHelper');
+const { postUpload, uploadToCloudinary } = require('../middleware/upload');
 
 // All mentorship routes require authentication
 router.use(protect);
 
 // ─── POST /api/mentorship/register-mentor ─────────────────────
-// Alumni or staff can register as a mentor
-router.post('/register-mentor', authorize('alumni', 'staff', 'admin'), async (req, res) => {
+// ANY role (student, alumni, staff) can register as a mentor
+router.post('/register-mentor', async (req, res) => {
   try {
     const { skills, domain, experience, bio, isAvailable } = req.body;
     const mentor = await Mentor.findOneAndUpdate(
@@ -35,7 +38,6 @@ router.post('/register-mentor', authorize('alumni', 'staff', 'admin'), async (re
 });
 
 // ─── GET /api/mentorship/me/mentor-profile ───────────────────
-// Get own mentor profile (alumni/staff)
 router.get('/me/mentor-profile', async (req, res) => {
   try {
     const mentor = await Mentor.findOne({ userId: req.user._id });
@@ -49,7 +51,8 @@ router.get('/me/mentor-profile', async (req, res) => {
 // Discover mentors — filter by domain, department, company, search
 router.get('/mentors', async (req, res) => {
   try {
-    const { domain, department, search, available } = req.query;
+    const { domain, department, search, available, page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Start with mentor model — filter available
     const mentorFilter = {};
@@ -59,12 +62,14 @@ router.get('/mentors', async (req, res) => {
     const mentors = await Mentor.find(mentorFilter).lean();
     const mentorUserIds = mentors.map(m => m.userId);
 
-    // Filter the associated users
+    // Filter the associated users — no role restriction (students can be mentors too)
     const userFilter = {
       _id: { $in: mentorUserIds },
-      role: { $in: ['alumni', 'staff'] },
       status: 'Active'
     };
+    // Exclude self
+    userFilter._id.$nin = [req.user._id];
+
     if (department && department !== 'all') userFilter.department = new RegExp(department, 'i');
     if (search && search.trim()) {
       userFilter.$or = [
@@ -74,8 +79,11 @@ router.get('/mentors', async (req, res) => {
       ];
     }
 
+    const total = await User.countDocuments(userFilter);
     const users = await User.find(userFilter)
-      .select('name email profilePic role department batch company designation');
+      .select('name email profilePic role department batch company designation')
+      .skip(skip)
+      .limit(parseInt(limit));
 
     // Merge mentor data with user data
     const mentorMap = {};
@@ -94,7 +102,13 @@ router.get('/mentors', async (req, res) => {
       mentorProfile: mentorMap[u._id.toString()] || {}
     }));
 
-    res.json({ success: true, data: result, total: result.length });
+    res.json({
+      success: true,
+      data: result,
+      total,
+      page: parseInt(page),
+      hasMore: skip + result.length < total
+    });
   } catch (err) {
     console.error('[Mentorship] mentors error:', err);
     res.status(500).json({ message: 'Failed to fetch mentors.' });
@@ -102,11 +116,16 @@ router.get('/mentors', async (req, res) => {
 });
 
 // ─── POST /api/mentorship/request ─────────────────────────────
-// Student sends a mentorship request
-router.post('/request', authorize('student'), async (req, res) => {
+// Anyone can send a mentorship request (dual-role)
+router.post('/request', async (req, res) => {
   try {
     const { mentorId, message, topic } = req.body;
     if (!mentorId) return res.status(400).json({ message: 'mentorId is required.' });
+
+    // Can't request yourself
+    if (mentorId === req.user._id.toString()) {
+      return res.status(400).json({ message: 'You cannot request mentorship from yourself.' });
+    }
 
     // Mentor must exist
     const mentorProfile = await Mentor.findOne({ userId: mentorId });
@@ -142,7 +161,7 @@ router.post('/request', authorize('student'), async (req, res) => {
 });
 
 // ─── GET /api/mentorship/my-requests ─────────────────────────
-// Student sees their outgoing requests
+// Outgoing requests (as mentee)
 router.get('/my-requests', async (req, res) => {
   try {
     const requests = await MentorshipRequest.find({ menteeId: req.user._id })
@@ -168,14 +187,14 @@ router.get('/my-requests', async (req, res) => {
 });
 
 // ─── GET /api/mentorship/incoming-requests ────────────────────
-// Mentor sees pending requests directed at them
-router.get('/incoming-requests', authorize('alumni', 'staff', 'admin'), async (req, res) => {
+// Pending incoming requests (as mentor) — any user with a mentor profile
+router.get('/incoming-requests', async (req, res) => {
   try {
     const requests = await MentorshipRequest.find({
       mentorId: req.user._id,
       status: 'pending'
     })
-      .populate('menteeId', 'name email profilePic department batch')
+      .populate('menteeId', 'name email profilePic role department batch')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: requests });
   } catch (err) {
@@ -184,7 +203,7 @@ router.get('/incoming-requests', authorize('alumni', 'staff', 'admin'), async (r
 });
 
 // ─── PUT /api/mentorship/request/:id/accept ───────────────────
-router.put('/request/:id/accept', authorize('alumni', 'staff', 'admin'), async (req, res) => {
+router.put('/request/:id/accept', async (req, res) => {
   try {
     const request = await MentorshipRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ message: 'Request not found.' });
@@ -198,13 +217,34 @@ router.put('/request/:id/accept', authorize('alumni', 'staff', 'admin'), async (
     request.status = 'accepted';
     await request.save();
 
-    // Create session
+    // Create or locate a dedicated mentorship chat between mentor and mentee
+    let chat = await Chat.findOne({
+      isMentorshipChat: true,
+      participants: { $all: [request.mentorId, request.menteeId], $size: 2 }
+    });
+
+    if (!chat) {
+      const menteeUser = await User.findById(request.menteeId).select('name');
+      chat = await Chat.create({
+        isGroupChat: false,
+        isMentorshipChat: true,
+        chatName: `Mentorship: ${req.user.name} ↔ ${menteeUser?.name || 'Mentee'}`,
+        participants: [request.mentorId, request.menteeId]
+      });
+    }
+
+    // Create session linked to the chat
     const session = await MentorshipSession.create({
       menteeId:  request.menteeId,
       mentorId:  request.mentorId,
       requestId: request._id,
+      chatId:    chat._id,
       topic:     request.topic || ''
     });
+
+    // Update the chat's session ref
+    chat.mentorshipSessionRef = session._id;
+    await chat.save();
 
     // Notify mentee
     await createNotification(req.app.get('io'), {
@@ -216,7 +256,7 @@ router.put('/request/:id/accept', authorize('alumni', 'staff', 'admin'), async (
       relatedId: session._id
     });
 
-    res.json({ success: true, data: { request, session }, message: 'Request accepted. Session started.' });
+    res.json({ success: true, data: { request, session, chatId: chat._id }, message: 'Request accepted. Session started.' });
   } catch (err) {
     console.error('[Mentorship] accept error:', err);
     res.status(500).json({ message: 'Failed to accept request.' });
@@ -224,7 +264,7 @@ router.put('/request/:id/accept', authorize('alumni', 'staff', 'admin'), async (
 });
 
 // ─── PUT /api/mentorship/request/:id/reject ───────────────────
-router.put('/request/:id/reject', authorize('alumni', 'staff', 'admin'), async (req, res) => {
+router.put('/request/:id/reject', async (req, res) => {
   try {
     const request = await MentorshipRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ message: 'Request not found.' });
@@ -252,14 +292,14 @@ router.put('/request/:id/reject', authorize('alumni', 'staff', 'admin'), async (
 });
 
 // ─── GET /api/mentorship/my-sessions ─────────────────────────
-// Any authenticated user — returns sessions where they are mentor or mentee
+// Returns sessions where user is mentor OR mentee
 router.get('/my-sessions', async (req, res) => {
   try {
     const uid = req.user._id;
     const sessions = await MentorshipSession.find({
       $or: [{ menteeId: uid }, { mentorId: uid }]
     })
-      .populate('menteeId', 'name email profilePic department batch')
+      .populate('menteeId', 'name email profilePic department batch role')
       .populate('mentorId', 'name email profilePic department company designation role')
       .sort({ createdAt: -1 });
 
@@ -270,8 +310,8 @@ router.get('/my-sessions', async (req, res) => {
 });
 
 // ─── PUT /api/mentorship/session/:id/complete ────────────────
-// Mentor marks session as complete + adds notes
-router.put('/session/:id/complete', authorize('alumni', 'staff', 'admin'), async (req, res) => {
+// Mentor marks session as complete
+router.put('/session/:id/complete', async (req, res) => {
   try {
     const session = await MentorshipSession.findById(req.params.id);
     if (!session) return res.status(404).json({ message: 'Session not found.' });
@@ -347,19 +387,82 @@ router.put('/session/:id/feedback', async (req, res) => {
 });
 
 // ─── PUT /api/mentorship/session/:id/notes ──────────────────
-// Mentor adds/edits session notes
-router.put('/session/:id/notes', authorize('alumni', 'staff', 'admin'), async (req, res) => {
+// Mentor adds/edits session notes + resources
+router.put('/session/:id/notes', async (req, res) => {
   try {
     const session = await MentorshipSession.findById(req.params.id);
     if (!session) return res.status(404).json({ message: 'Session not found.' });
     if (session.mentorId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Only the mentor can edit notes.' });
     }
-    session.notes = req.body.notes || '';
+    if (req.body.notes !== undefined)     session.notes = req.body.notes;
+    if (req.body.resources !== undefined) session.resources = req.body.resources;
     await session.save();
     res.json({ success: true, data: session });
   } catch (err) {
     res.status(500).json({ message: 'Failed to update notes.' });
+  }
+});
+
+// ─── POST /api/mentorship/chat/:chatId/image ────────────────
+// Upload image in mentorship chat (Cloudinary + send as message)
+router.post('/chat/:chatId/image', postUpload.single('image'), async (req, res) => {
+  try {
+    const { chatId } = req.params;
+
+    // Verify the chat exists and user is participant
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ message: 'Chat not found.' });
+    const isParticipant = chat.participants.some(p => p.toString() === req.user._id.toString());
+    if (!isParticipant) return res.status(403).json({ message: 'Not authorized.' });
+
+    if (!req.file) return res.status(400).json({ message: 'No image file provided.' });
+
+    // Upload to Cloudinary
+    const imageUrl = await uploadToCloudinary(
+      req.file.buffer,
+      'alumni/mentorship_chat',
+      'image',
+      {
+        transformation: [
+          { width: 800, crop: 'limit' },
+          { quality: 'auto', fetch_format: 'auto' }
+        ]
+      }
+    );
+
+    // Create message with image
+    let message = await Message.create({
+      chatId,
+      senderId: req.user._id,
+      text: req.body.caption || '',
+      image: imageUrl,
+      messageType: req.body.caption ? 'mixed' : 'image'
+    });
+
+    message = await message.populate('senderId', 'name profilePic');
+    message = await message.populate('chatId');
+
+    // Update last message
+    await Chat.findByIdAndUpdate(chatId, {
+      lastMessage: {
+        text: '📷 Image',
+        senderId: req.user._id,
+        timestamp: new Date()
+      },
+      updatedAt: new Date()
+    });
+
+    // Emit via socket if available
+    const io = req.app.get('io');
+    if (io) {
+      io.to(chatId).emit('message received', message);
+    }
+
+    res.json({ success: true, data: message });
+  } catch (err) {
+    console.error('[Mentorship] chat image upload error:', err);
+    res.status(500).json({ message: 'Failed to upload image.' });
   }
 });
 

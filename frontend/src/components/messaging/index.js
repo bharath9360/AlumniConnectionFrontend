@@ -314,11 +314,23 @@ export const ChatBubble = ({ msg, isMine, isLastInGroup }) => {
       ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
 
+  const hasImage = !!msg.image;
+  const hasText  = !!msg.text;
+
   return (
     <div className={`msg-bubble-wrap ${isMine ? 'msg-bubble-wrap--mine' : 'msg-bubble-wrap--theirs'} ${isLastInGroup ? 'msg-bubble-wrap--gap-top' : ''}`}>
-      <div className={`msg-bubble ${isMine ? 'msg-bubble--mine' : 'msg-bubble--theirs'}`}>
-        {msg.text}
-        <div className="msg-bubble__meta">
+      <div className={`msg-bubble ${isMine ? 'msg-bubble--mine' : 'msg-bubble--theirs'}`} style={hasImage ? { padding: 4, maxWidth: 280 } : undefined}>
+        {hasImage && (
+          <img
+            src={msg.image}
+            alt="shared"
+            loading="lazy"
+            onClick={() => window.open(msg.image, '_blank')}
+            style={{ width: '100%', borderRadius: hasText ? '12px 12px 4px 4px' : 12, cursor: 'pointer', display: 'block' }}
+          />
+        )}
+        {hasText && <div style={hasImage ? { padding: '6px 8px 2px' } : undefined}>{msg.text}</div>}
+        <div className="msg-bubble__meta" style={hasImage && !hasText ? { padding: '2px 8px' } : undefined}>
           <span>{time}</span>
           {isMine && (
             <span className={`msg-bubble__tick ${msg.isRead ? 'msg-bubble__tick--seen' : ''}`}>
@@ -390,8 +402,11 @@ ChatWindow.Messages = function ChatWindowMessages({ messages, currentUserId, onL
 };
 
 // ── Input bar ──────────────────────────────────────────────────
-ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend, disabled, blockedMessage, onSendConnectionRequest, isSendingRequest }) {
+ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend, onImageSend, disabled, blockedMessage, onSendConnectionRequest, isSendingRequest }) {
   const [showEmoji, setShowEmoji] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
   const EMOJIS = ['😊','😂','❤️','👍','🎉','🙏','😍','🔥','👏','😢','😮','🤔','💪','✅','🚀','😁','🙌','💯','🤝','😎'];
 
@@ -419,7 +434,7 @@ ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend, disabled,
   }
 
   const handleKey = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendClick(); }
   };
 
   const addEmoji = (emoji) => {
@@ -427,13 +442,39 @@ ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend, disabled,
     setShowEmoji(false);
   };
 
-  // Auto-resize textarea
   const handleChange = (e) => {
     const el = e.target;
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
     onChange(el.value);
   };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5MB'); return; }
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreview(ev.target.result);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const clearImage = () => { setImageFile(null); setImagePreview(null); };
+
+  const handleSendClick = async () => {
+    if (imageFile && onImageSend) {
+      setUploading(true);
+      try { await onImageSend(imageFile, value.trim()); clearImage(); onChange(''); }
+      catch(_) {}
+      finally { setUploading(false); }
+    } else {
+      onSend();
+    }
+  };
+
+  const canSend = value.trim() || imageFile;
 
   return (
     <div className="msg-input-bar">
@@ -444,16 +485,23 @@ ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend, disabled,
           ))}
         </div>
       )}
+      {imagePreview && (
+        <div style={{ padding: '8px 12px', background: '#f8f9fa', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src={imagePreview} alt="preview" style={{ height: 64, borderRadius: 8, objectFit: 'cover' }} />
+          <button onClick={clearImage} style={{ background: 'none', border: 'none', color: '#999', fontSize: 18, cursor: 'pointer' }}>×</button>
+          {uploading && <span className="spinner-border spinner-border-sm text-danger" role="status" />}
+        </div>
+      )}
       <div className="msg-input-inner">
         <div className="msg-input-icons">
           <button
             className="msg-input-icon-btn"
-            title="Attach file"
+            title="Send image"
             onClick={() => fileRef.current?.click()}
           >
-            <i className="fa-solid fa-paperclip" />
+            <i className="fa-solid fa-image" />
           </button>
-          <input ref={fileRef} type="file" className="d-none" accept="image/*,.pdf,.doc,.docx" />
+          <input ref={fileRef} type="file" className="d-none" accept="image/*" onChange={handleFileSelect} />
           <button
             className={`msg-input-icon-btn ${showEmoji ? 'msg-input-icon-btn--active' : ''}`}
             title="Emoji"
@@ -475,13 +523,13 @@ ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend, disabled,
         />
 
         <button
-          className={`msg-send-btn ${!value.trim() ? 'msg-send-btn--dim' : ''}`}
-          onClick={onSend}
+          className={`msg-send-btn ${!canSend ? 'msg-send-btn--dim' : ''}`}
+          onClick={handleSendClick}
           title="Send"
-          disabled={!value.trim()}
+          disabled={!canSend || uploading}
           aria-label="Send message"
         >
-          <i className="fas fa-paper-plane" />
+          {uploading ? <span className="spinner-border spinner-border-sm" role="status" /> : <i className="fas fa-paper-plane" />}
         </button>
       </div>
     </div>
