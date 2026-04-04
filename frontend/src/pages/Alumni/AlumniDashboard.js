@@ -362,15 +362,43 @@ const AlumniDashboard = () => {
 
   const showToast = (message, type = 'info') => setToast({ message, type });
 
-  /* Load feed — page 1 on mount */
+  /* Load feed — page 1 on mount, with sessionStorage instant-paint cache */
   useEffect(() => {
     const loadFeed = async () => {
+      const cacheKey = `alumni_feed_${user?._id || 'guest'}`;
       try {
+        // ── Try sessionStorage cache first for instant paint ——
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const { data, pagination } = JSON.parse(cached);
+            setFeedData(data);
+            setHasMore(pagination?.hasMore ?? false);
+            setLoading(false);
+            // Background revalidation: silently refresh without blocking UI
+            const fresh = await postService.getFeed(1, 20);
+            const freshData = fresh.data.data || [];
+            setFeedData(freshData);
+            setHasMore(fresh.data.pagination?.hasMore ?? false);
+            sessionStorage.setItem(cacheKey, JSON.stringify({ data: freshData, pagination: fresh.data.pagination }));
+            return;
+          } catch (_) {
+            // Corrupt cache — fall through to fresh fetch
+            sessionStorage.removeItem(cacheKey);
+          }
+        }
+
+        // ── Cold fetch (no cache yet) ——
         setLoading(true);
         const res = await postService.getFeed(1, 20);
-        setFeedData(res.data.data || []);
+        const freshData = res.data.data || [];
+        setFeedData(freshData);
         setHasMore(res.data.pagination?.hasMore ?? false);
         setPage(1);
+        // Persist first page to session cache
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({ data: freshData, pagination: res.data.pagination }));
+        } catch (_) { /* sessionStorage quota exceeded — no-op */ }
       } catch {
         showToast('Failed to load feed. Please refresh.', 'error');
       } finally {
@@ -378,10 +406,15 @@ const AlumniDashboard = () => {
       }
     };
     loadFeed();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* Callbacks */
-  const handlePostCreated = (newPost) => setFeedData(prev => [newPost, ...prev]);
+  const handlePostCreated = (newPost) => {
+    setFeedData(prev => [newPost, ...prev]);
+    // Bust session cache so next navigation re-fetches fresh data
+    try { sessionStorage.removeItem(`alumni_feed_${user?._id || 'guest'}`); } catch (_) {}
+  };
 
   const handleLike = async (postId) => {
     try {

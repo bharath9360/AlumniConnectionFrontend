@@ -7,7 +7,13 @@ const http = require('http');
 const path = require('path');
 const cron = require('node-cron');
 const { Server } = require('socket.io');
+const apicache  = require('apicache');
 require('dotenv').config();
+
+// ─── apicache: 2-min in-memory cache for GET /api/posts ──────
+const cache = apicache.middleware;
+// Only cache successful (2xx) responses
+apicache.options({ statusCodes: { include: [200] } });
 
 const { runGraduationJob } = require('./jobs/graduationJob');
 const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
@@ -29,6 +35,20 @@ app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true }));
 // Global sanitization — strip XSS vectors from all request bodies
 app.use(sanitizeBody);
+
+// ─── Smart Cache-Control Headers (Part 2) ─────────────────────
+// Static assets (images, fonts, JS/CSS bundles) get aggressive CDN caching.
+// API routes must always be validated — no stale data served to clients.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/uploads') || req.path.match(/\.(png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|eot|css|js)$/i)) {
+    // Immutable static assets: 1 year max-age + immutable hint
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  } else if (req.path.startsWith('/api/')) {
+    // API responses: always revalidate, never serve stale
+    res.setHeader('Cache-Control', 'no-store');
+  }
+  next();
+});
 
 // Serve uploads folder statically with CORS headers for cross-origin deployments (Vercel → Railway)
 app.use('/uploads', (req, res, next) => {
@@ -165,7 +185,9 @@ io.on('connection', (socket) => {
 // ─── Routes (must come AFTER io is attached to app) ──────────
 app.use('/api/auth',         authLimiter, require('./routes/auth'));
 app.use('/api/users',        apiLimiter,  require('./routes/users'));
-app.use('/api/posts',        apiLimiter,  require('./routes/posts'));
+// Part 3: 2-minute in-memory cache on GET /api/posts (read-heavy feed)
+// Only GET requests are cached; POST/PUT/DELETE bypass apicache automatically.
+app.use('/api/posts',        apiLimiter,  cache('2 minutes'), require('./routes/posts'));
 app.use('/api/jobs',         apiLimiter,  require('./routes/jobs'));
 app.use('/api/events',       apiLimiter,  require('./routes/events'));
 app.use('/api/notifications',apiLimiter,  require('./routes/notifications'));

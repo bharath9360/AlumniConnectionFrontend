@@ -5,16 +5,22 @@
  * because of a Cloudinary cleanup issue.
  */
 const cloudinary = require('../config/cloudinary');
+const { stripTransforms } = require('./cloudinaryUrl');
 
 /**
  * Extract Cloudinary public_id from a secure URL.
- * Example: "https://res.cloudinary.com/<cloud>/image/upload/v123/alumni/posts/abc123.webp"
+ * Strips CDN transformation params (e.g. f_auto,q_auto) before parsing
+ * so deletion works for both raw and CDN-optimised URLs.
+ *
+ * Example: "https://res.cloudinary.com/<cloud>/image/upload/f_auto,q_auto/v123/alumni/posts/abc123.webp"
  *   → "alumni/posts/abc123"
  */
 const extractPublicId = (url) => {
   if (!url || typeof url !== 'string') return null;
   try {
-    const parts = url.split('/upload/');
+    // Strip any injected CDN transformation params before extracting public_id
+    const cleanUrl = stripTransforms(url);
+    const parts = cleanUrl.split('/upload/');
     if (parts.length < 2) return null;
     // Remove version prefix (v123456789/) and file extension
     const afterUpload = parts[1].replace(/^v\d+\//, '');
@@ -26,6 +32,7 @@ const extractPublicId = (url) => {
 
 /**
  * Delete a Cloudinary image by URL.  Fire-and-forget.
+ * Works for both raw Cloudinary URLs and CDN-transform-injected URLs.
  * @param {string} url — full Cloudinary secure URL
  */
 const deleteCloudinaryImage = async (url) => {

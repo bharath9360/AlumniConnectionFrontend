@@ -3,10 +3,19 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { FaEllipsisH, FaPencilAlt, FaTimes, FaTrashAlt } from 'react-icons/fa';
 
-// Unified media URL resolver — handles absolute URLs, relative paths, and missing env vars
+// Unified media URL resolver — handles absolute URLs, relative paths, and missing env vars.
+// Also injects f_auto,q_auto CDN params for Cloudinary URLs so the CDN serves
+// the optimal format (WebP/AVIF) even for URLs already stored in the database.
 const resolveMediaUrl = (url) => {
     if (!url || !url.trim()) return null;
-    // Cloudinary URLs start with https — use directly
+    // Cloudinary URLs: inject CDN optimisation params if not already present
+    if (url.startsWith('https://res.cloudinary.com') || url.startsWith('http://res.cloudinary.com')) {
+        if (!url.includes('f_auto') && !url.includes('q_auto')) {
+            return url.replace('/image/upload/', '/image/upload/f_auto,q_auto/');
+        }
+        return url;
+    }
+    // Already absolute non-Cloudinary — use directly
     if (url.startsWith('https://') || url.startsWith('http://')) return url;
     // Fallback for any legacy relative paths still in DB
     const base = process.env.REACT_APP_BACKEND_URL ||
@@ -100,6 +109,7 @@ const FeedItem = ({ post, onLike, onComment, onShare, onEdit, onDelete, onDelete
                                     src={resolvedAuthorPic}
                                     alt={authorName}
                                     loading="lazy"
+                                    decoding="async"
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                     onError={(e) => { e.target.style.display = 'none'; }}
                                 />
@@ -125,6 +135,7 @@ const FeedItem = ({ post, onLike, onComment, onShare, onEdit, onDelete, onDelete
                             src={mediaUrl}
                             alt="Post attachment"
                             loading="lazy"
+                            decoding="async"
                             className="w-100"
                             style={{ maxHeight: '400px', objectFit: 'cover', display: 'block' }}
                             onError={(e) => { e.target.closest('.post-media').style.display = 'none'; }}
@@ -223,4 +234,20 @@ const FeedItem = ({ post, onLike, onComment, onShare, onEdit, onDelete, onDelete
     );
 };
 
-export default FeedItem;
+// Part 6: React.memo — prevents re-renders when sibling posts
+// change (critical for long infinite-scroll feeds).
+// Custom equality: only re-render if the post data changes or
+// callbacks are swapped (shallow-stable on parent re-mounts).
+export default React.memo(FeedItem, (prev, next) => {
+    return (
+        prev.post._id        === next.post._id        &&
+        prev.post.likes      === next.post.likes      &&
+        prev.post.liked      === next.post.liked      &&
+        prev.post.comments?.length === next.post.comments?.length &&
+        prev.onLike          === next.onLike          &&
+        prev.onComment       === next.onComment       &&
+        prev.onShare         === next.onShare         &&
+        prev.onEdit          === next.onEdit          &&
+        prev.onDelete        === next.onDelete
+    );
+});

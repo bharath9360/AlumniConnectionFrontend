@@ -1,6 +1,7 @@
 const multer  = require('multer');
 const sharp   = require('sharp');
 const cloudinary = require('../config/cloudinary');
+const { injectCdnParams } = require('../utils/cloudinaryUrl');
 
 // Use memory storage — files go to Cloudinary, not disk
 const storage = multer.memoryStorage();
@@ -70,7 +71,8 @@ const uploadToCloudinary = (buffer, folder, resourceType = 'image', transforms =
       uploadOptions,
       (error, result) => {
         if (error) return reject(error);
-        resolve(result.secure_url); // Always HTTPS
+        // Inject f_auto,q_auto CDN params for optimal format delivery
+        resolve(injectCdnParams(result.secure_url));
       }
     );
 
