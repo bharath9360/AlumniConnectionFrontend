@@ -163,8 +163,8 @@ router.post('/', protect, async (req, res) => {
         const notifDocs = admins.map(a => ({
           userId: a._id,
           type: 'admin_approval_needed',
-          title: `Alumni Event Needs Approval: ${event.title}`,
-          description: `Posted by ${req.user.name} • ${event.date || ''} at ${event.venue || ''} • Pending review`,
+          title: `New Event Needs Approval: ${event.title}`,
+          description: `Posted by ${req.user.name} (${req.user.role}) • ${event.date || ''} at ${event.venue || ''} • Pending review`,
           icon: '⏳',
           relatedId: event._id
         }));

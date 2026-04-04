@@ -198,6 +198,7 @@ app.use('/api/admin',        apiLimiter,  require('./routes/adminAnalytics'));
 app.use('/api/landing',      apiLimiter,  require('./routes/landing'));
 app.use('/api/groups',       apiLimiter,  require('./routes/groups'));
 app.use('/api/staff',        apiLimiter,  require('./routes/staff'));
+app.use('/api/mentorship',   apiLimiter,  require('./routes/mentorship'));
 
 // ─── Health Check ─────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));

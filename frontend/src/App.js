@@ -24,6 +24,8 @@ import AlumniLogin from './pages/Auth/AlumniLogin';
 import AdminLogin from './pages/Auth/AdminLogin';
 import StaffSignUp from './pages/Auth/StaffSignUp';
 import StaffLogin from './pages/Auth/StaffLogin';
+import AdminLoginPage from './pages/Auth/AdminLoginPage';
+import Mentorship from './pages/Mentorship/Mentorship';
 
 // Unified Profile (own-edit + public-view merged)
 import Profile from './pages/Profile/Profile';
@@ -127,6 +129,11 @@ function App() {
             </Route>
 
             {/* ════════════════════════════════════════════════════
+                Admin Login — isolated full-screen, no Navbar
+            ════════════════════════════════════════════════════ */}
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+
+            {/* ════════════════════════════════════════════════════
                 Messaging — full-screen layout (NO Navbar/BottomNav)
                 Isolated just like the Admin panel above.
             ════════════════════════════════════════════════════ */}
@@ -218,6 +225,7 @@ function App() {
                         <Route path="/network" element={<Network />} />
                         <Route path="/messaging" element={<Messaging />} />
                         <Route path="/notifications" element={<Notification />} />
+                        <Route path="/mentorship" element={<Mentorship />} />
                       </Route>
                     </Routes>
                     </ErrorBoundary>

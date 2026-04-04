@@ -209,7 +209,7 @@ const JobsAndEvents = () => {
 
   // ── Role flags ────────────────────────────────────────────
   const role      = (user?.role || '').toLowerCase();
-  const canCreate = role === 'alumni' || role === 'admin';
+  const canCreate = role === 'alumni' || role === 'admin' || role === 'staff';
   const canApply  = role === 'student';
 
   // Persist tab in URL query

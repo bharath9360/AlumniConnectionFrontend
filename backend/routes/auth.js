@@ -262,7 +262,7 @@ router.post('/resend-otp', async (req, res) => {
 // ─── POST /api/auth/login ─────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, secretKey } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required.' });
@@ -277,6 +277,15 @@ router.post('/login', async (req, res) => {
     // Role check
     if (role && user.role !== role) {
       return res.status(401).json({ message: `This account is not registered as ${role}.` });
+    }
+
+    // ── Admin secret key enforcement ──────────────────────────
+    // If the account is admin, the secret key MUST match.
+    if (user.role === 'admin') {
+      const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY || 'MAMCET_ADMIN_2026';
+      if (!secretKey || secretKey !== ADMIN_SECRET) {
+        return res.status(403).json({ message: 'Invalid admin secret key. Access denied.' });
+      }
     }
 
     // Block Pending alumni from logging in

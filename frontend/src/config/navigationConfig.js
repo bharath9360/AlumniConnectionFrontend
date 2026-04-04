@@ -8,7 +8,8 @@ import {
     FaEnvelope,
     FaBriefcase,
     FaUserFriends,
-    FaCommentDots
+    FaCommentDots,
+    FaHandsHelping
 } from 'react-icons/fa';
 
 export const navigationConfig = {
@@ -16,16 +17,18 @@ export const navigationConfig = {
         { path: '/alumni/home',    icon: FaHome,         label: 'Home'          },
         { path: '/network',        icon: FaUserFriends,  label: 'Network',       noUserId: true },
         { path: '/opportunities',  icon: FaLayerGroup,   label: 'Opportunities', noUserId: true },
+        { path: '/mentorship',     icon: FaHandsHelping, label: 'Mentorship',    noUserId: true },
         { path: '/messages',       icon: FaCommentDots,  label: 'Messages',      noUserId: true, isMessaging: true },
         { path: '/notifications',  icon: FaBell,         label: 'Notifications', noUserId: true, isNotification: true },
     ],
     staff: [
-        { path: '/staff/dashboard', icon: FaChartLine,   label: 'Dashboard',     noUserId: true },
-        { path: '/alumni/home',     icon: FaHome,         label: 'Home'          },
-        { path: '/network',         icon: FaUserFriends,  label: 'Network',       noUserId: true },
-        { path: '/opportunities',   icon: FaLayerGroup,   label: 'Opportunities', noUserId: true },
-        { path: '/messages',        icon: FaCommentDots,  label: 'Messages',      noUserId: true, isMessaging: true },
-        { path: '/notifications',   icon: FaBell,         label: 'Notifications', noUserId: true, isNotification: true },
+        { path: '/staff/dashboard', icon: FaChartLine,    label: 'Dashboard',     noUserId: true },
+        { path: '/alumni/home',     icon: FaHome,          label: 'Home'          },
+        { path: '/network',         icon: FaUserFriends,   label: 'Network',       noUserId: true },
+        { path: '/opportunities',   icon: FaLayerGroup,    label: 'Opportunities', noUserId: true },
+        { path: '/mentorship',      icon: FaHandsHelping,  label: 'Mentorship',    noUserId: true },
+        { path: '/messages',        icon: FaCommentDots,   label: 'Messages',      noUserId: true, isMessaging: true },
+        { path: '/notifications',   icon: FaBell,          label: 'Notifications', noUserId: true, isNotification: true },
     ],
     admin: [
         { path: '/admin/home',       icon: FaHome,           label: 'Home'      },
@@ -38,6 +41,7 @@ export const navigationConfig = {
         { path: '/student/home',   icon: FaHome,         label: 'Home'          },
         { path: '/network',        icon: FaUserFriends,  label: 'Network',       noUserId: true },
         { path: '/opportunities',  icon: FaBriefcase,    label: 'Opportunities', noUserId: true },
+        { path: '/mentorship',     icon: FaHandsHelping, label: 'Mentorship',    noUserId: true },
         { path: '/messages',       icon: FaCommentDots,  label: 'Messages',      noUserId: true, isMessaging: true },
         { path: '/notifications',  icon: FaBell,         label: 'Notifications', noUserId: true, isNotification: true },
     ],

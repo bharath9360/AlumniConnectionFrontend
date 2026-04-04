@@ -171,8 +171,8 @@ router.post('/', protect, async (req, res) => {
         const notifDocs = admins.map(a => ({
           userId: a._id,
           type: 'admin_approval_needed',
-          title: `Alumni Job Needs Approval: ${job.title}`,
-          description: `Posted by ${req.user.name} at ${job.company} • Pending review`,
+          title: `New Job Needs Approval: ${job.title}`,
+          description: `Posted by ${req.user.name} (${req.user.role}) at ${job.company} • Pending review`,
           icon: '⏳',
           relatedId: job._id
         }));

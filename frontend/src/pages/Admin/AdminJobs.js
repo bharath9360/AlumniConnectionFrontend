@@ -524,7 +524,7 @@ const AdminJobs = () => {
       {activeTab === 'pending' && (
         <div className="ajd-info-banner">
           <FiInfo size={14} />
-          <span>These jobs were submitted by alumni and are awaiting your approval before being published to students.</span>
+          <span>These jobs were submitted by alumni and staff coordinators and are awaiting your approval before being published to students.</span>
         </div>
       )}
 
