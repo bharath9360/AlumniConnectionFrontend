@@ -17,4 +17,7 @@ const chatSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// ── Performance indexes ──────────────────────────────────────
+chatSchema.index({ participants: 1 });             // Fast chat lookup by user
+
 module.exports = mongoose.model('Chat', chatSchema);

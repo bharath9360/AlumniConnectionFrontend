@@ -27,4 +27,7 @@ const messageSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// ── Performance indexes ──────────────────────────────────────
+messageSchema.index({ chatId: 1, createdAt: -1 }); // Fast message retrieval per chat
+
 module.exports = mongoose.model('Message', messageSchema);

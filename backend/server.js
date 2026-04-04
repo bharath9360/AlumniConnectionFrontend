@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const http = require('http');
 const path = require('path');
 const cron = require('node-cron');
@@ -23,7 +24,8 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
-app.use(express.json({ limit: '10mb' }));
+app.use(compression());                          // Gzip all responses — major bandwidth savings
+app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true }));
 // Global sanitization — strip XSS vectors from all request bodies
 app.use(sanitizeBody);

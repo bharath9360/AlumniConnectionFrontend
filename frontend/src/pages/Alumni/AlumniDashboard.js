@@ -349,19 +349,24 @@ const CreatePostBox = ({ user, onPostCreated, showToast }) => {
 const AlumniDashboard = () => {
   const { user } = useAuth();
 
-  const [feedData, setFeedData] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [toast,    setToast]    = useState(null);
+  const [feedData,    setFeedData]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page,        setPage]        = useState(1);
+  const [hasMore,     setHasMore]     = useState(true);
+  const [toast,       setToast]       = useState(null);
 
   const showToast = (message, type = 'info') => setToast({ message, type });
 
-  /* Load feed */
+  /* Load feed — page 1 on mount */
   useEffect(() => {
     const loadFeed = async () => {
       try {
         setLoading(true);
-        const res = await postService.getFeed();
+        const res = await postService.getFeed(1, 20);
         setFeedData(res.data.data || []);
+        setHasMore(res.data.pagination?.hasMore ?? false);
+        setPage(1);
       } catch {
         showToast('Failed to load feed. Please refresh.', 'error');
       } finally {
@@ -395,6 +400,23 @@ const AlumniDashboard = () => {
 
   const handleShare = () => showToast('Post link copied to clipboard!', 'info');
 
+  /* Load More — append next page */
+  const handleLoadMore = async () => {
+    const nextPage = page + 1;
+    try {
+      setLoadingMore(true);
+      const res = await postService.getFeed(nextPage, 20);
+      const newPosts = res.data.data || [];
+      setFeedData(prev => [...prev, ...newPosts]);
+      setHasMore(res.data.pagination?.hasMore ?? false);
+      setPage(nextPage);
+    } catch {
+      showToast('Failed to load more posts.', 'error');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   /* Loading screen */
   if (loading) {
     return (
@@ -424,15 +446,34 @@ const AlumniDashboard = () => {
 
             <div className="feed-scroll-area">
               {feedData.length > 0 ? (
-                feedData.map(post => (
-                  <FeedItem
-                    key={post._id || post.id}
-                    post={post}
-                    onLike={handleLike}
-                    onComment={handleComment}
-                    onShare={handleShare}
-                  />
-                ))
+                <>
+                  {feedData.map(post => (
+                    <FeedItem
+                      key={post._id || post.id}
+                      post={post}
+                      onLike={handleLike}
+                      onComment={handleComment}
+                      onShare={handleShare}
+                    />
+                  ))}
+
+                  {hasMore && (
+                    <div className="text-center my-3">
+                      <button
+                        className="btn btn-outline-secondary rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2"
+                        onClick={handleLoadMore}
+                        disabled={loadingMore}
+                        style={{ fontSize: 14 }}
+                      >
+                        {loadingMore ? (
+                          <><ClipLoader size={14} color="#666" /> Loading…</>
+                        ) : (
+                          <><i className="fas fa-arrow-down"></i> Load More Posts</>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center p-5 bg-white rounded-4 shadow-sm border-0">
                   <i className="fas fa-stream fa-2x text-muted mb-3"></i>

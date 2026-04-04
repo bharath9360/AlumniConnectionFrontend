@@ -1,16 +1,26 @@
 const express = require('express');
 const Post = require('../models/Post');
 const { protect, optionalAuth } = require('../middleware/auth');
-const { postUpload: upload, uploadToCloudinary } = require('../middleware/upload');
+const { postUpload: upload, uploadOptimized, uploadToCloudinary } = require('../middleware/upload');
+const { deleteCloudinaryImage } = require('../utils/cloudinaryCleanup');
 
 const router = express.Router();
 
-// ─── GET /api/posts — All posts, newest first ─────────────────
+// ─── GET /api/posts — All posts, newest first (paginated) ─────
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    const posts = await Post.find()
-      .sort({ createdAt: -1 })
-      .populate('userId', 'name profilePic role designation');
+    const page  = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip  = (page - 1) * limit;
+
+    const [posts, total] = await Promise.all([
+      Post.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('userId', 'name profilePic role designation'),
+      Post.countDocuments()
+    ]);
 
     const userId = req.user?._id;
     const result = posts.map(post => {
@@ -24,7 +34,17 @@ router.get('/', optionalAuth, async (req, res) => {
       }
       return obj;
     });
-    res.json({ success: true, data: result });
+
+    res.json({
+      success: true,
+      data: result,
+      pagination: {
+        page,
+        limit,
+        total,
+        hasMore: skip + posts.length < total,
+      }
+    });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch posts.' });
   }
@@ -36,27 +56,37 @@ router.post('/', protect, upload.single('image'), async (req, res) => {
   try {
     const { content } = req.body;
 
-    // ── Upload media to Cloudinary (buffer → HTTPS URL) ──────────
-    // req.file.buffer is populated by Multer memoryStorage.
-    // The secure_url returned by Cloudinary is stored in MongoDB.
+    // ── Upload media (with Sharp optimization for images) ──────
     let mediaUrl = '';
+    let imageOptimized = false;
+
     if (req.file) {
       const isVideo = req.file.mimetype.startsWith('video/');
-      mediaUrl = await uploadToCloudinary(
-        req.file.buffer,
-        'alumni/posts',
-        isVideo ? 'video' : 'image',
-        isVideo ? {
-          transformation: [
-            { quality: 'auto' }
-          ]
-        } : {
-          transformation: [
-            { width: 1200, crop: 'limit' },
-            { quality: 'auto', fetch_format: 'auto' }
-          ]
-        }
-      );
+
+      if (isVideo) {
+        // Videos: upload directly, no Sharp optimization
+        mediaUrl = await uploadToCloudinary(
+          req.file.buffer,
+          'alumni/posts',
+          'video',
+          { transformation: [{ quality: 'auto' }] }
+        );
+      } else {
+        // Images: optimize with Sharp first, then upload
+        const result = await uploadOptimized(
+          req.file.buffer,
+          'alumni/posts',
+          'image',
+          {
+            transformation: [
+              { width: 1200, crop: 'limit' },
+              { quality: 'auto', fetch_format: 'auto' }
+            ]
+          }
+        );
+        mediaUrl = result.url;
+        imageOptimized = result.optimized;
+      }
     } else if (req.body.media) {
       // Allow external Cloudinary URLs passed directly as a form field
       mediaUrl = req.body.media;
@@ -73,7 +103,8 @@ router.post('/', protect, upload.single('image'), async (req, res) => {
       userRole: req.user.designation || req.user.role,
       userPic: req.user.profilePic || '',
       content: content || '',
-      media: mediaUrl           // ← Multer image URL is stored here in MongoDB
+      media: mediaUrl,
+      imageOptimized
     });
 
     // Notify accepted connections
@@ -109,8 +140,6 @@ router.post('/', protect, upload.single('image'), async (req, res) => {
     } catch (_) {}
 
     // ── Return a shape consistent with GET /api/posts ────────────
-    // Re-fetch the post with the userId populated so the client object
-    // has userName / userPic from the live User document (same as feed).
     const populatedPost = await Post.findById(post._id)
       .populate('userId', 'name profilePic role designation');
 
@@ -327,6 +356,11 @@ router.delete('/:id', protect, async (req, res) => {
 
     if (post.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to delete this post.' });
+    }
+
+    // Clean up Cloudinary image (fire-and-forget)
+    if (post.media) {
+      deleteCloudinaryImage(post.media).catch(() => {});
     }
 
     await post.deleteOne();

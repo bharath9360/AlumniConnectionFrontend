@@ -15,6 +15,7 @@ const postSchema = new mongoose.Schema({
   userPic: { type: String, default: '' },
   content: { type: String, default: '' },   // optional — image-only posts allowed
   media: { type: String, default: '' },      // Multer-uploaded image URL stored here
+  imageOptimized: { type: Boolean, default: false }, // Whether Sharp compressed this image
   likes: { type: Number, default: 0 },
   likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   shares: { type: Number, default: 0 },
@@ -27,6 +28,10 @@ const postSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// ── Performance indexes ──────────────────────────────────────
+postSchema.index({ createdAt: -1 });              // Feed sort (newest first)
+postSchema.index({ userId: 1, createdAt: -1 });   // User-specific post queries
 
 // Virtual: whether a specific user has liked this post
 postSchema.methods.toClientObject = function (userId) {

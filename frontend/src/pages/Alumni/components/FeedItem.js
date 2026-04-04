@@ -99,6 +99,7 @@ const FeedItem = ({ post, onLike, onComment, onShare, onEdit, onDelete, onDelete
                                 <img
                                     src={resolvedAuthorPic}
                                     alt={authorName}
+                                    loading="lazy"
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                     onError={(e) => { e.target.style.display = 'none'; }}
                                 />
@@ -123,6 +124,7 @@ const FeedItem = ({ post, onLike, onComment, onShare, onEdit, onDelete, onDelete
                         <img
                             src={mediaUrl}
                             alt="Post attachment"
+                            loading="lazy"
                             className="w-100"
                             style={{ maxHeight: '400px', objectFit: 'cover', display: 'block' }}
                             onError={(e) => { e.target.closest('.post-media').style.display = 'none'; }}

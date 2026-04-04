@@ -8,6 +8,7 @@ const { protect, authorize } = require('../middleware/auth');
 const { sendApprovalEmail, sendBroadcastEmail } = require('../services/emailService');
 const { runGraduationJob, promoteStudentToAlumni } = require('../jobs/graduationJob');
 const { createNotification } = require('../utils/notifyHelper');
+const { deleteCloudinaryImage } = require('../utils/cloudinaryCleanup');
 
 const router = express.Router();
 
@@ -730,8 +731,15 @@ router.get('/posts', protect, authorize('admin'), async (req, res) => {
 router.delete('/posts/:id', protect, authorize('admin'), async (req, res) => {
   try {
     const Post = require('../models/Post');
-    const post = await Post.findByIdAndDelete(req.params.id);
+    const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: 'Post not found.' });
+
+    // Clean up Cloudinary image (fire-and-forget)
+    if (post.media) {
+      deleteCloudinaryImage(post.media).catch(() => {});
+    }
+
+    await post.deleteOne();
     res.json({ success: true, message: 'Post permanently deleted.' });
   } catch (err) {
     console.error('[DELETE /admin/posts/:id]', err);
