@@ -7,6 +7,8 @@ let transporter;
 if (isSmtpConfigured) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
+    port: 587,
+    secure: false,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS  // Use Gmail App Password, not your regular password
