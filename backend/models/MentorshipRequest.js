@@ -12,7 +12,7 @@ const mentorshipRequestSchema = new mongoose.Schema({
     required: true
   },
   message: { type: String, default: '', maxlength: 500 },
-  topic: { type: String, default: '' },      // Area student wants mentorship in
+  topic: { type: String, default: '' },
   status: {
     type: String,
     enum: ['pending', 'accepted', 'rejected'],
@@ -20,7 +20,7 @@ const mentorshipRequestSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Prevent duplicate requests from same mentee to same mentor
-mentorshipRequestSchema.index({ menteeId: 1, mentorId: 1 }, { unique: true });
+// Index for fast lookup — NOT unique, multiple sessions allowed
+mentorshipRequestSchema.index({ menteeId: 1, mentorId: 1, status: 1 });
 
 module.exports = mongoose.model('MentorshipRequest', mentorshipRequestSchema);
