@@ -14,7 +14,7 @@ const { postUpload, uploadToCloudinary } = require('../middleware/upload');
 router.use(protect);
 
 // ─── POST /api/mentorship/register-mentor ─────────────────────
-// ANY role (student, alumni, staff) can register as a mentor
+// ANY authenticated user can register as a mentor
 router.post('/register-mentor', async (req, res) => {
   try {
     const { skills, domain, experience, bio, isAvailable } = req.body;
@@ -48,13 +48,11 @@ router.get('/me/mentor-profile', async (req, res) => {
 });
 
 // ─── GET /api/mentorship/mentors ──────────────────────────────
-// Discover mentors — filter by domain, department, company, search
 router.get('/mentors', async (req, res) => {
   try {
     const { domain, department, search, available, page = 1, limit = 20 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Start with mentor model — filter available
     const mentorFilter = {};
     if (available === 'true') mentorFilter.isAvailable = true;
     if (domain && domain !== 'all') mentorFilter.domain = { $in: [new RegExp(domain, 'i')] };
@@ -62,13 +60,12 @@ router.get('/mentors', async (req, res) => {
     const mentors = await Mentor.find(mentorFilter).lean();
     const mentorUserIds = mentors.map(m => m.userId);
 
-    // Filter the associated users — no role restriction (students can be mentors too)
     const userFilter = {
       _id: { $in: mentorUserIds },
       status: 'Active'
     };
-    // Exclude self
-    userFilter._id.$nin = [req.user._id];
+    // Exclude self — must handle $in + $nin together
+    userFilter._id = { $in: mentorUserIds, $nin: [req.user._id] };
 
     if (department && department !== 'all') userFilter.department = new RegExp(department, 'i');
     if (search && search.trim()) {
@@ -85,9 +82,22 @@ router.get('/mentors', async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Merge mentor data with user data
     const mentorMap = {};
     mentors.forEach(m => { mentorMap[m.userId.toString()] = m; });
+
+    // Get session count per mentor for "Previously mentored you X times" UX
+    const sessionCounts = await MentorshipSession.aggregate([
+      {
+        $match: {
+          menteeId: req.user._id,
+          mentorId: { $in: mentorUserIds },
+          status: 'completed'
+        }
+      },
+      { $group: { _id: '$mentorId', count: { $sum: 1 } } }
+    ]);
+    const sessionCountMap = {};
+    sessionCounts.forEach(s => { sessionCountMap[s._id.toString()] = s.count; });
 
     const result = users.map(u => ({
       _id: u._id,
@@ -99,16 +109,11 @@ router.get('/mentors', async (req, res) => {
       batch: u.batch,
       company: u.company,
       designation: u.designation,
-      mentorProfile: mentorMap[u._id.toString()] || {}
+      mentorProfile: mentorMap[u._id.toString()] || {},
+      pastSessionsWithMe: sessionCountMap[u._id.toString()] || 0
     }));
 
-    res.json({
-      success: true,
-      data: result,
-      total,
-      page: parseInt(page),
-      hasMore: skip + result.length < total
-    });
+    res.json({ success: true, data: result, total, page: parseInt(page), hasMore: skip + result.length < total });
   } catch (err) {
     console.error('[Mentorship] mentors error:', err);
     res.status(500).json({ message: 'Failed to fetch mentors.' });
@@ -116,21 +121,33 @@ router.get('/mentors', async (req, res) => {
 });
 
 // ─── POST /api/mentorship/request ─────────────────────────────
-// Anyone can send a mentorship request (dual-role)
+// Allow re-request as long as there's no active pending/accepted request
 router.post('/request', async (req, res) => {
   try {
     const { mentorId, message, topic } = req.body;
     if (!mentorId) return res.status(400).json({ message: 'mentorId is required.' });
 
-    // Can't request yourself
     if (mentorId === req.user._id.toString()) {
       return res.status(400).json({ message: 'You cannot request mentorship from yourself.' });
     }
 
-    // Mentor must exist
     const mentorProfile = await Mentor.findOne({ userId: mentorId });
     if (!mentorProfile) return res.status(404).json({ message: 'Mentor profile not found.' });
     if (!mentorProfile.isAvailable) return res.status(400).json({ message: 'This mentor is currently unavailable.' });
+
+    // Block only if there's already a pending or active (accepted) request
+    const existing = await MentorshipRequest.findOne({
+      menteeId: req.user._id,
+      mentorId,
+      status: { $in: ['pending', 'accepted'] }
+    });
+    if (existing) {
+      return res.status(400).json({
+        message: existing.status === 'pending'
+          ? 'You already have a pending request with this mentor.'
+          : 'You already have an active session with this mentor. Complete it first.'
+      });
+    }
 
     const request = await MentorshipRequest.create({
       menteeId: req.user._id,
@@ -140,7 +157,6 @@ router.post('/request', async (req, res) => {
       status: 'pending'
     });
 
-    // Notify the mentor
     await createNotification(req.app.get('io'), {
       userId: mentorId,
       type: 'mentorship',
@@ -152,23 +168,18 @@ router.post('/request', async (req, res) => {
 
     res.status(201).json({ success: true, data: request, message: 'Request sent successfully.' });
   } catch (err) {
-    if (err.code === 11000) {
-      return res.status(400).json({ message: 'You have already sent a request to this mentor.' });
-    }
     console.error('[Mentorship] request error:', err);
     res.status(500).json({ message: 'Failed to send request.' });
   }
 });
 
 // ─── GET /api/mentorship/my-requests ─────────────────────────
-// Outgoing requests (as mentee)
 router.get('/my-requests', async (req, res) => {
   try {
     const requests = await MentorshipRequest.find({ menteeId: req.user._id })
       .populate('mentorId', 'name email profilePic role department company designation')
       .sort({ createdAt: -1 });
 
-    // Attach mentor profiles
     const mentorIds = requests.map(r => r.mentorId?._id).filter(Boolean);
     const profiles  = await Mentor.find({ userId: { $in: mentorIds } }).lean();
     const profMap   = {};
@@ -187,7 +198,6 @@ router.get('/my-requests', async (req, res) => {
 });
 
 // ─── GET /api/mentorship/incoming-requests ────────────────────
-// Pending incoming requests (as mentor) — any user with a mentor profile
 router.get('/incoming-requests', async (req, res) => {
   try {
     const requests = await MentorshipRequest.find({
@@ -217,11 +227,16 @@ router.put('/request/:id/accept', async (req, res) => {
     request.status = 'accepted';
     await request.save();
 
-    // Create or locate a dedicated mentorship chat between mentor and mentee
+    // Reuse existing mentorship chat between this pair, or create a new one
     let chat = await Chat.findOne({
       isMentorshipChat: true,
       participants: { $all: [request.mentorId, request.menteeId], $size: 2 }
     });
+
+    const sessionNumber = await MentorshipSession.countDocuments({
+      mentorId: request.mentorId,
+      menteeId: request.menteeId
+    }) + 1;
 
     if (!chat) {
       const menteeUser = await User.findById(request.menteeId).select('name');
@@ -231,9 +246,16 @@ router.put('/request/:id/accept', async (req, res) => {
         chatName: `Mentorship: ${req.user.name} ↔ ${menteeUser?.name || 'Mentee'}`,
         participants: [request.mentorId, request.menteeId]
       });
+    } else {
+      // Post a session-divider system message in the existing chat
+      await Message.create({
+        chatId: chat._id,
+        senderId: req.user._id,
+        text: `📚 Session ${sessionNumber} started — Topic: ${request.topic || 'General'}`,
+        messageType: 'text'
+      });
     }
 
-    // Create session linked to the chat
     const session = await MentorshipSession.create({
       menteeId:  request.menteeId,
       mentorId:  request.mentorId,
@@ -242,16 +264,15 @@ router.put('/request/:id/accept', async (req, res) => {
       topic:     request.topic || ''
     });
 
-    // Update the chat's session ref
+    // Keep chat's session ref pointing to the latest session
     chat.mentorshipSessionRef = session._id;
     await chat.save();
 
-    // Notify mentee
     await createNotification(req.app.get('io'), {
       userId: request.menteeId,
       type: 'mentorship',
       title: `${req.user.name} accepted your mentorship request! 🎉`,
-      description: request.topic ? `Topic: ${request.topic}` : 'Your mentorship journey begins now.',
+      description: request.topic ? `Session ${sessionNumber} — Topic: ${request.topic}` : 'Your mentorship journey continues!',
       icon: '✅',
       relatedId: session._id
     });
@@ -275,7 +296,6 @@ router.put('/request/:id/reject', async (req, res) => {
     request.status = 'rejected';
     await request.save();
 
-    // Notify mentee
     await createNotification(req.app.get('io'), {
       userId: request.menteeId,
       type: 'mentorship',
@@ -292,7 +312,7 @@ router.put('/request/:id/reject', async (req, res) => {
 });
 
 // ─── GET /api/mentorship/my-sessions ─────────────────────────
-// Returns sessions where user is mentor OR mentee
+// Returns all sessions — grouped by the other person for UX
 router.get('/my-sessions', async (req, res) => {
   try {
     const uid = req.user._id;
@@ -310,7 +330,6 @@ router.get('/my-sessions', async (req, res) => {
 });
 
 // ─── PUT /api/mentorship/session/:id/complete ────────────────
-// Mentor marks session as complete
 router.put('/session/:id/complete', async (req, res) => {
   try {
     const session = await MentorshipSession.findById(req.params.id);
@@ -324,18 +343,31 @@ router.put('/session/:id/complete', async (req, res) => {
     if (req.body.notes) session.notes = req.body.notes;
     await session.save();
 
-    // Update mentor stats
     await Mentor.findOneAndUpdate(
       { userId: req.user._id },
       { $inc: { totalSessions: 1 } }
     );
 
-    // Notify mentee to leave feedback
+    // Post completion marker in the mentorship chat
+    if (session.chatId) {
+      const sessionNum = await MentorshipSession.countDocuments({
+        mentorId: session.mentorId,
+        menteeId: session.menteeId,
+        _id: { $lte: session._id }
+      });
+      await Message.create({
+        chatId: session.chatId,
+        senderId: req.user._id,
+        text: `✅ Session ${sessionNum} completed. Great work! ${session.topic ? `Topic was: ${session.topic}` : ''}`,
+        messageType: 'text'
+      });
+    }
+
     await createNotification(req.app.get('io'), {
       userId: session.menteeId,
       type: 'mentorship',
       title: `Mentorship session completed! Leave feedback 🌟`,
-      description: `Rate your experience with ${req.user.name} to help others find great mentors.`,
+      description: `Rate your experience with ${req.user.name}. You can request another session anytime!`,
       icon: '⭐',
       relatedId: session._id
     });
@@ -347,7 +379,6 @@ router.put('/session/:id/complete', async (req, res) => {
 });
 
 // ─── PUT /api/mentorship/session/:id/feedback ────────────────
-// Mentee submits rating + comment after session completes
 router.put('/session/:id/feedback', async (req, res) => {
   try {
     const session = await MentorshipSession.findById(req.params.id);
@@ -370,11 +401,11 @@ router.put('/session/:id/feedback', async (req, res) => {
     session.feedback = { rating, comment: comment || '', submittedAt: new Date() };
     await session.save();
 
-    // Update mentor's average rating
+    // Update mentor's aggregate rating
     const mentor = await Mentor.findOne({ userId: session.mentorId });
     if (mentor) {
-      const newTotal  = mentor.totalRatings + 1;
-      const newAvg    = ((mentor.avgRating * mentor.totalRatings) + rating) / newTotal;
+      const newTotal = mentor.totalRatings + 1;
+      const newAvg   = ((mentor.avgRating * mentor.totalRatings) + rating) / newTotal;
       mentor.avgRating    = Math.round(newAvg * 10) / 10;
       mentor.totalRatings = newTotal;
       await mentor.save();
@@ -387,7 +418,6 @@ router.put('/session/:id/feedback', async (req, res) => {
 });
 
 // ─── PUT /api/mentorship/session/:id/notes ──────────────────
-// Mentor adds/edits session notes + resources
 router.put('/session/:id/notes', async (req, res) => {
   try {
     const session = await MentorshipSession.findById(req.params.id);
@@ -395,7 +425,7 @@ router.put('/session/:id/notes', async (req, res) => {
     if (session.mentorId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Only the mentor can edit notes.' });
     }
-    if (req.body.notes !== undefined)     session.notes = req.body.notes;
+    if (req.body.notes     !== undefined) session.notes     = req.body.notes;
     if (req.body.resources !== undefined) session.resources = req.body.resources;
     await session.save();
     res.json({ success: true, data: session });
@@ -405,33 +435,22 @@ router.put('/session/:id/notes', async (req, res) => {
 });
 
 // ─── POST /api/mentorship/chat/:chatId/image ────────────────
-// Upload image in mentorship chat (Cloudinary + send as message)
 router.post('/chat/:chatId/image', postUpload.single('image'), async (req, res) => {
   try {
     const { chatId } = req.params;
-
-    // Verify the chat exists and user is participant
     const chat = await Chat.findById(chatId);
     if (!chat) return res.status(404).json({ message: 'Chat not found.' });
     const isParticipant = chat.participants.some(p => p.toString() === req.user._id.toString());
     if (!isParticipant) return res.status(403).json({ message: 'Not authorized.' });
-
     if (!req.file) return res.status(400).json({ message: 'No image file provided.' });
 
-    // Upload to Cloudinary
     const imageUrl = await uploadToCloudinary(
       req.file.buffer,
       'alumni/mentorship_chat',
       'image',
-      {
-        transformation: [
-          { width: 800, crop: 'limit' },
-          { quality: 'auto', fetch_format: 'auto' }
-        ]
-      }
+      { transformation: [{ width: 800, crop: 'limit' }, { quality: 'auto', fetch_format: 'auto' }] }
     );
 
-    // Create message with image
     let message = await Message.create({
       chatId,
       senderId: req.user._id,
@@ -441,27 +460,18 @@ router.post('/chat/:chatId/image', postUpload.single('image'), async (req, res) 
     });
 
     message = await message.populate('senderId', 'name profilePic');
-    message = await message.populate('chatId');
 
-    // Update last message
     await Chat.findByIdAndUpdate(chatId, {
-      lastMessage: {
-        text: '📷 Image',
-        senderId: req.user._id,
-        timestamp: new Date()
-      },
+      lastMessage: { text: '📷 Image', senderId: req.user._id, timestamp: new Date() },
       updatedAt: new Date()
     });
 
-    // Emit via socket if available
     const io = req.app.get('io');
-    if (io) {
-      io.to(chatId).emit('message received', message);
-    }
+    if (io) io.to(chatId).emit('message received', message);
 
     res.json({ success: true, data: message });
   } catch (err) {
-    console.error('[Mentorship] chat image upload error:', err);
+    console.error('[Mentorship] image upload error:', err);
     res.status(500).json({ message: 'Failed to upload image.' });
   }
 });
