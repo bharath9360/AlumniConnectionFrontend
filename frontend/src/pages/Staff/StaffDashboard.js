@@ -464,8 +464,8 @@ const StaffDashboard = () => {
                         paddingAngle={3}
                         dataKey="value"
                       >
-                        <Cell fill={STAFF_GREEN} />
-                        <Cell fill="#e05252" />
+                        <Cell fill={PIE_COLORS[0]} />
+                        <Cell fill={PIE_COLORS[1]} />
                       </Pie>
                       <Legend wrapperStyle={{ fontSize: 12 }} />
                       <Tooltip contentStyle={{ fontSize: 12 }} />
