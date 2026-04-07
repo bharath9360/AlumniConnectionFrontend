@@ -43,9 +43,9 @@ const createLimiter = ({
 };
 
 // Pre-configured limiters
-const authLimiter = createLimiter({ windowMs: 15 * 60 * 1000, max: 50,  message: 'Too many requests. Try again in 15 minutes.' });
-const apiLimiter  = createLimiter({ windowMs: 60 * 1000,        max: 200, message: 'Request rate exceeded.' });
-const strictLimiter = createLimiter({ windowMs: 60 * 1000,      max: 10,  message: 'Action rate limited. Slow down.' });
+const authLimiter = createLimiter({ windowMs: 2 * 60 * 1000, max: 150, message: 'Too many requests. Try again in 15 minutes.' });
+const apiLimiter = createLimiter({ windowMs: 60 * 1000, max: 200, message: 'Request rate exceeded.' });
+const strictLimiter = createLimiter({ windowMs: 60 * 1000, max: 10, message: 'Action rate limited. Slow down.' });
 
 // Cleanup stale entries every 10 minutes to prevent memory leaks
 setInterval(() => {
