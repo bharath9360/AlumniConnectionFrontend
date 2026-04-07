@@ -24,6 +24,10 @@ import AlumniLogin from './pages/Auth/AlumniLogin';
 import StaffSignUp from './pages/Auth/StaffSignUp';
 import StaffLogin from './pages/Auth/StaffLogin';
 import AdminLoginPage from './pages/Auth/AdminLoginPage';
+import NotFound from './pages/NotFound';
+import Maintenance from './pages/Maintenance';
+import LegalPage from './pages/Legal/LegalPage';
+import { Toaster } from 'react-hot-toast';
 import Mentorship from './pages/Mentorship/Mentorship';
 
 // Unified Profile (own-edit + public-view merged)
@@ -101,10 +105,22 @@ const OwnProfileRedirect = () => {
 
 
 function App() {
+  // Part 4: Maintenance Toggle (IMPORTANT)
+  if (process.env.REACT_APP_MAINTENANCE === 'true') {
+    return <Maintenance />;
+  }
+
   return (
     <AuthProvider>
       <SocketProvider>
         <MessageProvider>
+          <Toaster 
+            position="top-right" 
+            toastOptions={{
+              duration: 4000,
+              style: { borderRadius: '8px', background: '#333', color: '#fff', fontSize: '14px' }
+            }} 
+          />
           <Router>
             <Routes>
               {/* ════════════════════════════════════════════════════
@@ -163,6 +179,9 @@ function App() {
                           <Route path="/profile/:id" element={<Profile />} />
                           <Route path="/profile/:id/posts" element={<ProfilePosts />} />
                           <Route path="/profile/:id/activity" element={<ProfileActivity />} />
+                          <Route path="/privacy-policy" element={<LegalPage type="privacy" />} />
+                          <Route path="/terms-conditions" element={<LegalPage type="terms" />} />
+                          <Route path="/security" element={<LegalPage type="security" />} />
 
                           {/* ── Auth Routes ───────────────────────── */}
                           <Route path="/register" element={<RoleSelection />} />
@@ -226,6 +245,9 @@ function App() {
                             <Route path="/notifications" element={<Notification />} />
                             <Route path="/mentorship" element={<Mentorship />} />
                           </Route>
+
+                          {/* ── 404 Route Fallback ────────────────── */}
+                          <Route path="*" element={<NotFound />} />
                         </Routes>
                       </ErrorBoundary>
                     </main>

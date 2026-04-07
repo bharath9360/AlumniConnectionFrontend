@@ -14,6 +14,7 @@ import {
   UserResultItem,
 } from '../../components/messaging';
 import { ChatListSkeleton, MessagesSkeleton, EmptyState } from '../../components/common/Skeletons';
+import toast from 'react-hot-toast';
 import '../../styles/Messaging.css';
 
 const Messaging = () => {
@@ -305,6 +306,9 @@ const Messaging = () => {
     } catch (err) {
       if (err.response?.status === 403 || err.response?.data?.code === 'NOT_CONNECTED') {
         setBlockedChats(prev => ({ ...prev, [activeChat._id]: true }));
+      } else {
+        toast.error('Failed to send message. Please try again.');
+        // Optionally mark local message object as failed, but toast is sufficient failsafe UI.
       }
       console.error('Failed to send message:', err);
     }
@@ -336,6 +340,7 @@ const Messaging = () => {
       ));
     } catch (err) {
       console.error('Failed to send image:', err);
+      toast.error('Failed to send image. Please try again.');
     }
   };
 

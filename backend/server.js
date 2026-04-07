@@ -199,15 +199,14 @@ app.use('/api/landing',      apiLimiter,  require('./routes/landing'));
 app.use('/api/groups',       apiLimiter,  require('./routes/groups'));
 app.use('/api/staff',        apiLimiter,  require('./routes/staff'));
 app.use('/api/mentorship',   apiLimiter,  require('./routes/mentorship'));
+app.use('/api/legal',        apiLimiter,  require('./routes/legal'));
 
 // ─── Health Check ─────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
 // ─── Global Error Handler ─────────────────────────────────────
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
-});
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // ─── Database & Server Start ──────────────────────────────────
 const PORT = process.env.PORT || 5000;
