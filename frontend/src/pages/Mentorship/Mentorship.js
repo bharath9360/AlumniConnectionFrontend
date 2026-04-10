@@ -320,8 +320,8 @@ const Mentorship = () => {
 
   useEffect(() => { fetchMentors(); }, [fetchMentors]);
 
-  const fetchPersonalData = useCallback(async () => {
-    setLoadingData(true);
+  const fetchPersonalData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingData(true);
     try {
       const [sessRes, reqRes, inRes, mpRes] = await Promise.allSettled([
         mentorshipService.getMySessions(),
@@ -334,7 +334,7 @@ const Mentorship = () => {
       if (inRes.status === 'fulfilled') setIncomingReqs(inRes.value.data.data || []);
       if (mpRes.status === 'fulfilled') setMyMentorProfile(mpRes.value.data.data);
     } catch (_) {}
-    finally { setLoadingData(false); }
+    finally { if (!silent) setLoadingData(false); }
   }, []);
 
   useEffect(() => { fetchPersonalData(); }, [fetchPersonalData]);
@@ -369,32 +369,32 @@ const Mentorship = () => {
       await mentorshipService.sendRequest({ mentorId: requestTarget._id, topic, message });
       toast.success('Request sent! 🙌');
       setRequestTarget(null);
-      fetchPersonalData();
+      fetchPersonalData(true);
     } catch (err) { toast.error(err.response?.data?.message || 'Failed.'); }
     finally { setReqLoading(false); }
   };
 
   const handleAccept = async req => {
-    try { await mentorshipService.acceptRequest(req._id); toast.success('Accepted! Session started.'); fetchPersonalData(); }
+    try { await mentorshipService.acceptRequest(req._id); toast.success('Accepted! Session started.'); fetchPersonalData(true); }
     catch(e) { toast.error(e.response?.data?.message || 'Failed.'); }
   };
   const handleReject = async req => {
-    try { await mentorshipService.rejectRequest(req._id); toast.success('Declined.'); fetchPersonalData(); }
+    try { await mentorshipService.rejectRequest(req._id); toast.success('Declined.'); fetchPersonalData(true); }
     catch(_) { toast.error('Failed.'); }
   };
   const handleComplete = async s => {
-    try { await mentorshipService.completeSession(s._id, { notes: s.notes }); toast.success('Completed! ✅'); fetchPersonalData(); }
+    try { await mentorshipService.completeSession(s._id, { notes: s.notes }); toast.success('Completed! ✅'); fetchPersonalData(true); }
     catch(_) { toast.error('Failed.'); }
   };
   const handleFeedback = async ({ rating, comment }) => {
     setFeedbackLoading(true);
-    try { await mentorshipService.submitFeedback(feedbackTarget._id, { rating, comment }); toast.success('Feedback submitted! 🌟'); setFeedbackTarget(null); fetchPersonalData(); }
+    try { await mentorshipService.submitFeedback(feedbackTarget._id, { rating, comment }); toast.success('Feedback submitted! 🌟'); setFeedbackTarget(null); fetchPersonalData(true); }
     catch(e) { toast.error(e.response?.data?.message || 'Failed.'); }
     finally { setFeedbackLoading(false); }
   };
   const handleSaveNotes = async () => {
     setNotesSaving(true);
-    try { await mentorshipService.updateNotes(notesTarget._id, { notes: notesText }); toast.success('Notes saved.'); setNotesTarget(null); fetchPersonalData(); }
+    try { await mentorshipService.updateNotes(notesTarget._id, { notes: notesText }); toast.success('Notes saved.'); setNotesTarget(null); fetchPersonalData(true); }
     catch(_) { toast.error('Failed.'); }
     finally { setNotesSaving(false); }
   };

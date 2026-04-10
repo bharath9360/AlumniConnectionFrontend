@@ -31,12 +31,21 @@ api.interceptors.response.use(
       localStorage.removeItem('alumni_token');
       localStorage.removeItem('alumni_user');
 
-      if (role === 'admin') {
-        window.location.href = '/admin/login';
-      } else if (role === 'student') {
-        window.location.href = '/login/student';
-      } else {
-        window.location.href = '/login/alumni';
+      // ── Fire a custom DOM event so AuthContext can handle the
+      //    redirect via React Router (no hard page reload).
+      //    AuthContext listens for 'alumni:session-expired'.
+      let redirectTo = '/login';
+      if (role === 'admin')   redirectTo = '/admin/login';
+      else if (role === 'student') redirectTo = '/login/student';
+      else if (role === 'staff')   redirectTo = '/login';
+
+      try {
+        window.dispatchEvent(
+          new CustomEvent('alumni:session-expired', { detail: { redirectTo } })
+        );
+      } catch (_) {
+        // Fallback for any edge case (e.g. during SSR/test)
+        window.location.href = redirectTo;
       }
     } else if (!error.response || error.code === 'ERR_NETWORK') {
       // Part 11: Network Error Fallback
@@ -46,6 +55,7 @@ api.interceptors.response.use(
   }
 
 );
+
 
 // ─── Auth Service ─────────────────────────────────────────────
 export const authService = {

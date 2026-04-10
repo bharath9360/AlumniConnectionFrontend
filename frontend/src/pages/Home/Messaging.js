@@ -20,65 +20,147 @@ import '../../styles/Messaging.css';
 const Messaging = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  // Pull onlineUsers array directly so online-status effect reacts to reference changes
+  // ── Pull shared socket + online users (updates cause instant status sync) ──
   const { socket: contextSocket, onlineUsers } = useSocket();
-  const { markChatAsRead, incrementUnread, setActiveChatId } = useMessage();
-  const [chats, setChats] = useState([]);
-  const [activeChat, setActiveChat] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [msgInput, setMsgInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [callingChat, setCallingChat] = useState(null);
-  const [mobileView, setMobileView] = useState('list'); // 'list' | 'chat'
-  const [isComposing, setIsComposing] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const [blockedChats, setBlockedChats] = useState({});
-  const [unreadCounts, setUnreadCounts] = useState({});
-  const [showProfilePanel, setShowProfilePanel] = useState(false);
-  const [isSendingRequest, setIsSendingRequest] = useState(false);
+  // ── Use MessageContext as single source for unread counts ───────────────────
+  const { unreadMap, markChatAsRead, incrementUnread, setActiveChatId } = useMessage();
 
-  const location = useLocation();
-  const socketRef = useRef(null);
+  const [chats,             setChats]             = useState([]);
+  const [activeChat,        setActiveChat]         = useState(null);
+  const [messages,          setMessages]           = useState([]);
+  const [loading,           setLoading]            = useState(true);
+  const [msgInput,          setMsgInput]           = useState('');
+  const [search,            setSearch]             = useState('');
+  const [callingChat,       setCallingChat]        = useState(null);
+  const [mobileView,        setMobileView]         = useState('list'); // 'list' | 'chat'
+  const [isComposing,       setIsComposing]        = useState(false);
+  const [searchResults,     setSearchResults]      = useState([]);
+  const [isTyping,          setIsTyping]           = useState(false);
+  const [blockedChats,      setBlockedChats]       = useState({});
+  const [showProfilePanel,  setShowProfilePanel]   = useState(false);
+  const [isSendingRequest,  setIsSendingRequest]   = useState(false);
+
+  // ── Pagination state ─────────────────────────────────────────
+  const [page,          setPage]          = useState(1);
+  const [hasMore,       setHasMore]       = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const location        = useLocation();
+  const socketRef       = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const selectChatRef = useRef(null);
+  const selectChatRef   = useRef(null);
+  // Keep a ref of activeChat._id so socket handlers always see current value
+  const activeChatIdRef = useRef(null);
 
-  // ── Connect Socket & setup listeners ──────────────────────────
+  // ── Enrich chat doc with display info ────────────────────────
+  const enrichChat = useCallback((chat, currentUserId, onlineList = []) => {
+    if (chat.isGroupChat) {
+      return {
+        ...chat,
+        userName:    chat.chatName || 'Group Chat',
+        userInitial: (chat.chatName || 'G').charAt(0).toUpperCase(),
+        userRole:    'group',
+        otherUserId: chat._id,
+        status:      'online',
+      };
+    }
+
+    // Find the participant who is NOT the current user
+    const otherParticipant = chat.participants?.find(p => {
+      const pid = p?._id?.toString() || p?.toString();
+      return pid !== currentUserId?.toString();
+    });
+    const otherId = otherParticipant?._id?.toString() || '';
+    return {
+      ...chat,
+      userName:    otherParticipant?.name || 'Unknown User',
+      userInitial: (otherParticipant?.name || 'U').charAt(0).toUpperCase(),
+      userRole:    otherParticipant?.role || '',
+      company:     otherParticipant?.company || '',
+      profilePic:  otherParticipant?.profilePic || '',
+      otherUserId: otherId,
+      status:      onlineList.includes(otherId) ? 'online' : 'offline',
+    };
+  }, []);
+
+  // ── Fetch all chats on mount ──────────────────────────────────
+  useEffect(() => {
+    const fetchChats = async () => {
+      try {
+        const { data } = await chatService.fetchChats();
+        const enriched = data.map(chat => enrichChat(chat, user._id, onlineUsers));
+        setChats(enriched);
+
+        // Deep-link: /messages?chatId=xxx or /messages/:chatId
+        const params = new URLSearchParams(location.search);
+        const chatId = params.get('chatId');
+        if (chatId) {
+          const target = enriched.find(c => c._id === chatId);
+          if (target) selectChat(target);
+        }
+      } catch (err) {
+        console.error('Failed to fetch chats:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user) fetchChats();
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Re-derive online status INSTANTLY when onlineUsers changes ─
+  // No latency: this runs synchronously whenever the socket broadcasts the updated list
+  useEffect(() => {
+    if (!user || chats.length === 0) return;
+    setChats(prev =>
+      prev.map(chat => ({
+        ...chat,
+        status: chat.isGroupChat
+          ? 'online'
+          : (onlineUsers.includes(chat.otherUserId) ? 'online' : 'offline'),
+      }))
+    );
+    if (activeChat?.otherUserId) {
+      setActiveChat(prev =>
+        prev ? {
+          ...prev,
+          status: onlineUsers.includes(prev.otherUserId) ? 'online' : 'offline',
+        } : prev
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineUsers]);
+
+  // ── Socket setup ────────────────────────────────────────────────
   useEffect(() => {
     if (!user || !contextSocket) return;
 
     const socket = contextSocket;
     socketRef.current = socket;
 
+    // ────────────────────────────────────────────────────────────
+    // message_received — new real-time message from another user
+    // ────────────────────────────────────────────────────────────
     const handleNewMessage = (newMessage) => {
-      const msgChatId = newMessage.chatId?._id || newMessage.chatId;
+      const msgChatId = (newMessage.chatId?._id || newMessage.chatId)?.toString();
+      const currentChatId = activeChatIdRef.current;
 
-      setActiveChat(prev => {
-        if (prev && prev._id === msgChatId) {
-          setMessages(prevMsgs => [...prevMsgs, newMessage]);
-          // Chat is open — mark read in context (also calls API)
-          markChatAsRead(msgChatId);
-          setUnreadCounts(prev2 => ({ ...prev2, [msgChatId]: 0 }));
-        } else {
-          // Chat is NOT open — increment in context (updates global badge)
-          incrementUnread(msgChatId);
-          setUnreadCounts(prev2 => ({
-            ...prev2,
-            [msgChatId]: (prev2[msgChatId] || 0) + 1,
-          }));
-        }
-        return prev;
-      });
+      if (currentChatId && currentChatId === msgChatId) {
+        // Chat is open → append immediately + mark read
+        setMessages(prev => [...prev, newMessage]);
+        markChatAsRead(msgChatId);
+      } else {
+        // MessageContext global listener handles incrementing the read badge
+      }
 
+      // Always update sidebar preview + sort to top
       setChats(prev => {
         const updated = prev.map(c => {
           if (c._id === msgChatId) {
             return {
               ...c,
               lastMessage: {
-                text: newMessage.text,
-                senderId: newMessage.senderId?._id || newMessage.senderId,
+                text:      newMessage.text || (newMessage.image ? '📷 Image' : ''),
+                senderId:  newMessage.senderId?._id || newMessage.senderId,
                 timestamp: newMessage.createdAt || new Date().toISOString(),
               },
             };
@@ -93,107 +175,70 @@ const Messaging = () => {
       });
     };
 
+    // ────────────────────────────────────────────────────────────
+    // messages_read — recipient opened our chat → update ticks
+    // Emitted by backend after PUT /api/chat/:chatId/read
+    // ────────────────────────────────────────────────────────────
+    const handleMessagesRead = ({ chatId, readBy }) => {
+      // Only update messages that belong to this chat and were sent by the current user
+      setMessages(prev =>
+        prev.map(msg => {
+          const msgChatId = (msg.chatId?._id || msg.chatId)?.toString();
+          const isSentByMe = (msg.senderId?._id || msg.senderId)?.toString() === user._id?.toString();
+          if (msgChatId === chatId && isSentByMe) {
+            // Mark readBy
+            const existingReadBy = msg.readBy || [];
+            if (existingReadBy.includes(readBy)) return msg;
+            return { ...msg, readBy: [...existingReadBy, readBy] };
+          }
+          return msg;
+        })
+      );
+    };
+
+    // ────────────────────────────────────────────────────────────
+    // user_reading — recipient is actively looking at the chat right now
+    // (emitted by server on join_chat). Mark their messages as delivered.
+    // ────────────────────────────────────────────────────────────
+    const handleUserReading = ({ userId }) => {
+      if (!userId) return;
+      setMessages(prev =>
+        prev.map(msg => {
+          const isSentByMe = (msg.senderId?._id || msg.senderId)?.toString() === user._id?.toString();
+          if (!isSentByMe) return msg;
+          const existingReadBy = msg.readBy || [];
+          if (existingReadBy.includes(userId.toString())) return msg;
+          return { ...msg, readBy: [...existingReadBy, userId.toString()] };
+        })
+      );
+    };
+
     socket.on('message_received', handleNewMessage);
-    socket.on('typing',      () => setIsTyping(true));
-    socket.on('stop_typing', () => setIsTyping(false));
+    socket.on('messages_read',    handleMessagesRead);
+    socket.on('user_reading',     handleUserReading);
+    socket.on('typing',           () => setIsTyping(true));
+    socket.on('stop_typing',      () => setIsTyping(false));
 
     return () => {
       socket.off('message_received', handleNewMessage);
+      socket.off('messages_read',    handleMessagesRead);
+      socket.off('user_reading',     handleUserReading);
       socket.off('typing');
       socket.off('stop_typing');
     };
-  }, [user, contextSocket, activeChat?._id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Enrich chat doc with display info  ──────────────────────
-  const enrichChat = useCallback((chat, currentUserId, onlineList = []) => {
-    if (chat.isGroupChat) {
-      return {
-        ...chat,
-        userName: chat.chatName || 'Group Chat',
-        userInitial: (chat.chatName || 'G').charAt(0).toUpperCase(),
-        userRole: 'group',
-        otherUserId: chat._id,
-        status: 'online',
-      };
-    }
-
-    const otherParticipant = chat.participants?.find(p => (p._id || p) !== currentUserId);
-    const otherId = otherParticipant?._id?.toString() || '';
-    return {
-      ...chat,
-      userName: otherParticipant?.name || 'Unknown User',
-      userInitial: (otherParticipant?.name || 'U').charAt(0).toUpperCase(),
-      userRole: otherParticipant?.role || '',
-      company: otherParticipant?.company || '',
-      profilePic: otherParticipant?.profilePic || '',
-      otherUserId: otherId,
-      status: onlineList.includes(otherId) ? 'online' : 'offline',
-    };
-  }, []);
-
-  // ── Fetch all chats on mount ──────────────────────────────────
-  useEffect(() => {
-    const fetchChats = async () => {
-      try {
-        const { data } = await chatService.fetchChats();
-        const enriched = data.map(chat => enrichChat(chat, user._id));
-        setChats(enriched);
-
-        // Deep-link: /messaging?chatId=xxx
-        const params = new URLSearchParams(location.search);
-        const chatId = params.get('chatId');
-        if (chatId) {
-          const target = enriched.find(c => c._id === chatId);
-          if (target) selectChat(target);
-        }
-      } catch (err) {
-        console.error('Failed to fetch chats:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user) fetchChats();
-  }, [user, location.search, enrichChat]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Fetch unread counts once chats are loaded ────────────────
-  useEffect(() => {
-    if (!user) return;
-    chatService.getUnreadCounts()
-      .then(({ data }) => setUnreadCounts(data.data || {}))
-      .catch(() => {});
-  }, [user, chats.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Re-derive online status whenever onlineUsers changes ─────
-  useEffect(() => {
-    if (!user || chats.length === 0) return;
-    setChats(prev =>
-      prev.map(chat => ({
-        ...chat,
-        status: onlineUsers.includes(chat.otherUserId) ? 'online' : 'offline',
-      }))
-    );
-    if (activeChat?.otherUserId) {
-      setActiveChat(prev =>
-        prev ? { ...prev, status: onlineUsers.includes(prev.otherUserId) ? 'online' : 'offline' } : prev
-      );
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onlineUsers]);
-
-  // ── Pagination state ─────────────────────────────────────────
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  }, [user, contextSocket, markChatAsRead, incrementUnread]); // stable deps only
 
   // ── Select a chat and load messages ──────────────────────────
   const selectChat = useCallback(async (chat) => {
+    // Leave previous chat
     setActiveChat(prev => {
       if (prev?._id && prev._id !== chat._id && socketRef.current) {
         socketRef.current.emit('leave_chat', prev._id);
       }
       return chat;
     });
-    setActiveChatId(chat._id);   // tell MessageContext which chat is open
+    activeChatIdRef.current = chat._id;          // sync ref for socket handlers
+    setActiveChatId(chat._id);                   // tell MessageContext
     setMobileView('chat');
     setIsComposing(false);
     setMessages([]);
@@ -203,7 +248,8 @@ const Messaging = () => {
 
     try {
       const { data } = await chatService.fetchMessages(chat._id, 1, 30);
-      setMessages(data.data || data);
+      const rawMessages = data.data || data;
+      setMessages(rawMessages);
       setHasMore(data.hasMore || false);
       setPage(1);
     } catch (err) {
@@ -213,14 +259,16 @@ const Messaging = () => {
     if (socketRef.current) {
       socketRef.current.emit('join_chat', chat._id);
     }
-    // Mark read via context — updates global badge AND calls API
+    // Mark read — updates global badge + calls API which emits 'messages_read' to sender
     markChatAsRead(chat._id);
-    setUnreadCounts(prev => ({ ...prev, [chat._id]: 0 }));
-  }, [markChatAsRead, setActiveChatId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [markChatAsRead, setActiveChatId]);
 
   // Clear active chat in context on unmount
   useEffect(() => {
-    return () => setActiveChatId(null);
+    return () => {
+      setActiveChatId(null);
+      activeChatIdRef.current = null;
+    };
   }, [setActiveChatId]);
 
   const loadMoreMessages = async () => {
@@ -245,7 +293,7 @@ const Messaging = () => {
   const handleSelectNewUser = async (selectedUser) => {
     try {
       const { data: chat } = await chatService.accessChat(selectedUser._id);
-      const enriched = enrichChat(chat, user._id);
+      const enriched = enrichChat(chat, user._id, onlineUsers);
       setChats(prev => {
         const exists = prev.find(c => c._id === enriched._id);
         if (!exists) return [enriched, ...prev];
@@ -265,19 +313,14 @@ const Messaging = () => {
     setSearchResults([]);
   };
 
-  // ── Search all users ──────────────────────────────────────────
+  // ── Search connections ────────────────────────────────────────
   useEffect(() => {
-    if (!isComposing || search.trim().length < 1) {
-      setSearchResults([]);
-      return;
-    }
+    if (!isComposing || search.trim().length < 1) { setSearchResults([]); return; }
     const timer = setTimeout(async () => {
       try {
         const { data } = await chatService.searchUsers(search);
         setSearchResults(data);
-      } catch (err) {
-        setSearchResults([]);
-      }
+      } catch { setSearchResults([]); }
     }, 400);
     return () => clearTimeout(timer);
   }, [search, isComposing]);
@@ -291,12 +334,14 @@ const Messaging = () => {
 
     try {
       const { data: newMessage } = await chatService.sendMessage(activeChat._id, text);
-      setMessages(prev => [...prev, newMessage]);
+      // Optimistic update — append message (readBy = [] initially → shows single tick)
+      setMessages(prev => [...prev, { ...newMessage, readBy: newMessage.readBy || [] }]);
       setChats(prev => prev.map(c =>
         c._id === activeChat._id
           ? { ...c, lastMessage: { text, senderId: user._id, timestamp: new Date() } }
           : c
       ));
+      // Emit to server so recipient gets real-time delivery
       if (socketRef.current) {
         socketRef.current.emit('new_message', {
           ...newMessage,
@@ -308,9 +353,7 @@ const Messaging = () => {
         setBlockedChats(prev => ({ ...prev, [activeChat._id]: true }));
       } else {
         toast.error('Failed to send message. Please try again.');
-        // Optionally mark local message object as failed, but toast is sufficient failsafe UI.
       }
-      console.error('Failed to send message:', err);
     }
   };
 
@@ -318,28 +361,17 @@ const Messaging = () => {
   const handleImageSend = async (file, caption) => {
     if (!activeChat || !file) return;
     try {
-      // If it's a mentorship chat, use the dedicated endpoint
-      if (activeChat.isMentorshipChat) {
-        const fd = new FormData();
-        fd.append('image', file);
-        if (caption) fd.append('caption', caption);
-        const { data } = await mentorshipService.uploadChatImage(activeChat._id, fd);
-        setMessages(prev => [...prev, data.data]);
-      } else {
-        // For regular chats, upload via mentorship image endpoint (reuses Cloudinary)
-        const fd = new FormData();
-        fd.append('image', file);
-        if (caption) fd.append('caption', caption);
-        const { data } = await mentorshipService.uploadChatImage(activeChat._id, fd);
-        setMessages(prev => [...prev, data.data]);
-      }
+      const fd = new FormData();
+      fd.append('image', file);
+      if (caption) fd.append('caption', caption);
+      const { data } = await mentorshipService.uploadChatImage(activeChat._id, fd);
+      setMessages(prev => [...prev, { ...data.data, readBy: data.data?.readBy || [] }]);
       setChats(prev => prev.map(c =>
         c._id === activeChat._id
           ? { ...c, lastMessage: { text: '📷 Image', senderId: user._id, timestamp: new Date() } }
           : c
       ));
-    } catch (err) {
-      console.error('Failed to send image:', err);
+    } catch {
       toast.error('Failed to send image. Please try again.');
     }
   };
@@ -351,8 +383,7 @@ const Messaging = () => {
     socketRef.current.emit('typing', activeChat._id);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      socketRef.current.emit('stop_typing', activeChat._id);
-      setIsTyping(false);
+      socketRef.current?.emit('stop_typing', activeChat._id);
     }, 1500);
   };
 
@@ -360,18 +391,14 @@ const Messaging = () => {
     return () => { if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current); };
   }, []);
 
-  // ── Send connection request from blocked banner ───────────────
+  // ── Connection request from blocked banner ───────────────────
   const handleSendConnectionRequest = async () => {
     if (!activeChat?.otherUserId) return;
     setIsSendingRequest(true);
     try {
       await connectionService.sendRequest(activeChat.otherUserId);
-      // Keep blocked state but show feedback via button state
-    } catch (err) {
-      console.error('Connection request failed:', err);
-    } finally {
-      setIsSendingRequest(false);
-    }
+    } catch { /* silent */ }
+    finally { setIsSendingRequest(false); }
   };
 
   // ── Filtered chat list ────────────────────────────────────────
@@ -385,7 +412,6 @@ const Messaging = () => {
     return (
       <div className="msg-viewport">
         <div className="msg-shell">
-          {/* Sidebar skeleton */}
           <div className="msg-sidebar">
             <div className="msg-sidebar__header">
               <div style={{ width: 90, height: 20, background: '#f0f0f0', borderRadius: 6 }} />
@@ -396,7 +422,6 @@ const Messaging = () => {
             </div>
             <ChatListSkeleton rows={7} />
           </div>
-          {/* Desktop — empty state panel while chats load */}
           <div className="msg-window">
             <ChatEmptyState />
           </div>
@@ -414,7 +439,7 @@ const Messaging = () => {
         {/* ─── LEFT: Chat Sidebar ─── */}
         <div className={`msg-sidebar ${mobileView === 'chat' ? 'msg-sidebar--hidden' : ''}`}>
           <ChatSidebar>
-            {/* Sidebar header with Back-to-Home button */}
+            {/* Sidebar header */}
             <div className="msg-sidebar__header">
               <div className="d-flex align-items-center gap-2">
                 {isComposing ? (
@@ -426,15 +451,14 @@ const Messaging = () => {
                     <i className="fas fa-arrow-left" />
                   </button>
                 ) : (
-                  // Back-to-home — exits full-screen messaging
                   <button
                     className="msg-icon-btn"
                     onClick={() => {
                       const role = user?.role?.toLowerCase() || 'alumni';
                       const uid  = user?._id || user?.id;
-                      if (role === 'student')  navigate(`/student/home/${uid}`);
-                      else if (role === 'admin') navigate(`/admin/home/${uid}`);
-                      else navigate(`/alumni/home/${uid}`);
+                      if (role === 'student')       navigate(`/student/home/${uid}`);
+                      else if (role === 'admin')    navigate(`/admin/home/${uid}`);
+                      else                          navigate(`/alumni/home/${uid}`);
                     }}
                     title="Back to home"
                     aria-label="Go back to dashboard"
@@ -486,7 +510,7 @@ const Messaging = () => {
                         chat={chat}
                         currentUserId={user._id}
                         isActive={activeChat?._id === chat._id}
-                        unreadCount={unreadCounts[chat._id] || 0}
+                        unreadCount={unreadMap[chat._id] || 0}   // ← reads from MessageContext
                         onClick={() => selectChat(chat)}
                       />
                     ))
@@ -498,29 +522,23 @@ const Messaging = () => {
         </div>
 
         {/* ─── CENTER: Chat Window ─── */}
-        {/* msg-window is a flex column: header=fixed, messages=scroll, input=fixed */}
         <div className={`msg-window ${mobileView === 'list' ? 'msg-window--hidden' : ''}`}>
           {activeChat ? (
             <>
-              {/* FIXED: header stays at top, never scrolls */}
               <ChatWindow.Header
                 chat={activeChat}
                 onBack={() => { setMobileView('list'); setShowProfilePanel(false); }}
                 onProfileClick={() => {
                   if (activeChat.isGroupChat) return;
                   const isMobile = window.innerWidth < 992;
-                  if (isMobile) {
-                    navigate(`/profile/${activeChat.otherUserId}`);
-                  } else {
-                    setShowProfilePanel(p => !p);
-                  }
+                  if (isMobile) { navigate(`/profile/${activeChat.otherUserId}`); }
+                  else          { setShowProfilePanel(p => !p); }
                 }}
                 onClearChat={() => {}}
                 onDeleteChat={() => {}}
                 onVoiceCall={setCallingChat}
               />
 
-              {/* SCROLLABLE: messages fill remaining space */}
               {messages.length === 0 && !isLoadingMore ? (
                 <div className="msg-messages">
                   <MessagesSkeleton rows={6} />
@@ -529,27 +547,22 @@ const Messaging = () => {
                 <ChatWindow.Messages
                   messages={messages}
                   currentUserId={user._id}
+                  otherUserId={activeChat?.otherUserId}
                   hasMore={hasMore}
                   isLoadingMore={isLoadingMore}
                   onLoadMore={loadMoreMessages}
                 />
               )}
 
-              {/* Typing indicator — right above input, shrink:0 */}
               {isTyping && <TypingIndicator name={activeChat.userName} />}
 
-              {/* FIXED: input stays at bottom, never scrolls */}
               <ChatWindow.Input
                 value={msgInput}
                 onChange={handleTyping}
                 onSend={handleSend}
                 onImageSend={handleImageSend}
                 disabled={isBlockedLocally}
-                blockedMessage={
-                  isBlockedLocally
-                    ? 'You must be connected to start messaging.'
-                    : undefined
-                }
+                blockedMessage={isBlockedLocally ? 'You must be connected to start messaging.' : undefined}
                 onSendConnectionRequest={isBlockedLocally ? handleSendConnectionRequest : undefined}
                 isSendingRequest={isSendingRequest}
               />

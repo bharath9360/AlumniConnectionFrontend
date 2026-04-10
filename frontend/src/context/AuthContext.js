@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+
 import { ClipLoader } from 'react-spinners';
 
 const AuthContext = createContext(null);
@@ -42,6 +43,26 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     setUser(null);
+  }, []);
+
+  // ── Handle session expiry dispatched by Axios interceptor ─
+  // We use a ref so the event listener always sees latest logout/user
+  const logoutRef = useRef(logout);
+  useEffect(() => { logoutRef.current = logout; }, [logout]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      logoutRef.current();
+      // e.detail.redirectTo is set by api.js based on the expired role
+      const redirectTo = e?.detail?.redirectTo || '/login';
+      // Navigate using the React Router history if inside a router,
+      // otherwise we fall back gracefully (edge case during crash recovery)
+      try {
+        window.dispatchEvent(new CustomEvent('alumni:navigate', { detail: { to: redirectTo } }));
+      } catch (_) {}
+    };
+    window.addEventListener('alumni:session-expired', handler);
+    return () => window.removeEventListener('alumni:session-expired', handler);
   }, []);
 
   // ── Update user in state + localStorage (for profile edits) ─

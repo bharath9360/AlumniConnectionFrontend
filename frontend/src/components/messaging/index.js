@@ -307,7 +307,11 @@ const DateSeparator = ({ label }) => (
 );
 
 // ── Single bubble ──────────────────────────────────────────────
-export const ChatBubble = ({ msg, isMine, isLastInGroup }) => {
+// readBy logic (WhatsApp-style):
+//   ✓        grey  = sent to server
+//   ✓✓       grey  = delivered (recipient is online / in their room)
+//   ✓✓       red   = read (recipient called PUT /:chatId/read)
+export const ChatBubble = ({ msg, isMine, isLastInGroup, otherUserId }) => {
   const time = msg.createdAt
     ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : msg.timestamp
@@ -316,6 +320,19 @@ export const ChatBubble = ({ msg, isMine, isLastInGroup }) => {
 
   const hasImage = !!msg.image;
   const hasText  = !!msg.text;
+
+  // Determine tick status from readBy array
+  const readBy      = msg.readBy || [];
+  const isRead      = otherUserId
+    ? readBy.some(id => id?.toString() === otherUserId?.toString())
+    : false;
+  const isDelivered = readBy.length > 0;
+
+  const tickStatus = isMine
+    ? isRead      ? 'read'
+    : isDelivered ? 'delivered'
+    : 'sent'
+    : null;
 
   return (
     <div className={`msg-bubble-wrap ${isMine ? 'msg-bubble-wrap--mine' : 'msg-bubble-wrap--theirs'} ${isLastInGroup ? 'msg-bubble-wrap--gap-top' : ''}`}>
@@ -332,9 +349,18 @@ export const ChatBubble = ({ msg, isMine, isLastInGroup }) => {
         {hasText && <div style={hasImage ? { padding: '6px 8px 2px' } : undefined}>{msg.text}</div>}
         <div className="msg-bubble__meta" style={hasImage && !hasText ? { padding: '2px 8px' } : undefined}>
           <span>{time}</span>
-          {isMine && (
-            <span className={`msg-bubble__tick ${msg.isRead ? 'msg-bubble__tick--seen' : ''}`}>
-              {msg.isRead ? '✓✓' : '✓'}
+          {tickStatus && (
+            <span className={`msg-tick msg-tick--${tickStatus}`} title={tickStatus}>
+              {tickStatus === 'sent' ? (
+                <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
+                  <path d="M1 5L5 9L13 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              ) : (
+                <svg width="18" height="10" viewBox="0 0 18 10" fill="none">
+                  <path d="M1 5L5 9L13 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M5 5L9 9L17 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
             </span>
           )}
         </div>
@@ -344,7 +370,7 @@ export const ChatBubble = ({ msg, isMine, isLastInGroup }) => {
 };
 
 // ── Messages panel ─────────────────────────────────────────────
-ChatWindow.Messages = function ChatWindowMessages({ messages, currentUserId, onLoadMore, hasMore, isLoadingMore }) {
+ChatWindow.Messages = function ChatWindowMessages({ messages, currentUserId, otherUserId, onLoadMore, hasMore, isLoadingMore }) {
   const scrollRef = useRef(null);
   const endRef    = useRef(null);
   const prevScrollHeight = useRef(null);
@@ -383,7 +409,6 @@ ChatWindow.Messages = function ChatWindowMessages({ messages, currentUserId, onL
         const prev = messages[idx - 1];
         const isMine = msg.senderId?._id === currentUserId || msg.senderId === currentUserId;
         const showDate = !isSameDay(prev?.createdAt || prev?.timestamp, msg.createdAt || msg.timestamp);
-        // New group if: first message, different sender from prev, or big time gap
         const prevSenderId = prev?.senderId?._id || prev?.senderId;
         const curSenderId  = msg.senderId?._id  || msg.senderId;
         const isNewGroup   = !prev || prevSenderId !== curSenderId || showDate;
@@ -391,7 +416,12 @@ ChatWindow.Messages = function ChatWindowMessages({ messages, currentUserId, onL
         return (
           <React.Fragment key={msg._id || msg.id || idx}>
             {showDate && <DateSeparator label={formatDateSep(msg.createdAt || msg.timestamp)} />}
-            <ChatBubble msg={msg} isMine={isMine} isLastInGroup={isNewGroup} />
+            <ChatBubble
+              msg={msg}
+              isMine={isMine}
+              isLastInGroup={isNewGroup}
+              otherUserId={otherUserId}
+            />
           </React.Fragment>
         );
       })}
@@ -400,6 +430,7 @@ ChatWindow.Messages = function ChatWindowMessages({ messages, currentUserId, onL
     </div>
   );
 };
+
 
 // ── Input bar ──────────────────────────────────────────────────
 ChatWindow.Input = function ChatWindowInput({ value, onChange, onSend, onImageSend, disabled, blockedMessage, onSendConnectionRequest, isSendingRequest }) {

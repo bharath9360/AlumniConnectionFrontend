@@ -86,6 +86,7 @@ import AdminBroadcast from './pages/Admin/AdminBroadcast';
 import './styles/Global.css';
 import './styles/Dashboard.css';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import NavigationSync from './components/common/NavigationSync';
 
 // ─── Route redirect helpers ────────────────────────────────────
 // /alumni/profile/:userId or /admin/profile/:userId → /profile/:userId
@@ -122,6 +123,7 @@ function App() {
             }} 
           />
           <Router>
+            <NavigationSync />
             <Routes>
               {/* ════════════════════════════════════════════════════
                 Admin Panel — full-screen layout (no global Navbar)

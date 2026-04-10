@@ -575,8 +575,27 @@
   color: var(--msg-text-muted);
 }
 
-.msg-bubble__tick { font-size: 0.72rem; }
+/* ── WhatsApp-style message ticks ────────────────────────── */
+/* msg-tick--sent      = ✓   grey  = sent to server           */
+/* msg-tick--delivered = ✓✓  grey  = recipient received it    */
+/* msg-tick--read      = ✓✓  red   = recipient opened chat    */
+.msg-tick {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 3px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition: color 0.25s ease;
+}
+
+.msg-tick--sent      { color: rgba(122, 12, 28, 0.38); }
+.msg-tick--delivered { color: rgba(122, 12, 28, 0.55); }
+.msg-tick--read      { color: var(--msg-red); }
+
+/* Keep old class for backward compat with any lingering references */
+.msg-bubble__tick { font-size: 0.72rem; display: inline-flex; align-items: center; margin-left: 3px; }
 .msg-bubble__tick--seen { color: #c8102e; }
+
 
 /* ── Typing indicator — FIXED (part of bottom zone) ─────── */
 .msg-typing-bar {

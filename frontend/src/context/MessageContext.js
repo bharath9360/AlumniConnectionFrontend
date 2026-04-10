@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { useSocket } from './SocketContext';
 import { chatService } from '../services/api';
 
 const MessageContext = createContext(null);
@@ -7,15 +8,18 @@ const MessageContext = createContext(null);
 export const useMessage = () => useContext(MessageContext);
 
 // ─────────────────────────────────────────────────────────────────
-// MessageProvider
-//   Owns all unread-count state so every consumer (Navbar, BottomNav,
-//   Messaging page) shares the SAME numbers without double-fetching.
+// MessageProvider — Single source of truth for unread message counts.
+//
+// KEY DESIGN: Messaging.js reads unreadMap directly from this context
+// instead of maintaining its own local unreadCounts state.
+// This eliminates the count mismatch between sidebar badge and chat list.
 // ─────────────────────────────────────────────────────────────────
 export const MessageProvider = ({ children }) => {
-  const { user }                              = useAuth();
-  const [unreadMap, setUnreadMap]             = useState({});   // { chatId: count }
-  const [totalUnreadCount, setTotalUnread]    = useState(0);
-  const activeChatIdRef                       = useRef(null);   // which chat the user has open
+  const { user }                           = useAuth();
+  const { socket }                         = useSocket() || {};
+  const [unreadMap,       setUnreadMap]    = useState({});   // { chatId: count } — per-chat unread
+  const [totalUnreadCount, setTotalUnread] = useState(0);
+  const activeChatIdRef                    = useRef(null);   // which chat the user has open
 
   // ── Derive total whenever map changes ────────────────────────
   const recalcTotal = useCallback((map) => {
@@ -23,7 +27,7 @@ export const MessageProvider = ({ children }) => {
     setTotalUnread(total);
   }, []);
 
-  // ── Initial fetch from REST: GET /api/chat/unread-count ──────
+  // ── Fetch from REST: GET /api/chat/unread-count ──────────────
   const fetchUnreadCounts = useCallback(async () => {
     if (!user) return;
     try {
@@ -34,7 +38,7 @@ export const MessageProvider = ({ children }) => {
     } catch (_) { /* silent */ }
   }, [user, recalcTotal]);
 
-  // Fetch on login
+  // Fetch on login; clear on logout
   useEffect(() => {
     if (user) {
       fetchUnreadCounts();
@@ -44,12 +48,12 @@ export const MessageProvider = ({ children }) => {
     }
   }, [user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Mark a chat as read (called from Messaging when user opens chat) ──
+  // ── Mark a chat as read ──────────────────────────────────────
   const markChatAsRead = useCallback((chatId) => {
     if (!chatId) return;
     const key = chatId.toString();
-    // Zero out locally immediately for instant badge update
     setUnreadMap(prev => {
+      if (prev[key] === 0) return prev; // already zero, skip re-render
       const next = { ...prev, [key]: 0 };
       recalcTotal(next);
       return next;
@@ -58,12 +62,11 @@ export const MessageProvider = ({ children }) => {
     chatService.markChatRead(key).catch(() => {});
   }, [recalcTotal]);
 
-  // ── Increment count when a real-time message arrives ────────
-  //   Called from Messaging.js (which has the socket listener)
+  // ── Increment when a real-time message arrives ───────────────
   const incrementUnread = useCallback((chatId) => {
     if (!chatId) return;
     const key = chatId.toString();
-    // If the incoming chat is the one the user has open, mark read immediately
+    // If the incoming chat is already open, mark read immediately
     if (activeChatIdRef.current && activeChatIdRef.current === key) {
       markChatAsRead(key);
       return;
@@ -75,17 +78,29 @@ export const MessageProvider = ({ children }) => {
     });
   }, [markChatAsRead, recalcTotal]);
 
-  // ── Let Messaging page register which chat is currently open ──
+  // ── Set/clear which chat is currently open ───────────────────
   const setActiveChatId = useCallback((chatId) => {
-    // Always store as string so comparison with socket-delivered IDs is consistent
     activeChatIdRef.current = chatId ? chatId.toString() : null;
   }, []);
+
+  // ── Global real-time listener for ALL pages ────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handleGlobalNewMessage = (newMessage) => {
+      const msgChatId = (newMessage.chatId?._id || newMessage.chatId)?.toString();
+      if (msgChatId) incrementUnread(msgChatId);
+    };
+    socket.on('message_received', handleGlobalNewMessage);
+    return () => {
+      socket.off('message_received', handleGlobalNewMessage);
+    };
+  }, [socket, incrementUnread]);
 
   return (
     <MessageContext.Provider
       value={{
-        unreadMap,
-        totalUnreadCount,
+        unreadMap,            // { chatId: unreadCount } — use this in ChatItem
+        totalUnreadCount,     // scalar for Navbar badge
         markChatAsRead,
         incrementUnread,
         setActiveChatId,

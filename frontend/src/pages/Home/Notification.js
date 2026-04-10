@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClipLoader } from 'react-spinners';
@@ -145,7 +146,9 @@ const NotifCard = ({ notif, onRead, onDelete, onClick }) => {
 /* ─── Main Notification Page ────────────────────────────────── */
 const Notification = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { notifications, unreadCount, notifLoaded, markOneRead, markAllRead, deleteNotif, clearAll } = useSocket();
+
 
   const [activeTab,   setActiveTab]   = useState('all');
   const [search,      setSearch]      = useState('');
@@ -155,14 +158,17 @@ const Notification = () => {
   const handleClick = useCallback((notif) => {
     markOneRead(notif._id);
     const { type, relatedId } = notif;
-    if (type === 'message')                    navigate('/messaging');
+    const uid = user?._id || user?.id;
+    if (type === 'message')                    navigate('/messages');
     else if (type === 'job' || type === 'job_alert')       navigate('/opportunities?tab=jobs');
     else if (type === 'event' || type === 'event_alert')   navigate('/opportunities?tab=events');
     else if (type === 'connection_request' || type === 'connection_accepted')
       navigate(relatedId ? `/profile/${relatedId}` : '/notifications');
     else if (type === 'admin_approval_needed') navigate('/admin/approvals');
-    else if (type === 'account_activated')     navigate('/alumni/home');
-  }, [navigate, markOneRead]);
+    else if (type === 'account_activated' && uid) navigate(`/alumni/home/${uid}`);
+    else if (type === 'mentorship')            navigate('/mentorship');
+  }, [navigate, markOneRead, user]);
+
 
   /* ── Filter + search ──────────────────────────────────────── */
   const filtered = useMemo(() => {

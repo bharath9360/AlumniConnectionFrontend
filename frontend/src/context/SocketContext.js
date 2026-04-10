@@ -73,8 +73,26 @@ export const SocketProvider = ({ children }) => {
       });
     });
 
+    // ── Online status: batch broadcast ────────────────────────────
+    // Emitted periodically by server with full list of online user IDs
     sock.on('online_users', (userIds) => {
       setOnlineUsers(Array.isArray(userIds) ? userIds : []);
+    });
+
+    // ── Online status: instant per-user events ────────────────────
+    // These fire immediately when a user connects/disconnects,
+    // giving zero-latency status updates without waiting for next batch
+    sock.on('user_joined', (userId) => {
+      if (!userId) return;
+      setOnlineUsers(prev => {
+        const uid = userId.toString();
+        return prev.includes(uid) ? prev : [...prev, uid];
+      });
+    });
+
+    sock.on('user_left', (userId) => {
+      if (!userId) return;
+      setOnlineUsers(prev => prev.filter(id => id !== userId.toString()));
     });
 
     sock.on('disconnect', () => setIsConnected(false));
