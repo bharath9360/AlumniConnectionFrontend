@@ -6,8 +6,11 @@ import {
   FiLock, FiUser, FiShield, FiServer,
   FiSave, FiEye, FiEyeOff, FiCheck, FiAlertTriangle,
   FiInfo, FiSearch, FiChevronLeft, FiChevronRight,
-  FiRefreshCw, FiToggleLeft, FiToggleRight,
+  FiRefreshCw, FiToggleLeft, FiToggleRight, FiFileText
 } from 'react-icons/fi';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
+import { legalService } from '../../services/api';
 
 /* ── Toast ─────────────────────────────────────────────────── */
 let _tid = 0;
@@ -529,13 +532,135 @@ const SystemConfigTab = ({ toast }) => {
 };
 
 /* ══════════════════════════════════════════════════════════════
+   TAB: LEGAL & SECURITY
+══════════════════════════════════════════════════════════════ */
+const LegalSettingsTab = ({ toast }) => {
+  const [docType, setDocType] = useState('privacy');
+  const [content, setContent] = useState('');
+  const [title, setTitle] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    legalService.getContent(docType)
+      .then(res => {
+        setContent(res.data.data.content);
+        setTitle(res.data.data.title);
+      })
+      .catch((err) => {
+        setContent('');
+        setTitle('');
+        toast(err.response?.data?.message || 'Failed to load content.', 'error');
+      })
+      .finally(() => setLoading(false));
+  }, [docType, toast]);
+
+  const handleSave = async () => {
+    if (!title) {
+      toast('Title is required.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      await legalService.updateContent(docType, { title, content });
+      toast('✅ Content saved successfully!', 'success');
+    } catch (err) {
+      toast(err.response?.data?.message || 'Save failed.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const quillModules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      ['link'],
+      ['clean']
+    ],
+  };
+
+  return (
+    <div>
+      <div className="am-settings-section-title">Legal & Security Pages</div>
+      <p style={{ fontSize: 13, color: '#888', marginBottom: 22, marginTop: -8 }}>
+        Manage public-facing compliance pages.
+      </p>
+
+      {/* Sub-tabs */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+        {[
+          { id: 'privacy', label: 'Privacy Policy' },
+          { id: 'terms', label: 'Terms & Conditions' },
+          { id: 'security', label: 'Security' }
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setDocType(t.id)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 20,
+              fontSize: 13,
+              fontWeight: docType === t.id ? 700 : 500,
+              background: docType === t.id ? '#c84022' : '#f0f0f0',
+              color: docType === t.id ? '#fff' : '#666',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}><ClipLoader color="#c84022" size={30} /></div>
+      ) : (
+        <>
+          <Field label="Page Title">
+            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Terms and Conditions" />
+          </Field>
+          
+          <Field label="Page Content (Rich Text)">
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1.5px solid #e8e8e8', background: '#fff' }}>
+              <ReactQuill 
+                theme="snow" 
+                value={content} 
+                onChange={setContent} 
+                modules={quillModules}
+                style={{ height: 350 }}
+              />
+            </div>
+            {/* Note: ReactQuill's toolbar adds vertical footprint, so 350 height might result in ~400 total. */}
+            <div style={{ height: 42 }}></div> 
+          </Field>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, background: 'linear-gradient(135deg,#c84022,#a6331a)', border: 'none', borderRadius: 10, padding: '11px 22px', cursor: 'pointer', fontSize: 13.5, color: '#fff', fontWeight: 700, boxShadow: '0 3px 14px rgba(200,64,34,0.35)' }}
+          >
+            {saving ? <ClipLoader size={14} color="#fff" /> : <FiSave size={14} />}
+            {saving ? 'Saving…' : 'Save Content'}
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════ */
 const TABS = [
-  { id: 'profile',  label: 'Profile',        icon: FiUser,    color: '#6366f1' },
-  { id: 'security', label: 'Security',        icon: FiLock,    color: '#c84022' },
-  { id: 'roles',    label: 'Role Manager',    icon: FiShield,  color: '#8b5cf6' },
-  { id: 'system',   label: 'System Config',   icon: FiServer,  color: '#10b981' },
+  { id: 'profile',  label: 'Profile',         icon: FiUser,       color: '#6366f1' },
+  { id: 'security', label: 'Security',        icon: FiLock,       color: '#c84022' },
+  { id: 'roles',    label: 'Role Manager',    icon: FiShield,     color: '#8b5cf6' },
+  { id: 'system',   label: 'System Config',   icon: FiServer,     color: '#10b981' },
+  { id: 'legal',    label: 'Legal & Privacy', icon: FiFileText,   color: '#f59e0b' },
 ];
 
 const AdminSettings = () => {
@@ -603,6 +728,7 @@ const AdminSettings = () => {
           {tab === 'security' && <SecurityTab toast={toast} />}
           {tab === 'roles'    && <RoleManagerTab toast={toast} currentUserId={user?._id || user?.id} />}
           {tab === 'system'   && <SystemConfigTab toast={toast} />}
+          {tab === 'legal'    && <LegalSettingsTab toast={toast} />}
         </div>
       </div>
 

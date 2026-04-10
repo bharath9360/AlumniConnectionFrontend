@@ -1,4 +1,5 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 // ─── Axios Instance ───────────────────────────────────────────
 const api = axios.create({
@@ -37,6 +38,9 @@ api.interceptors.response.use(
       } else {
         window.location.href = '/login/alumni';
       }
+    } else if (!error.response || error.code === 'ERR_NETWORK') {
+      // Part 11: Network Error Fallback
+      toast.error('Check your internet connection');
     }
     return Promise.reject(error);
   }
@@ -266,6 +270,12 @@ export const mentorshipService = {
   uploadChatImage:     (chatId, formData) => api.post(`/mentorship/chat/${chatId}/image`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+};
+
+// ─── Legal & Compliance Service ─────────────────────────────────
+export const legalService = {
+  getContent:    (type)       => api.get(`/legal/${type}`),
+  updateContent: (type, data) => api.post(`/legal/admin/${type}`, data),
 };
 
 export default api;

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/api';
+import toast from 'react-hot-toast';
+import { handleError } from '../../utils/errorHandler';
 import { ClipLoader } from 'react-spinners';
 import '../../styles/Auth.css';
 
@@ -23,7 +25,10 @@ const StudentLogin = () => {
       login(user, token);
       navigate(`/student/home/${user._id || user.id}`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      console.error(err);
+      const msg = handleError(err);
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
