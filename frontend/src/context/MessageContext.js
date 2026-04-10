@@ -16,7 +16,7 @@ export const useMessage = () => useContext(MessageContext);
 // ─────────────────────────────────────────────────────────────────
 export const MessageProvider = ({ children }) => {
   const { user }                           = useAuth();
-  const { socket }                         = useSocket() || {};
+  const { socket, isConnected }             = useSocket() || {};
   const [unreadMap,       setUnreadMap]    = useState({});   // { chatId: count } — per-chat unread
   const [totalUnreadCount, setTotalUnread] = useState(0);
   const activeChatIdRef                    = useRef(null);   // which chat the user has open
@@ -47,6 +47,22 @@ export const MessageProvider = ({ children }) => {
       setTotalUnread(0);
     }
   }, [user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Re-sync unread counts after reconnect ─────────────────────
+  // Catches messages missed while socket was disconnected.
+  const wasDisconnectedRef = useRef(false);
+  useEffect(() => {
+    if (!user) return;
+    if (!isConnected) {
+      wasDisconnectedRef.current = true;
+      return;
+    }
+    // isConnected just turned true — if we were previously disconnected, re-fetch
+    if (wasDisconnectedRef.current) {
+      wasDisconnectedRef.current = false;
+      fetchUnreadCounts();
+    }
+  }, [isConnected, user, fetchUnreadCounts]);
 
   // ── Mark a chat as read ──────────────────────────────────────
   const markChatAsRead = useCallback((chatId) => {

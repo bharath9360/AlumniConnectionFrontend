@@ -12,9 +12,11 @@ const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
 export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
   const socketRef              = useRef(null);
+  const reconnectTimeoutRef    = useRef(null);
   const [socket,        setSocket]       = useState(null);
   const [isConnected,   setIsConnected]  = useState(false);
   const [onlineUsers,   setOnlineUsers]  = useState([]);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
   // ── Shared notification state (single source of truth) ────────
   const [notifications, setNotifications] = useState([]);
@@ -38,33 +40,86 @@ export const SocketProvider = ({ children }) => {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
+        setSocket(null);
         setIsConnected(false);
         setOnlineUsers([]);
+        setReconnectAttempts(0);
       }
       setNotifications([]);
       setNotifLoaded(false);
       return;
     }
 
+    // ── Production-ready socket config ─────────────────────────
     const sock = io(SOCKET_URL, {
-      transports: ['websocket'],
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
+      transports: ['websocket', 'polling'],   // fallback for firewalls
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,                // start at 1s
+      reconnectionDelayMax: 5000,             // cap at 5s
+      timeout: 20000,                         // 20s connection timeout
+      autoConnect: true,
+      forceNew: false,
+      path: '/socket.io/',
+      withCredentials: true,
+      upgrade: true,                          // allow polling → websocket
+      rememberUpgrade: true,                  // skip polling on next connect
     });
 
     socketRef.current = sock;
     setSocket(sock);
 
+    // ── Connection success ────────────────────────────────────
     const doSetup = () => {
       sock.emit('setup', user);
       setIsConnected(true);
+      setReconnectAttempts(0);
     };
 
     sock.on('connect', doSetup);
     sock.on('connected', () => setIsConnected(true));
-    sock.on('reconnect', doSetup);
 
-    // Real-time notification push — prepend to shared list
+    // ── Disconnect handling ───────────────────────────────────
+    sock.on('disconnect', (reason) => {
+      setIsConnected(false);
+      // Server forcefully disconnected (deploy restart) — manual reconnect
+      if (reason === 'io server disconnect') {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          sock.connect();
+        }, 1000);
+      }
+    });
+
+    // ── Reconnection lifecycle ────────────────────────────────
+    sock.on('reconnect_attempt', (attemptNumber) => {
+      setReconnectAttempts(attemptNumber);
+    });
+
+    sock.on('reconnect', () => {
+      // Re-establish identity after reconnect
+      setIsConnected(true);
+      setReconnectAttempts(0);
+      sock.emit('setup', user);
+    });
+
+    sock.on('reconnect_failed', () => {
+      setIsConnected(false);
+    });
+
+    sock.on('connect_error', (err) => {
+      // Silently log — no aggressive UI spam
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Socket connection error:', err.message);
+      }
+      setIsConnected(false);
+    });
+
+    sock.on('error', (error) => {
+      console.error('Socket error:', error);
+    });
+
+    // ── Real-time notification push ───────────────────────────
     sock.on('notification_received', (notif) => {
       setNotifications(prev => {
         // Avoid duplicates (server might emit twice on reconnect)
@@ -73,15 +128,12 @@ export const SocketProvider = ({ children }) => {
       });
     });
 
-    // ── Online status: batch broadcast ────────────────────────────
-    // Emitted periodically by server with full list of online user IDs
+    // ── Online status: batch broadcast ────────────────────────
     sock.on('online_users', (userIds) => {
       setOnlineUsers(Array.isArray(userIds) ? userIds : []);
     });
 
-    // ── Online status: instant per-user events ────────────────────
-    // These fire immediately when a user connects/disconnects,
-    // giving zero-latency status updates without waiting for next batch
+    // ── Online status: instant per-user events ────────────────
     sock.on('user_joined', (userId) => {
       if (!userId) return;
       setOnlineUsers(prev => {
@@ -95,23 +147,34 @@ export const SocketProvider = ({ children }) => {
       setOnlineUsers(prev => prev.filter(id => id !== userId.toString()));
     });
 
-    sock.on('disconnect', () => setIsConnected(false));
-    sock.on('connect_error', (err) => {
-      console.warn('Socket connection error:', err.message);
-      setIsConnected(false);
-    });
-
     // Initial REST fetch + 60s polling fallback
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60_000);
 
+    // ── Cleanup ──────────────────────────────────────────────
     return () => {
       clearInterval(interval);
+      clearTimeout(reconnectTimeoutRef.current);
+
+      sock.off('connect');
+      sock.off('connected');
+      sock.off('disconnect');
+      sock.off('reconnect_attempt');
+      sock.off('reconnect');
+      sock.off('reconnect_failed');
+      sock.off('connect_error');
+      sock.off('error');
+      sock.off('notification_received');
+      sock.off('online_users');
+      sock.off('user_joined');
+      sock.off('user_left');
+
       sock.disconnect();
       socketRef.current = null;
       setSocket(null);
       setIsConnected(false);
       setOnlineUsers([]);
+      setReconnectAttempts(0);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id]);
@@ -162,6 +225,7 @@ export const SocketProvider = ({ children }) => {
         isConnected,
         onlineUsers,
         isOnline,
+        reconnectAttempts,
         // Shared notification state
         notifications,
         unreadCount,

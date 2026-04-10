@@ -1129,3 +1129,47 @@
   .msg-messages { padding: 12px 10px; }
   .msg-bubble { max-width: min(85%, 320px); }
 }
+
+/* ── Connection Status Banner ─────────────────────────────── */
+.connection-status-banner {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #c8102e 0%, #a00d24 100%);
+  color: white;
+  padding: 10px 24px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(200, 16, 46, 0.35);
+  animation: connectionSlideDown 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.connection-status-banner i {
+  font-size: 15px;
+  animation: connectionPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes connectionSlideDown {
+  from { top: -50px; opacity: 0; }
+  to   { top: 70px;  opacity: 1; }
+}
+
+@keyframes connectionPulse {
+  0%, 100% { opacity: 1;   }
+  50%      { opacity: 0.45; }
+}
+
+@media (max-width: 768px) {
+  .connection-status-banner {
+    top: 60px;
+    font-size: 13px;
+    padding: 8px 18px;
+  }
+}

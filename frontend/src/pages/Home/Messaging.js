@@ -20,8 +20,8 @@ import '../../styles/Messaging.css';
 const Messaging = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  // ── Pull shared socket + online users (updates cause instant status sync) ──
-  const { socket: contextSocket, onlineUsers } = useSocket();
+  // ── Pull shared socket + online users + connection status ──
+  const { socket: contextSocket, onlineUsers, isConnected, reconnectAttempts } = useSocket();
   // ── Use MessageContext as single source for unread counts ───────────────────
   const { unreadMap, markChatAsRead, incrementUnread, setActiveChatId } = useMessage();
 
@@ -434,6 +434,15 @@ const Messaging = () => {
 
   return (
     <div className="msg-viewport">
+      {/* ── Connection status banner (WhatsApp-style) ── */}
+      {!isConnected && (
+        <div className="connection-status-banner">
+          <i className="fas fa-exclamation-triangle" />
+          {reconnectAttempts > 0
+            ? `Reconnecting... (${reconnectAttempts}/10)`
+            : 'Connecting to chat server...'}
+        </div>
+      )}
       <div className="msg-shell">
 
         {/* ─── LEFT: Chat Sidebar ─── */}

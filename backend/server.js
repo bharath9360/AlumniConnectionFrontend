@@ -57,11 +57,39 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, 'uploads')));
 
-// ─── Socket.io Setup ──────────────────────────────────────────
+// ─── Socket.io Setup (Production-Ready) ──────────────────────
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
+    methods: ["GET", "POST"]
+  },
+  // Transport: try WebSocket first, fall back to polling (Render/firewalls)
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,        // 60s before declaring a client dead
+  pingInterval: 25000,       // heartbeat every 25s
+  upgradeTimeout: 30000,     // 30s to upgrade polling → websocket
+  connectTimeout: 45000,     // 45s initial connection timeout
+  allowUpgrades: true,       // allow polling → websocket upgrade
+  perMessageDeflate: false,  // disable compression (CPU vs bandwidth trade-off)
+  httpCompression: true,
+  maxHttpBufferSize: 1e6,    // 1MB max message size
+  allowEIO3: true,           // backward compat with older clients
+  path: '/socket.io/',
+  // Origin allowlist
+  allowRequest: (req, callback) => {
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      'http://localhost:3000',
+      'http://localhost:5000'
+    ].filter(Boolean);
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`❌ Blocked socket from unknown origin: ${origin}`);
+      callback('Origin not allowed', false);
+    }
   }
 });
 
@@ -84,13 +112,18 @@ const isUserActiveInChat = (userId, chatId) => {
 // Expose to route handlers via app
 app.set('isUserActiveInChat', isUserActiveInChat);
 
-/** Broadcast the current list of unique online user IDs to every client */
+/** Broadcast the current list of unique online user IDs to every client.
+ *  Debounced at 500ms to prevent event spam during rapid connect/disconnect bursts. */
+let broadcastTimeout;
 const broadcastOnlineUsers = () => {
-  const uniqueIds = [...new Set(onlineUsers.values())];
-  io.emit('online_users', uniqueIds);
-  if (process.env.NODE_ENV !== 'test') {
-    console.log(`📊 Online users: ${uniqueIds.length}`);
-  }
+  clearTimeout(broadcastTimeout);
+  broadcastTimeout = setTimeout(() => {
+    const uniqueIds = [...new Set(onlineUsers.values())];
+    io.emit('online_users', uniqueIds);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`📊 Online users: ${uniqueIds.length}`);
+    }
+  }, 500);
 };
 
 io.on('connection', (socket) => {
@@ -173,7 +206,7 @@ io.on('connection', (socket) => {
   socket.on('stop_typing', (room) => socket.in(room).emit('stop_typing'));
 
   // Clean up presence and active chat tracking on disconnect
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
     const userId = onlineUsers.get(socket.id);
     if (userId) {
       onlineUsers.delete(socket.id);
@@ -181,14 +214,25 @@ io.on('connection', (socket) => {
       const stillOnline = [...onlineUsers.values()].includes(userId);
       if (!stillOnline) {
         activeChats.delete(userId);
-        // ── Instant zero-latency notification ──
         io.emit('user_left', userId);
       }
     }
     broadcastOnlineUsers();
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`❌ Socket ${socket.id} disconnected (${reason})${userId ? ` — user ${userId}` : ''}`);
+    }
+  });
+
+  // Per-socket error handler
+  socket.on('error', (error) => {
+    console.error(`❌ Socket error (${socket.id}):`, error.message || error);
   });
 });
 
+// Engine-level transport errors (upgrade failures, bad handshakes)
+io.engine.on('connection_error', (err) => {
+  console.error('❌ Socket.IO engine error:', { code: err.code, message: err.message });
+});
 
 // ─── Routes (must come AFTER io is attached to app) ──────────
 app.use('/api/auth',         authLimiter, require('./routes/auth'));
