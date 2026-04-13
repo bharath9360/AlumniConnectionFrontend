@@ -80,12 +80,22 @@ const userSchema = new mongoose.Schema({
 
   // Legacy field removed: connections collection is used now
 
+  // Staff-specific
+  staffRole: { type: String, trim: true }, // e.g. Principal, HOD, Professor
+
   // Account status
   status: {
     type: String,
     enum: ['Pending', 'Active'],
     default: 'Active'
   },
+  needsPasswordChange: {
+    type: Boolean,
+    default: false
+  },
+  // Bulk-import only: stores the plain-text temp password shown in the credentials email.
+  // Cleared to null once user activates (sets their own password).
+  tempPassword: { type: String, select: false, default: null },
 
   // Session tracking (used for "active users" analytics)
   lastLogin: { type: Date, default: null },

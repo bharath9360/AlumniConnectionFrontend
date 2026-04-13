@@ -9,21 +9,30 @@ const AlumniLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]       = useState('');
+  const [pendingApproval, setPendingApproval] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setPendingApproval(false);
     setLoading(true);
     try {
       const res = await authService.login(email, password, 'alumni');
       const { user, token } = res.data;
       login(user, token);
-      navigate(`/alumni/home/${user._id || user.id}`);
+      if (user.status !== 'Pending') {
+        navigate(`/alumni/home/${user._id || user.id}`);
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      const data = err.response?.data;
+      if (data?.pendingApproval) {
+        setPendingApproval(true);
+      } else {
+        setError(data?.message || 'Login failed. Please check your credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -38,6 +47,14 @@ const AlumniLogin = () => {
           <h2 className="login-title">Alumni Login</h2>
         </div>
 
+        {pendingApproval && (
+          <div className="alert py-2 small mb-3" role="alert"
+            style={{ background: '#fff8e1', border: '1px solid #ffc107', color: '#856404', borderRadius: 8 }}>
+            <i className="fas fa-clock me-2"></i>
+            <strong>Pending Approval.</strong> Your account is awaiting admin review.
+            You'll receive an email once it's activated.
+          </div>
+        )}
         {error && (
           <div className="alert alert-danger py-2 small mb-3" role="alert">
             <i className="fas fa-exclamation-circle me-2"></i>{error}

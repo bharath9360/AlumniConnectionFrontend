@@ -182,7 +182,7 @@ io.on('connection', (socket) => {
       const chatId = (chat._id || chat)?.toString();
 
       // Always deliver the message event
-      socket.in(participantId).emit('message_received', newMessageReceived);
+      socket.in(participantId).emit('newMessage', newMessageReceived);
 
       // Only send notification bubble if the recipient is NOT currently viewing the chat
       const isActive = isUserActiveInChat(participantId, chatId);

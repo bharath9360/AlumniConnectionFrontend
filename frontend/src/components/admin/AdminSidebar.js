@@ -20,6 +20,7 @@ const NAV_ITEMS = [
     items: [
       { label: 'Alumni',       icon: FiUserCheck,  to: '/admin/alumni' },
       { label: 'Students',     icon: FiUsers,      to: '/admin/students' },
+      { label: 'Staff',        icon: FiUsers,      to: '/admin/staff' },
       { label: 'Groups',       icon: FiUsers,      to: '/admin/groups' },
       { label: 'Approvals',    icon: FiShield,     to: '/admin/approvals', badgeKey: 'pendingApprovals' },
       { label: 'Bulk Import',  icon: FiUploadCloud,to: '/admin/import' },

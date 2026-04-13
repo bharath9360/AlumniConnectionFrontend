@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useSocket } from '../../context/SocketContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
 import '../../styles/Navbar.css';
 
@@ -10,7 +10,7 @@ const BottomNav = () => {
     const path = location.pathname;
     const { user } = useAuth();
 
-    const { unreadCount } = useSocket();                    // bell badge (notifications)
+    const { unreadCount = 0 } = useNotifications();                    // bell badge (notifications)
 
     const isLandingPage = path === '/';
     const isAuthPage = path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/signup');

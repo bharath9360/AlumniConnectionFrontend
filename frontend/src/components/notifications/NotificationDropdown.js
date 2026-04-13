@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useSocket } from '../../context/SocketContext';
+import { useNotifications } from '../../context/NotificationContext';
 import {
   FaBell, FaCheck, FaUserPlus, FaCommentDots, FaBriefcase,
   FaCalendarAlt, FaNewspaper, FaShieldAlt, FaTrashAlt,
@@ -81,7 +81,7 @@ const NotificationDropdown = () => {
   const dropdownRef = useRef(null);
   const navigate    = useNavigate();
 
-  const { notifications, unreadCount, markOneRead, markAllRead, deleteNotif } = useSocket();
+  const { notifications = [], unreadCount, markOneRead, markAllRead, deleteNotif } = useNotifications();
 
   // ── Detect new incoming notification → show toast (skip message type — handled by chat sidebar) ──
   useEffect(() => {

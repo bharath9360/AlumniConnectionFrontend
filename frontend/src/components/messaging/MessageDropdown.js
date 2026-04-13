@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth }   from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { chatService } from '../../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaCommentDots } from 'react-icons/fa';
@@ -63,7 +64,7 @@ const MessageDropdown = () => {
   const dropRef  = useRef(null);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { unreadMessageCount = 0 } = useSocket();
+  const { unreadMessageCount = 0 } = useNotifications();
 
   const currentUserId = user?._id || user?.id;
 

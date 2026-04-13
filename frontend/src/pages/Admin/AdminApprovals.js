@@ -5,7 +5,7 @@ import { ClipLoader } from 'react-spinners';
 import {
   FiCheck, FiX, FiUser, FiBriefcase, FiCalendar,
   FiRefreshCw, FiAlertTriangle, FiInfo, FiMail,
-  FiMapPin, FiTag, FiUsers,
+  FiMapPin, FiTag, FiUsers, FiShield,
 } from 'react-icons/fi';
 
 /* ── Inline toast (matches all other admin panels) ──────────── */
@@ -68,6 +68,37 @@ const AlumniCard = ({ u, actionId, onApprove, onReject }) => (
         {u.presentStatus && <span>💼 {u.presentStatus}</span>}
       </div>
       {u.company && <div style={{ fontSize: 11.5, color: '#aaa', marginTop: 2 }}>@ {u.company}{u.designation ? ` · ${u.designation}` : ''}</div>}
+    </div>
+    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+      <ActionBtn onClick={onApprove} disabled={actionId === u._id} variant="approve">
+        {actionId === u._id ? <ClipLoader size={12} color="#059669" /> : <FiCheck size={13} />}
+        Approve
+      </ActionBtn>
+      <ActionBtn onClick={onReject} disabled={actionId === u._id} variant="reject">
+        <FiX size={13} /> Reject
+      </ActionBtn>
+    </div>
+  </div>
+);
+
+/* ── Staff Card ─────────────────────────────────────────────── */
+const StaffCard = ({ u, actionId, onApprove, onReject }) => (
+  <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #f0f0f0', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14, opacity: actionId === u._id ? 0.65 : 1, transition: 'opacity 0.2s', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+    <div style={{ width: 46, height: 46, borderRadius: '50%', background: ac(u.name || ''), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 17, flexShrink: 0, overflow: 'hidden' }}>
+      {u.profilePic ? <img src={u.profilePic} alt={u.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (u.name || '?')[0].toUpperCase()}
+    </div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontWeight: 800, fontSize: 14, color: '#1a1a2e', marginBottom: 3 }}>
+        {u.name}
+        <span style={{ marginLeft: 8, background: 'rgba(99,102,241,0.1)', color: '#6366f1', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
+          {u.staffRole || u.designation || 'Staff'}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12, color: '#888' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FiMail size={11} />{u.email}</span>
+        {u.department && <span>🏛 {u.department}</span>}
+        {u.createdAt && <span>📅 Registered {new Date(u.createdAt).toLocaleDateString()}</span>}
+      </div>
     </div>
     <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
       <ActionBtn onClick={onApprove} disabled={actionId === u._id} variant="approve">
@@ -149,6 +180,7 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
   const [pendingAlumni, setPendingAlumni] = useState([]);
   const [pendingJobs,   setPendingJobs]   = useState([]);
   const [pendingEvents, setPendingEvents] = useState([]);
+  const [pendingStaff,  setPendingStaff]  = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [actionId,      setActionId]      = useState(null);
   const { toasts, add: toast } = useToast();
@@ -156,14 +188,16 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, j, e] = await Promise.all([
+      const [a, j, e, s] = await Promise.all([
         adminService.getPendingAlumni(),
         jobService.getPendingJobs().catch(() => ({ data: { data: [] } })),
         eventService.getPendingEvents().catch(() => ({ data: { data: [] } })),
+        adminService.getPendingStaff().catch(() => ({ data: { data: [] } })),
       ]);
       setPendingAlumni(a.data?.data || a.data || []);
       setPendingJobs(j.data?.data   || j.data || []);
       setPendingEvents(e.data?.data || e.data || []);
+      setPendingStaff(s.data?.data  || s.data || []);
     } catch (err) {
       toast('Failed to load pending approvals.', 'error');
     } finally { setLoading(false); }
@@ -192,6 +226,29 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
       toast('Application rejected.', 'success');
     } catch (err) {
       toast('Failed to reject.', 'error');
+    } finally { setActionId(null); }
+  };
+
+  /* Staff actions */
+  const handleApproveStaff = async (userId) => {
+    setActionId(userId);
+    try {
+      await adminService.approveStaff(userId);
+      setPendingStaff(prev => prev.filter(u => u._id !== userId));
+      toast('✅ Staff account approved! Email sent.', 'success');
+    } catch (err) {
+      toast(err.response?.data?.message || 'Failed to approve staff.', 'error');
+    } finally { setActionId(null); }
+  };
+
+  const handleRejectStaff = async (userId) => {
+    setActionId(userId);
+    try {
+      await adminService.rejectStaff(userId);
+      setPendingStaff(prev => prev.filter(u => u._id !== userId));
+      toast('Staff registration rejected.', 'success');
+    } catch (err) {
+      toast('Failed to reject staff.', 'error');
     } finally { setActionId(null); }
   };
 
@@ -237,11 +294,12 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
     finally { setActionId(null); }
   };
 
-  const totalPending = pendingAlumni.length + pendingJobs.length + pendingEvents.length;
+  const totalPending = pendingAlumni.length + pendingJobs.length + pendingEvents.length + pendingStaff.length;
 
   const TABS = [
     { key: 'alumni',  label: 'Alumni',  icon: FiUser,      count: pendingAlumni.length, color: '#c84022' },
-    { key: 'jobs',    label: 'Jobs',    icon: FiBriefcase, count: pendingJobs.length,   color: '#6366f1' },
+    { key: 'staff',   label: 'Staff',   icon: FiShield,    count: pendingStaff.length,  color: '#6366f1' },
+    { key: 'jobs',    label: 'Jobs',    icon: FiBriefcase, count: pendingJobs.length,   color: '#f59e0b' },
     { key: 'events',  label: 'Events',  icon: FiCalendar,  count: pendingEvents.length, color: '#10b981' },
   ];
 
@@ -299,6 +357,18 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
                   <AlumniCard key={u._id} u={u} actionId={actionId}
                     onApprove={() => handleActivate(u._id)}
                     onReject={() => handleRejectAlumni(u._id)}
+                  />
+                ))
+          )}
+
+          {/* STAFF */}
+          {activeTab === 'staff' && (
+            pendingStaff.length === 0
+              ? <Empty icon="🏫" msg="No pending staff registration requests." />
+              : pendingStaff.map(u => (
+                  <StaffCard key={u._id} u={u} actionId={actionId}
+                    onApprove={() => handleApproveStaff(u._id)}
+                    onReject={() => handleRejectStaff(u._id)}
                   />
                 ))
           )}

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import { useMessage } from '../../context/MessageContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { navigationConfig, getUserRoleKey } from '../../config/navigationConfig';
 import NotificationDropdown from '../notifications/NotificationDropdown';
 import { FaSignOutAlt, FaCommentDots, FaBars, FaTimes } from 'react-icons/fa';
@@ -55,7 +55,7 @@ const Navbar = () => {
   const navigate  = useNavigate();
   const { user, userRole, logout } = useAuth();
   useSocket(); // keep socket alive — unreadCount for bell still used by NotificationDropdown internally
-  const { totalUnreadCount = 0 } = useMessage();
+  const { unreadMessageCount } = useNotifications();
   const roleKey   = getUserRoleKey(user);
 
   // used for the pre‑login mobile menu
@@ -196,12 +196,12 @@ const Navbar = () => {
                 >
                   <div className="position-relative">
                     {Icon && <Icon size={18} className="mb-1" />}
-                    {item.isMessaging && totalUnreadCount > 0 && (
+                    {item.isMessaging && unreadMessageCount > 0 && (
                       <span
                         className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
                         style={{ fontSize: '0.5rem', padding: '0.2em 0.4em', minWidth: 14, lineHeight: 1.4, fontWeight: 700 }}
                       >
-                        {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
+                        {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
                       </span>
                     )}
                   </div>
@@ -239,12 +239,12 @@ const Navbar = () => {
               aria-label="Messages"
             >
               <FaCommentDots size={22} />
-              {totalUnreadCount > 0 && (
+              {unreadMessageCount > 0 && (
                 <span
                   className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
                   style={{ fontSize: '0.5rem', padding: '0.2em 0.4em', minWidth: 14, lineHeight: 1.4, fontWeight: 700 }}
                 >
-                  {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
+                  {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
                 </span>
               )}
             </Link>

@@ -7,49 +7,45 @@ const MessageContext = createContext(null);
 
 export const useMessage = () => useContext(MessageContext);
 
-// ─────────────────────────────────────────────────────────────────
-// MessageProvider — Single source of truth for unread message counts.
-//
-// KEY DESIGN: Messaging.js reads unreadMap directly from this context
-// instead of maintaining its own local unreadCounts state.
-// This eliminates the count mismatch between sidebar badge and chat list.
-// ─────────────────────────────────────────────────────────────────
 export const MessageProvider = ({ children }) => {
-  const { user }                           = useAuth();
-  const { socket, isConnected }             = useSocket() || {};
-  const [unreadMap,       setUnreadMap]    = useState({});   // { chatId: count } — per-chat unread
-  const [totalUnreadCount, setTotalUnread] = useState(0);
-  const activeChatIdRef                    = useRef(null);   // which chat the user has open
+  const { user } = useAuth();
+  const { socket, isConnected } = useSocket() || {};
+  
+  // STEP 4: UNREAD COUNT LOGIC - Maintain array of unread messages
+  const [unreadMessages, setUnreadMessages] = useState([]);
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const activeChatIdRef = useRef(null);
 
-  // ── Derive total whenever map changes ────────────────────────
-  const recalcTotal = useCallback((map) => {
-    const total = Object.values(map).reduce((sum, n) => sum + (n || 0), 0);
-    setTotalUnread(total);
-  }, []);
+  // STEP 4: count messages where receiverId === currentUser AND read === false
+  // (In our schema: senderId != currentUser._id & not marked read)
+  const updateUnreadCount = useCallback((messages) => {
+    if (!user) return;
+    const count = messages.filter(msg => {
+      const senderId = msg.senderId?._id || msg.senderId;
+      return senderId !== user._id && !msg.isRead;
+    }).length;
+    setTotalUnreadCount(count);
+  }, [user]);
 
-  // ── Fetch from REST: GET /api/chat/unread-count ──────────────
-  const fetchUnreadCounts = useCallback(async () => {
+  // Fetch initial unread messages
+  const fetchUnreadMessages = useCallback(async () => {
     if (!user) return;
     try {
-      const { data } = await chatService.getUnreadCounts();
-      const map = data.data || {};
-      setUnreadMap(map);
-      recalcTotal(map);
+      const { data } = await chatService.getUnreadMessages();
+      setUnreadMessages(data.data || []);
+      updateUnreadCount(data.data || []);
     } catch (_) { /* silent */ }
-  }, [user, recalcTotal]);
+  }, [user, updateUnreadCount]);
 
-  // Fetch on login; clear on logout
   useEffect(() => {
     if (user) {
-      fetchUnreadCounts();
+      fetchUnreadMessages();
     } else {
-      setUnreadMap({});
-      setTotalUnread(0);
+      setUnreadMessages([]);
+      setTotalUnreadCount(0);
     }
   }, [user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Re-sync unread counts after reconnect ─────────────────────
-  // Catches messages missed while socket was disconnected.
   const wasDisconnectedRef = useRef(false);
   useEffect(() => {
     if (!user) return;
@@ -57,70 +53,75 @@ export const MessageProvider = ({ children }) => {
       wasDisconnectedRef.current = true;
       return;
     }
-    // isConnected just turned true — if we were previously disconnected, re-fetch
     if (wasDisconnectedRef.current) {
       wasDisconnectedRef.current = false;
-      fetchUnreadCounts();
+      fetchUnreadMessages();
     }
-  }, [isConnected, user, fetchUnreadCounts]);
+  }, [isConnected, user, fetchUnreadMessages]);
 
-  // ── Mark a chat as read ──────────────────────────────────────
+  // STEP 5: ON CHAT OPEN mark messages as read
   const markChatAsRead = useCallback((chatId) => {
     if (!chatId) return;
     const key = chatId.toString();
-    setUnreadMap(prev => {
-      if (prev[key] === 0) return prev; // already zero, skip re-render
-      const next = { ...prev, [key]: 0 };
-      recalcTotal(next);
+    setUnreadMessages(prev => {
+      const next = prev.filter(msg => {
+        const msgChatId = msg.chatId?._id || msg.chatId;
+        return msgChatId?.toString() !== key;
+      });
+      updateUnreadCount(next);
       return next;
     });
-    // Persist on server (fire-and-forget)
     chatService.markChatRead(key).catch(() => {});
-  }, [recalcTotal]);
+  }, [updateUnreadCount]);
 
-  // ── Increment when a real-time message arrives ───────────────
-  const incrementUnread = useCallback((chatId) => {
-    if (!chatId) return;
-    const key = chatId.toString();
-    // If the incoming chat is already open, mark read immediately
-    if (activeChatIdRef.current && activeChatIdRef.current === key) {
-      markChatAsRead(key);
-      return;
-    }
-    setUnreadMap(prev => {
-      const next = { ...prev, [key]: (prev[key] || 0) + 1 };
-      recalcTotal(next);
-      return next;
-    });
-  }, [markChatAsRead, recalcTotal]);
-
-  // ── Set/clear which chat is currently open ───────────────────
   const setActiveChatId = useCallback((chatId) => {
     activeChatIdRef.current = chatId ? chatId.toString() : null;
-  }, []);
+    if (chatId) {
+      markChatAsRead(chatId);
+    }
+  }, [markChatAsRead]);
 
-  // ── Global real-time listener for ALL pages ────────────────────
+  // STEP 3: FRONTEND SOCKET
   useEffect(() => {
     if (!socket) return;
-    const handleGlobalNewMessage = (newMessage) => {
-      const msgChatId = (newMessage.chatId?._id || newMessage.chatId)?.toString();
-      if (msgChatId) incrementUnread(msgChatId);
+    const handleNewMessage = (msg) => {
+      const msgChatId = (msg.chatId?._id || msg.chatId)?.toString();
+      if (activeChatIdRef.current && activeChatIdRef.current === msgChatId) {
+        // Chat is open, mark as read instantly
+        markChatAsRead(msgChatId);
+        return;
+      }
+      setUnreadMessages(prev => {
+        const next = [...prev, msg];
+        updateUnreadCount(next);
+        return next;
+      });
     };
-    socket.on('message_received', handleGlobalNewMessage);
+    
+    // Listen to "newMessage" as requested in STEP 3
+    socket.on('newMessage', handleNewMessage);
     return () => {
-      socket.off('message_received', handleGlobalNewMessage);
+      socket.off('newMessage', handleNewMessage);
     };
-  }, [socket, incrementUnread]);
+  }, [socket, markChatAsRead, updateUnreadCount]);
+
+  // Make unreadMap locally computed for backward compatibility in UI (optional)
+  const unreadMap = {};
+  unreadMessages.forEach(msg => {
+    const cid = (msg.chatId?._id || msg.chatId)?.toString();
+    if (cid && (msg.senderId?._id || msg.senderId) !== user?._id && !msg.isRead) {
+      unreadMap[cid] = (unreadMap[cid] || 0) + 1;
+    }
+  });
 
   return (
     <MessageContext.Provider
       value={{
-        unreadMap,            // { chatId: unreadCount } — use this in ChatItem
-        totalUnreadCount,     // scalar for Navbar badge
+        unreadMap,
+        totalUnreadCount,
         markChatAsRead,
-        incrementUnread,
         setActiveChatId,
-        fetchUnreadCounts,
+        fetchUnreadCounts: fetchUnreadMessages,
       }}
     >
       {children}

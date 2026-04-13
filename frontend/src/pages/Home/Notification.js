@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useSocket } from '../../context/SocketContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClipLoader } from 'react-spinners';
 import {
@@ -147,7 +147,7 @@ const NotifCard = ({ notif, onRead, onDelete, onClick }) => {
 const Notification = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { notifications, unreadCount, notifLoaded, markOneRead, markAllRead, deleteNotif, clearAll } = useSocket();
+  const { notifications = [], unreadCount, notifLoaded, markOneRead, markAllRead, deleteNotif, clearAll } = useNotifications();
 
 
   const [activeTab,   setActiveTab]   = useState('all');
