@@ -10,8 +10,10 @@ const {
 } = require('../middleware/auth');
 const {
   sendApprovalEmail,
-  sendBroadcastEmail
+  sendBroadcastEmail,
+  sendCredentialsEmail
 } = require('../services/emailService');
+const ImportLog = require('../models/ImportLog');
 const {
   runGraduationJob,
   promoteStudentToAlumni
@@ -246,6 +248,7 @@ router.post('/students/bulk-import', protect, authorize('admin'), upload.single(
     skipped: 0,
     errors: []
   };
+  const createdInBatch = []; // track created users to send emails
   for (const row of rows) {
     const name = (row['Name'] || row['name'] || '').toString().trim();
     const email = (row['Email'] || row['email'] || '').toString().trim().toLowerCase();
@@ -276,6 +279,7 @@ router.post('/students/bulk-import', protect, authorize('admin'), upload.single(
         name,
         email,
         password: hashed,
+        tempPassword: rawPass,   // store temp password for activation flow
         phone,
         department: dept,
         batch,
@@ -283,20 +287,32 @@ router.post('/students/bulk-import', protect, authorize('admin'), upload.single(
         rollNumber: roll,
         gender: gen,
         role: 'student',
-        status: 'Active'
+        status: 'Pending',
+        needsPasswordChange: true,
       });
       results.created++;
+      createdInBatch.push({ name, email, rawPass, role: 'student' });
     } catch (e) {
-      results.errors.push({
-        row: email,
-        reason: e.message
-      });
+      results.errors.push({ row: email, reason: e.message });
+    }
+  }
+
+  // Send ONE credentials email per new user
+  const emailStats = { sent: 0, failed: 0 };
+  for (const u of createdInBatch) {
+    try {
+      await sendCredentialsEmail(u.email, u.name, u.rawPass, u.role);
+      emailStats.sent++;
+    } catch (emailErr) {
+      console.error(`[BulkImport] Email failed for ${u.email}:`, emailErr.message);
+      emailStats.failed++;
     }
   }
   res.json({
     success: true,
-    message: `Import complete: ${results.created} created, ${results.skipped} skipped (duplicates), ${results.errors.length} errors.`,
-    results
+    message: `Import complete: ${results.created} created, ${results.skipped} skipped (duplicates), ${results.errors.length} errors. ${emailStats.sent} credential email${emailStats.sent !== 1 ? 's' : ''} sent.`,
+    results,
+    emailStats
   });
 }));
 
@@ -320,10 +336,11 @@ router.post('/alumni/bulk-import', protect, authorize('admin'), upload.single('f
     skipped: 0,
     errors: []
   };
+  const createdInBatch = []; // track created users to send emails
   for (const row of rows) {
-    const name = (row['Name'] || row['name'] || '').toString().trim();
+    const name  = (row['Name']  || row['name']  || '').toString().trim();
     const email = (row['Email'] || row['email'] || '').toString().trim().toLowerCase();
-    const dept = (row['Department'] || row['department'] || '').toString().trim();
+    const dept  = (row['Department'] || row['department'] || '').toString().trim();
     const batch = (row['Batch'] || row['batch'] || row['Pass Out Year'] || row['Year'] || row['year'] || '').toString().trim();
     const comp = (row['Company'] || row['company'] || '').toString().trim();
     const desig = (row['Designation'] || row['designation'] || '').toString().trim();
@@ -346,10 +363,11 @@ router.post('/alumni/bulk-import', protect, authorize('admin'), upload.single('f
     try {
       const rawPass = email.split('@')[0];
       const hashed = await bcrypt.hash(rawPass, 10);
-      const alumni = await User.create({
+      await User.create({
         name,
         email,
         password: hashed,
+        tempPassword: rawPass,   // store temp password for activation flow
         phone,
         gender: gen,
         department: dept,
@@ -357,75 +375,81 @@ router.post('/alumni/bulk-import', protect, authorize('admin'), upload.single('f
         company: comp,
         designation: desig,
         role: 'alumni',
-        status: 'Pending'
+        status: 'Pending',
+        needsPasswordChange: true,
       });
-      // Notify admin-side (no user notification needed at import)
       results.created++;
+      createdInBatch.push({ name, email, rawPass, role: 'alumni' });
     } catch (e) {
-      results.errors.push({
-        row: email,
-        reason: e.message
-      });
+      results.errors.push({ row: email, reason: e.message });
+    }
+  }
+
+  // Send ONE credentials email per new user (FLOW 2)
+  const emailStats = { sent: 0, failed: 0 };
+  for (const u of createdInBatch) {
+    try {
+      await sendCredentialsEmail(u.email, u.name, u.rawPass, u.role);
+      emailStats.sent++;
+    } catch (emailErr) {
+      console.error(`[BulkImport] Email failed for ${u.email}:`, emailErr.message);
+      emailStats.failed++;
     }
   }
   res.json({
     success: true,
-    message: `Import complete: ${results.created} created, ${results.skipped} skipped (duplicates), ${results.errors.length} errors.`,
-    results
+    message: `Import complete: ${results.created} created, ${results.skipped} skipped (duplicates), ${results.errors.length} errors. ${emailStats.sent} credential email${emailStats.sent !== 1 ? 's' : ''} sent.`,
+    results,
+    emailStats
   });
 }));
 
 // ─── POST /api/admin/import ───────────────────────────────────
-// Unified import endpoint — role determined by ?type=student|alumni
+// Unified import endpoint — role determined by ?type=student|alumni|staff
 // Supports dry-run mode: ?preview=true → validates & returns rows without writing to DB
+// On full import: creates accounts with status=Pending, sends credentials email to each new user.
 router.post('/import', protect, authorize('admin'), upload.single('file'), asyncHandler(async (req, res, next) => {
   const {
     type = 'student',
     preview = 'false'
   } = req.query;
   const isDryRun = preview === 'true';
-  if (!req.file) return res.status(400).json({
-    message: 'No file uploaded.'
-  });
-  if (!['student', 'alumni'].includes(type)) {
-    return res.status(400).json({
-      message: 'type must be "student" or "alumni".'
-    });
+  if (!req.file) return res.status(400).json({ message: 'No file uploaded.' });
+  if (!['student', 'alumni', 'staff'].includes(type)) {
+    return res.status(400).json({ message: 'type must be "student", "alumni", or "staff".' });
   }
-  const workbook = XLSX.read(req.file.buffer, {
-    type: 'buffer'
-  });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const raw = XLSX.utils.sheet_to_json(sheet, {
-    defval: ''
-  });
-  if (!raw.length) return res.status(400).json({
-    message: 'File is empty or has no rows.'
-  });
 
-  // ── Normalise each row ──────────────────────────────────
+  const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  if (!raw.length) return res.status(400).json({ message: 'File is empty or has no rows.' });
+
+  // ── Normalise each row ──────────────────────────────────────
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const normalised = raw.map((row, idx) => {
-    const name = (row['Name'] || row['name'] || '').toString().trim();
+    const name  = (row['Name']  || row['name']  || '').toString().trim();
     const email = (row['Email'] || row['email'] || '').toString().trim().toLowerCase();
-    const dept = (row['Department'] || row['department'] || '').toString().trim();
-    const year = (row['Year'] || row['year'] || (type === 'student' ? row['Batch'] || row['batch'] || row['Join Year'] || '' : row['Batch'] || row['batch'] || row['Pass Out Year'] || '')).toString().trim();
+    const dept  = (row['Department'] || row['department'] || '').toString().trim();
+    const year  = (row['Year'] || row['year'] ||
+      (type === 'student'
+        ? row['Batch'] || row['batch'] || row['Join Year']     || ''
+        : row['Batch'] || row['batch'] || row['Pass Out Year'] || '')
+    ).toString().trim();
     const gradY = (row['Graduation Year'] || row['graduationYear'] || row['Expected Graduation'] || '').toString().trim();
-    const roll = (row['Roll Number'] || row['rollNumber'] || row['Roll'] || '').toString().trim();
-    const comp = (row['Company'] || row['company'] || '').toString().trim();
-    const desig = (row['Designation'] || row['designation'] || '').toString().trim();
+    const roll  = (row['Roll Number'] || row['rollNumber'] || row['Roll'] || '').toString().trim();
+    const comp  = (row['Company']     || row['company']     || '').toString().trim();
+    const desig = (row['Designation'] || row['designation'] || row['Staff Role'] || row['staffRole'] || '').toString().trim();
     const phone = (row['Phone'] || row['phone'] || '').toString().trim();
-    const gen = (row['Gender'] || row['gender'] || '').toString().trim();
+    const gen   = (row['Gender'] || row['gender'] || '').toString().trim();
 
-    // ── per-row validation ──────────────────────────────
     const errors = [];
-    if (!name) errors.push('Name is required');
-    if (!email) errors.push('Email is required');else if (!EMAIL_RE.test(email)) errors.push('Invalid email format');
+    if (!name)  errors.push('Name is required');
+    if (!email) errors.push('Email is required');
+    else if (!EMAIL_RE.test(email)) errors.push('Invalid email format');
+
     return {
-      _row: idx + 2,
-      // spreadsheet row number (1-indexed header + 1)
-      name,
-      email,
+      _row: idx + 2, // spreadsheet row number (header = row 1)
+      name, email,
       department: dept,
       year,
       graduationYear: gradY,
@@ -439,73 +463,114 @@ router.post('/import', protect, authorize('admin'), upload.single('file'), async
     };
   });
 
-  // ── If preview mode → return normalised data only ────
+  // ── Preview / dry-run — return parsed data only ─────────────
   if (isDryRun) {
     return res.json({
       success: true,
       rows: normalised,
       totalRows: normalised.length,
-      validRows: normalised.filter(r => r._valid).length,
+      validRows:   normalised.filter(r => r._valid).length,
       invalidRows: normalised.filter(r => !r._valid).length
     });
   }
 
-  // ── Full import ────────────────────────────────────────
-  const results = {
-    created: 0,
-    skipped: 0,
-    errors: []
-  };
+  // ── Full import ─────────────────────────────────────────────
+  const results = { created: 0, skipped: 0, errors: [] };
+  const emailStats = { sent: 0, failed: 0 };
+  const createdUsers = []; // { email, name, rawPass, role } — for batch email
+
   for (const r of normalised) {
     if (!r._valid) {
-      results.errors.push({
-        row: r.email || `Row ${r._row}`,
-        reason: r._errors.join('; ')
-      });
+      results.errors.push({ row: r.email || `Row ${r._row}`, reason: r._errors.join('; ') });
       continue;
     }
-    const exists = await User.findOne({
-      email: r.email
-    });
-    if (exists) {
-      results.skipped++;
-      continue;
-    }
+    const exists = await User.findOne({ email: r.email });
+    if (exists) { results.skipped++; continue; }
+
     try {
-      const rawPass = type === 'student' ? r.rollNumber || r.email.split('@')[0] : r.email.split('@')[0];
+      // ── Generate default password ──────────────────────
+      // student: roll number (or email prefix) | alumni/staff: email prefix
+      const rawPass = type === 'student'
+        ? (r.rollNumber || r.email.split('@')[0])
+        : r.email.split('@')[0];
       const hashed = await bcrypt.hash(rawPass, 10);
+
+      // ── Role-specific field mapping ─────────────────────
+      const roleFields = {
+        student: {
+          role: 'student',
+          status: 'Pending',   // uniform Pending — admin can bulk-activate later
+          graduationYear: r.graduationYear,
+          rollNumber: r.rollNumber,
+        },
+        alumni: {
+          role: 'alumni',
+          status: 'Pending',
+          company: r.company,
+          designation: r.designation,
+        },
+        staff: {
+          role: 'staff',
+          status: 'Pending',
+          designation: r.designation,
+          staffRole: r.designation,
+        },
+      }[type];
+
       await User.create({
         name: r.name,
         email: r.email,
         password: hashed,
+        tempPassword: rawPass,   // STEP 3: store plain-text temp password for audit/resend
         phone: r.phone,
         gender: r.gender,
         department: r.department,
         batch: r.year,
-        ...(type === 'student' ? {
-          graduationYear: r.graduationYear,
-          rollNumber: r.rollNumber,
-          role: 'student',
-          status: 'Active'
-        } : {
-          company: r.company,
-          designation: r.designation,
-          role: 'alumni',
-          status: 'Pending'
-        })
+        needsPasswordChange: true,
+        ...roleFields
       });
+
       results.created++;
+      createdUsers.push({ name: r.name, email: r.email, rawPass, role: type });
     } catch (e) {
-      results.errors.push({
-        row: r.email,
-        reason: e.message
-      });
+      results.errors.push({ row: r.email, reason: e.message });
     }
   }
+
+  // ── Send credentials emails (fire serially to respect provider limits) ──
+  for (const u of createdUsers) {
+    try {
+      await sendCredentialsEmail(u.email, u.name, u.rawPass, u.role);
+      emailStats.sent++;
+    } catch (emailErr) {
+      console.error(`[BulkImport] Credentials email failed for ${u.email}:`, emailErr.message);
+      emailStats.failed++;
+    }
+  }
+
+  // ── Persist import log ──────────────────────────────────────
+  try {
+    await ImportLog.create({
+      importedBy:   req.user._id,
+      type,
+      totalRows:    normalised.length,
+      created:      results.created,
+      skipped:      results.skipped,
+      failed:       results.errors.length,
+      emailsSent:   emailStats.sent,
+      emailsFailed: emailStats.failed,
+      errors:       results.errors,
+      fileName:     req.file.originalname,
+    });
+  } catch (logErr) {
+    console.error('[BulkImport] Failed to save import log:', logErr.message);
+  }
+
   res.json({
     success: true,
-    message: `Import complete: ${results.created} created, ${results.skipped} skipped, ${results.errors.length} errors.`,
-    results
+    message: `Import complete: ${results.created} created, ${results.skipped} skipped, ${results.errors.length} errors. ${emailStats.sent} credential email${emailStats.sent !== 1 ? 's' : ''} sent.`,
+    results,
+    emailStats,
   });
 }));
 
@@ -638,46 +703,60 @@ router.put('/reject-alumni/:userId', protect, authorize('admin'), asyncHandler(a
 }));
 
 // ─── GET /api/admin/pending-alumni ───────────────────────────
+// Returns ONLY self-registered alumni awaiting approval.
+// Bulk-imported users (needsPasswordChange: true) are excluded — they
+// self-activate via the first-login wizard and do NOT need admin approval.
 router.get('/pending-alumni', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
   const pendingAlumni = await User.find({
     role: 'alumni',
-    status: 'Pending'
-  }).select('-password -secretKey -otp -otpExpiry').sort({
-    createdAt: -1
-  });
-  res.json({
-    success: true,
-    data: pendingAlumni
-  });
+    status: 'Pending',
+    $or: [
+      { needsPasswordChange: { $exists: false } },
+      { needsPasswordChange: false },
+    ]
+  }).select('-password -secretKey -otp -otpExpiry').sort({ createdAt: -1 });
+  res.json({ success: true, data: pendingAlumni });
 }));
 
 // ─── PUT /api/admin/activate/:userId ─────────────────────────
+// EMAIL RULE:
+//   • Self-registered users (alumni/staff who went through the OTP flow)
+//     → receive the "approval" email (their first email from us after activation).
+//   • Bulk-imported users (have tempPassword set at import time)
+//     → already received their credentials email during import.
+//     → DO NOT send another email here to avoid confusion / duplicates.
 router.put('/activate/:userId', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
-  const user = await User.findById(req.params.userId);
-  if (!user) return res.status(404).json({
-    message: 'User not found.'
-  });
-  if (user.status === 'Active') return res.status(400).json({
-    message: 'Account already active.'
-  });
+  const user = await User.findById(req.params.userId).select('+tempPassword');
+  if (!user) return res.status(404).json({ message: 'User not found.' });
+  if (user.status === 'Active') return res.status(400).json({ message: 'Account already active.' });
+
   user.status = 'Active';
   await user.save();
 
-  // Notify the alumni their account was approved — with real-time socket push
+  // ── In-app notification (real-time socket push) ──────────────
   const notif = await Notification.create({
     userId: user._id,
-    type: 'account_activated',
-    title: '🎉 Your account has been approved!',
+    type:   'account_activated',
+    title:  '🎉 Your account has been approved!',
     description: 'Welcome to MAMCET Alumni Connect! You can now log in and explore.',
     icon: '🎉'
   });
   const io = req.app.get('io');
   if (io) io.to(user._id.toString()).emit('notification_received', notif.toObject());
 
-  // Send approval email
-  try {
-    await sendApprovalEmail(user.email, user.name);
-  } catch (_) {}
+  // ── Email: only for SELF-REGISTERED users ───────────────────
+  // Bulk-imported users already got their credentials email at import time.
+  // tempPassword is set during bulk import and cleared only after activation wizard.
+  // If tempPassword is still present → bulk user → skip approval email.
+  const isBulkImported = !!user.tempPassword;
+  if (!isBulkImported) {
+    try {
+      await sendApprovalEmail(user.email, user.name);
+    } catch (emailErr) {
+      console.error(`[Activate] Approval email failed for ${user.email}:`, emailErr.message);
+    }
+  }
+
   res.json({
     success: true,
     message: `${user.name} has been activated.`
@@ -707,25 +786,50 @@ router.delete('/reject/:userId', protect, authorize('admin'), asyncHandler(async
 }));
 
 // ─── GET /api/admin/stats ─────────────────────────────────────
+// Only counts ACTIVATED (status === 'Active') users.
+// Pending and Rejected users are excluded from all totals.
 router.get('/stats', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
-  const Job = require('../models/Job');
+  const Job   = require('../models/Job');
   const Event = require('../models/Event');
-  const [totalUsers, pendingAlumni, pendingJobs, pendingEvents, totalPosts] = await Promise.all([User.countDocuments(), User.countDocuments({
-    role: 'alumni',
-    status: 'Pending'
-  }), Job.countDocuments({
-    status: 'Pending'
-  }), Event.countDocuments({
-    status: 'Pending'
-  }), require('../models/Post').countDocuments()]);
+  const Post  = require('../models/Post');
+
+  const [
+    activeStudents,
+    activeAlumni,
+    activeStaff,
+    pendingAlumni,
+    pendingStaff,
+    pendingJobs,
+    pendingEvents,
+    totalPosts,
+  ] = await Promise.all([
+    // ── Active counts (only fully activated users) ────────────
+    User.countDocuments({ role: 'student', status: 'Active' }),
+    User.countDocuments({ role: 'alumni',  status: 'Active' }),
+    User.countDocuments({ role: 'staff',   status: 'Active' }),
+    // ── Pending counts (for approval badges) ─────────────────
+    User.countDocuments({ role: 'alumni', status: 'Pending' }),
+    User.countDocuments({ role: 'staff',  status: 'Pending' }),
+    Job.countDocuments({ status: 'Pending' }),
+    Event.countDocuments({ status: 'Pending' }),
+    Post.countDocuments(),
+  ]);
+
+  // Total active users = students + alumni + staff (excludes pending/rejected)
+  const totalUsers = activeStudents + activeAlumni + activeStaff;
+
   res.json({
     success: true,
     data: {
-      totalUsers,
+      totalUsers,       // active only
+      activeStudents,
+      activeAlumni,
+      activeStaff,
       pendingAlumni,
+      pendingStaff,
       pendingJobs,
       pendingEvents,
-      totalPosts
+      totalPosts,
     }
   });
 }));
@@ -1227,4 +1331,237 @@ router.put('/system-config', protect, authorize('admin'), (req, res) => {
     }
   });
 });
+// ════════════════════════════════════════════════════════════════
+//  STAFF APPROVAL
+// ════════════════════════════════════════════════════════════════
+
+// ─── GET /api/admin/pending-staff ────────────────────────────
+// Returns all staff whose status is still Pending (awaiting admin approval)
+// Returns ONLY self-registered staff awaiting admin approval.
+// Bulk-imported staff (needsPasswordChange: true) are excluded — they
+// self-activate via the first-login wizard and do NOT need admin approval.
+router.get('/pending-staff', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
+  const pendingStaff = await User.find({
+    role: 'staff',
+    status: 'Pending',
+    $or: [
+      { needsPasswordChange: { $exists: false } },
+      { needsPasswordChange: false },
+    ]
+  })
+    .select('-password -secretKey -otp -otpExpiry')
+    .sort({ createdAt: -1 });
+
+  res.json({ success: true, data: pendingStaff });
+}));
+
+// ─── GET /api/admin/imported-users ──────────────────────────
+// Bulk-imported users who have NOT yet completed the activation wizard.
+// These are Pending + needsPasswordChange: true (set during bulk import).
+// They self-activate — admin cannot approve/reject them here, only monitor.
+// Query params: role (student|alumni|staff|all), page, limit
+router.get('/imported-users', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
+  const { role = 'all', page = 1, limit = 20 } = req.query;
+
+  const query = {
+    status: 'Pending',
+    needsPasswordChange: true,
+  };
+  if (role !== 'all') query.role = role;
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const [users, total] = await Promise.all([
+    User.find(query)
+      .select('-password -secretKey -otp -otpExpiry')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit)),
+    User.countDocuments(query),
+  ]);
+
+  res.json({
+    success: true,
+    data: users,
+    pagination: {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+    },
+  });
+}));
+
+// ─── POST /api/admin/approve-staff ───────────────────────────
+// Body: { userId, action: 'approve' | 'reject' }
+router.post('/approve-staff', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
+  const { userId, action } = req.body;
+  if (!userId || !['approve', 'reject'].includes(action)) {
+    return res.status(400).json({ message: 'userId and action (approve|reject) are required.' });
+  }
+
+  const staffUser = await User.findOne({ _id: userId, role: 'staff' });
+  if (!staffUser) return res.status(404).json({ message: 'Staff user not found.' });
+
+  if (action === 'approve') {
+    staffUser.status = 'Active';
+    await staffUser.save();
+
+    // Notify the staff member
+    const notif = await Notification.create({
+      userId: staffUser._id,
+      type: 'account_activated',
+      title: '🎉 Your staff account has been approved!',
+      description: 'Welcome to MAMCET Alumni Connect! You can now log in and access the staff dashboard.',
+      icon: '🎉'
+    });
+    const io = req.app.get('io');
+    if (io) io.to(staffUser._id.toString()).emit('notification_received', notif.toObject());
+
+    // ── Email: only for SELF-REGISTERED staff ─────────────────
+    // Bulk-imported staff already received credentials email at import time.
+    // tempPassword is present on bulk users until they complete the activation wizard.
+    const staffUserWithPass = await User.findById(staffUser._id).select('+tempPassword');
+    const isBulkImportedStaff = !!(staffUserWithPass?.tempPassword);
+    if (!isBulkImportedStaff) {
+      try { await sendApprovalEmail(staffUser.email, staffUser.name); } catch (emailErr) {
+        console.error(`[ApproveStaff] Email failed for ${staffUser.email}:`, emailErr.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `${staffUser.name} has been approved and can now log in.`
+    });
+  }
+
+  // action === 'reject'
+  await createNotification(req.app.get('io'), {
+    userId: staffUser._id,
+    type: 'system',
+    title: '❌ Staff registration not approved',
+    description: 'Unfortunately your staff registration was not approved. Please contact the admin for details.',
+    icon: '🚫'
+  });
+  await User.findByIdAndDelete(userId);
+
+  res.json({
+    success: true,
+    message: `${staffUser.name}'s staff registration has been rejected and removed.`
+  });
+}));
+
+// ════════════════════════════════════════════════════════════════
+//  STAFF CRUD (Approved/All Staff)
+// ════════════════════════════════════════════════════════════════
+
+// ─── GET /api/admin/staff ────────────────────────────────────
+// Full list with search, filter by dept/status, pagination
+router.get('/staff', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
+  const {
+    search = '',
+    department = '',
+    roleFilter = '',
+    status = '',
+    page = 1,
+    limit = 10,
+    sort = 'createdAt',
+    order = 'desc'
+  } = req.query;
+  const query = {
+    role: 'staff'
+  };
+
+  if (search.trim()) {
+    query.$or = [{
+      name: { $regex: search.trim(), $options: 'i' }
+    }, {
+      email: { $regex: search.trim(), $options: 'i' }
+    }];
+  }
+  if (department) query.department = department;
+  if (roleFilter) query.designation = roleFilter; // staff role maps to designation
+  if (status) query.status = status;
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const sortDir = order === 'asc' ? 1 : -1;
+  const sortObj = { [sort]: sortDir };
+
+  const [staff, total] = await Promise.all([
+    User.find(query).select('-password -secretKey -otp -otpExpiry -connections').sort(sortObj).skip(skip).limit(Number(limit)),
+    User.countDocuments(query)
+  ]);
+
+  const [departments, roles] = await Promise.all([
+    User.distinct('department', { role: 'staff', department: { $exists: true, $ne: '' } }),
+    User.distinct('designation', { role: 'staff', designation: { $exists: true, $ne: '' } })
+  ]);
+
+  res.json({
+    success: true,
+    data: staff,
+    pagination: {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit))
+    },
+    filters: {
+      departments: departments.sort(),
+      roles: roles.sort()
+    }
+  });
+}));
+
+// ─── PUT /api/admin/staff/:id ────────────────────────────────
+router.put('/staff/:id', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
+  const allowed = ['name', 'email', 'phone', 'department', 'designation', 'status'];
+  const updates = {};
+  allowed.forEach(k => {
+    if (req.body[k] !== undefined) updates[k] = req.body[k];
+  });
+  const user = await User.findByIdAndUpdate(req.params.id, { $set: updates }, {
+    new: true,
+    runValidators: true
+  }).select('-password -secretKey -otp -otpExpiry');
+  
+  if (!user || user.role !== 'staff') {
+    return res.status(404).json({ message: 'Staff member not found.' });
+  }
+  
+  res.json({
+    success: true,
+    data: user,
+    message: 'Staff profile updated.'
+  });
+}));
+
+// ─── DELETE /api/admin/staff/:id ────────────────────────────
+router.delete('/staff/:id', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
+  const user = await User.findOneAndDelete({
+    _id: req.params.id,
+    role: 'staff'
+  });
+  if (!user) return res.status(404).json({ message: 'Staff member not found.' });
+  
+  res.json({
+    success: true,
+    message: `${user.name}'s account has been deleted.`
+  });
+}));
+
+// ─── PUT /api/admin/reject-staff/:userId ────────────────────
+// Move an approved staff back to pending
+router.put('/reject-staff/:userId', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
+  const user = await User.findOneAndUpdate({ _id: req.params.userId, role: 'staff' }, {
+    status: 'Pending'
+  }, { new: true });
+  
+  if (!user) return res.status(404).json({ message: 'Staff member not found.' });
+  
+  res.json({
+    success: true,
+    message: `${user.name}'s account has been set to Pending.`
+  });
+}));
+
 module.exports = router;

@@ -204,10 +204,10 @@ const AdminPanelDashboard = () => {
 
   // ── Doughnut: Role split ───────────────────────────────────
   const doughnutData = {
-    labels: ['Alumni', 'Students'],
+    labels: ['Alumni', 'Students', 'Staff'],
     datasets: [{
-      data: [kpis.totalAlumni, kpis.totalStudents],
-      backgroundColor: [PALETTE.indigo, PALETTE.teal],
+      data: [kpis.totalAlumni, kpis.totalStudents, kpis.totalStaff || 0],
+      backgroundColor: [PALETTE.indigo, PALETTE.teal, PALETTE.pink],
       borderWidth: 0,
       hoverOffset: 4,
     }],
@@ -262,6 +262,15 @@ const AdminPanelDashboard = () => {
           delta="Enrolled this semester"
           deltaColor={PALETTE.teal}
           link="/admin/students"
+        />
+        <KpiCard
+          icon={FiUsers}
+          label="Total Staff"
+          value={kpis.totalStaff || 0}
+          iconBg={PALETTE.pink}
+          delta="Active staff members"
+          deltaColor={PALETTE.pink}
+          link="/admin/staff"
         />
         <KpiCard
           icon={FiUserCheck}
@@ -373,6 +382,7 @@ const AdminPanelDashboard = () => {
               {[
                 { label: 'Alumni',   value: kpis.totalAlumni,   color: PALETTE.indigo },
                 { label: 'Students', value: kpis.totalStudents, color: PALETTE.teal },
+                { label: 'Staff',    value: kpis.totalStaff || 0, color: PALETTE.pink },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ width: 10, height: 10, borderRadius: '50%', background: r.color, flexShrink: 0 }} />
@@ -381,7 +391,7 @@ const AdminPanelDashboard = () => {
                 </div>
               ))}
               <div style={{ fontSize: 12, color: '#aaa', marginTop: 6 }}>
-                Total: {kpis.totalAlumni + kpis.totalStudents}
+                Total: {kpis.totalAlumni + kpis.totalStudents + (kpis.totalStaff || 0)}
               </div>
             </div>
           </div>

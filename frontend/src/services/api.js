@@ -71,6 +71,9 @@ export const authService = {
   resendOtp: (email) =>
     api.post('/auth/resend-otp', { email }),
 
+  activateAccount: (data) =>
+    api.post('/auth/activate', data),
+
   getMe: () => api.get('/auth/me'),
 
   updateProfile: (data) => api.put('/auth/profile', data),
@@ -171,6 +174,7 @@ export const chatService = {
   searchUsers:   (searchQuery)   => api.get(`/chat/users/search?q=${searchQuery}`),
   sendMessage:   (chatId, text)  => api.post(`/chat/${chatId}/messages`, { text }),
   getUnreadCounts: ()            => api.get('/chat/unread-count'),
+  getUnreadMessages: ()          => api.get('/chat/unread'),
   markChatRead:  (chatId)        => api.put(`/chat/${chatId}/read`),
 };
 
@@ -218,9 +222,24 @@ export const adminService = {
   getUsersWithRoles: (params)         => api.get('/admin/users/roles', { params }),
   updateUserRole:    (id, role)       => api.put(`/admin/users/${id}/role`, { role }),
 
+  // Staff Management
+  getPendingStaff:     ()               => api.get('/admin/pending-staff'),
+  approveStaff:        (userId)         => api.post('/admin/approve-staff', { userId, action: 'approve' }),
+  rejectPendingStaff:  (userId)         => api.post('/admin/approve-staff', { userId, action: 'reject' }),
+  getStaff:            (params)         => api.get('/admin/staff', { params }),
+  updateStaff:         (id, data)       => api.put(`/admin/staff/${id}`, data),
+  deleteStaff:         (id)             => api.delete(`/admin/staff/${id}`),
+  rejectApprovedStaff: (id)             => api.put(`/admin/reject-staff/${id}`),
+
   // System Config
   getSystemConfig:    ()             => api.get('/admin/system-config'),
   updateSystemConfig: (data)         => api.put('/admin/system-config', data),
+
+  // Imported (bulk) users — read-only monitoring view
+  getImportedUsers: (params)         => api.get('/admin/imported-users', { params }),
+
+  // Quick-add alumni (from AdminHome modal)
+  addAlumni: (data)                  => api.post('/admin/alumni', data),
 };
 
 // ─── Landing Page CMS Service ─────────────────────────────────

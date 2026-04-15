@@ -363,11 +363,14 @@ const AdminStatsSidebar = ({ user }) => {
                 ) : stats ? (
                     <>
                         {[
-                            { label: 'Total Users',    value: stats.totalUsers    || 0, color: '#0d6efd' },
-                            { label: 'Total Posts',    value: stats.totalPosts    || 0, color: '#198754' },
-                            { label: 'Pending Alumni', value: stats.pendingAlumni || 0, color: stats.pendingAlumni > 0 ? '#c84022' : '#198754' },
-                            { label: 'Pending Jobs',   value: stats.pendingJobs   || 0, color: stats.pendingJobs   > 0 ? '#fd7e14' : '#198754' },
-                            { label: 'Pending Events', value: stats.pendingEvents || 0, color: stats.pendingEvents > 0 ? '#fd7e14' : '#198754' },
+                            { label: 'Active Students', value: stats.activeStudents ?? stats.totalUsers ?? 0,  color: '#14b8a6' },
+                            { label: 'Active Alumni',   value: stats.activeAlumni   || 0,                     color: '#6366f1' },
+                            { label: 'Active Staff',    value: stats.activeStaff    || 0,                     color: '#ec4899' },
+                            { label: 'Total Posts',     value: stats.totalPosts     || 0,                     color: '#198754' },
+                            { label: 'Pending Alumni',  value: stats.pendingAlumni  || 0,                     color: stats.pendingAlumni > 0 ? '#c84022' : '#198754' },
+                            { label: 'Pending Staff',   value: stats.pendingStaff   || 0,                     color: stats.pendingStaff  > 0 ? '#c84022' : '#198754' },
+                            { label: 'Pending Jobs',    value: stats.pendingJobs    || 0,                     color: stats.pendingJobs   > 0 ? '#fd7e14' : '#198754' },
+                            { label: 'Pending Events',  value: stats.pendingEvents  || 0,                     color: stats.pendingEvents > 0 ? '#fd7e14' : '#198754' },
                         ].map(({ label, value, color }) => (
                             <div key={label} className="d-flex justify-content-between align-items-center py-1 border-bottom" style={{ fontSize: 13 }}>
                                 <span className="text-muted">{label}</span>

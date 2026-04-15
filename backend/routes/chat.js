@@ -194,9 +194,29 @@ router.post('/', protect, requireFields('userId'), asyncHandler(async (req, res,
   }
 }));
 
-// ─── GET /api/chat/unread-count ─ Returns per-chat unread counts (MUST be before /:chatId)
+// ─── GET /api/chat/unread ─ Returns all unread messages for current user
+router.get('/unread', protect, asyncHandler(async (req, res, next) => {
+  const myId = req.user._id;
+  // Get all messages where user hasn't read them and didn't send them
+  const messages = await Message.find({
+    senderId: { $ne: myId },
+    readBy: { $nin: [myId] }
+  });
+  
+  res.json({ success: true, data: messages });
+}));
+
+// ─── GET /api/chat/unread-count ─ Returns total global unread count
 router.get('/unread-count', protect, asyncHandler(async (req, res, next) => {
   const myId = req.user._id;
+  // Count messages where: receiverId === currentUser AND read === false
+  // (In our schema: senderId != currentUser && readBy not including currentUser)
+  const totalUnread = await Message.countDocuments({
+    senderId: { $ne: myId },
+    readBy: { $nin: [myId] }
+  });
+  
+  // Keep the map for backward compatibility (per-chat badges) if needed by Messaging.js
   const counts = await Message.aggregate([{
     $match: {
       readBy: { $nin: [myId] },
@@ -207,7 +227,8 @@ router.get('/unread-count', protect, asyncHandler(async (req, res, next) => {
   }]);
   const map = {};
   counts.forEach(c => { map[c._id.toString()] = c.count; });
-  res.json({ success: true, data: map });
+  
+  res.json({ success: true, total: totalUnread, data: map });
 }));
 
 // ─── GET /api/chat/:chatId/messages — Get paginated messages

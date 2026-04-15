@@ -99,7 +99,8 @@ const sendAuthResponse = (res, statusCode, user, token) => {
       connectionCount: user.connectionCount,
       connections: user.connections,
       views: user.views,
-      presentStatus: user.presentStatus
+      presentStatus: user.presentStatus,
+      needsPasswordChange: user.needsPasswordChange
     }
   });
 };
@@ -152,60 +153,32 @@ router.post('/register', asyncHandler(async (req, res, next) => {
     });
   }
 
-  // ── ALUMNI: Create account with Pending status, notify admins ──
+  // ── ALUMNI: OTP flow → Pending approval (admin must activate) ──
+  // Same pattern as Staff: collect data, generate OTP, put in pendingRegistrations map.
+  // Account is NOT created until OTP is verified.
   if (role === 'alumni') {
-    const user = await User.create({
-      name,
-      email,
-      password,
-      phone,
-      gender,
+    const otp    = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = Date.now() + 10 * 60 * 1000;
+    pendingRegistrations.set(email.toLowerCase(), {
+      name, email: email.toLowerCase(), password, phone, gender,
       role: 'alumni',
-      status: 'Pending',
-      batch,
-      department,
-      degree,
-      address,
-      city,
-      state,
-      zipCode,
-      presentStatus,
-      company,
-      designation,
-      workLocation,
-      businessName,
-      natureOfBusiness,
-      institutionName,
-      coursePursuing
+      batch, department, degree, address, city, state, zipCode,
+      presentStatus, company, designation, workLocation,
+      businessName, natureOfBusiness, institutionName, coursePursuing,
+      otp,
+      otpExpiry: expiry
     });
-
-    // Notify all admins
-    try {
-      const admins = await User.find({
-        role: 'admin'
-      }).select('_id');
-      if (admins.length > 0) {
-        const notifDocs = admins.map(a => ({
-          userId: a._id,
-          type: 'admin_approval_needed',
-          title: `New Alumni Registration: ${name}`,
-          description: `${email} • ${department || ''} • ${batch || ''} — Awaiting your approval.`,
-          icon: '👤',
-          relatedId: user._id
-        }));
-        await Notification.insertMany(notifDocs);
-      }
-    } catch (_) {}
-    return res.status(201).json({
+    await sendOTPEmail(email, otp, name);
+    return res.status(200).json({
       success: true,
-      pendingApproval: true,
-      message: 'Registration submitted! Your account is under review by the MAMCET admin team. You will receive an email once approved.'
+      otpSent: true,
+      message: `OTP sent to ${email}. Please verify to complete alumni registration.`
     });
   }
 
-  // ── STAFF: OTP flow, instant activation (like students) ──
-  // Staff are trusted internal faculty — no admin approval step.
+  // ── STAFF: OTP flow → Pending approval (admin must activate) ──
   if (role === 'staff') {
+    const { staffRole } = req.body;
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = Date.now() + 10 * 60 * 1000;
     pendingRegistrations.set(email.toLowerCase(), {
@@ -217,7 +190,7 @@ router.post('/register', asyncHandler(async (req, res, next) => {
       role: 'staff',
       department,
       designation,
-      // Principal / HOD / Professor
+      staffRole: staffRole || designation, // Principal / HOD / Professor
       otp,
       otpExpiry: expiry
     });
@@ -279,43 +252,58 @@ router.post('/register', asyncHandler(async (req, res, next) => {
 
 // ─── POST /api/auth/verify-otp ────────────────────────────────
 router.post('/verify-otp', asyncHandler(async (req, res, next) => {
-  const {
-    email,
-    otp
-  } = req.body;
+  const { email, otp } = req.body;
   if (!email || !otp) {
-    return res.status(400).json({
-      message: 'Email and OTP are required.'
-    });
+    return res.status(400).json({ message: 'Email and OTP are required.' });
   }
   const pending = pendingRegistrations.get(email.toLowerCase());
   if (!pending) {
-    return res.status(400).json({
-      message: 'No pending registration for this email. Please register again.'
-    });
+    return res.status(400).json({ message: 'No pending registration for this email. Please register again.' });
   }
   if (Date.now() > pending.otpExpiry) {
     pendingRegistrations.delete(email.toLowerCase());
-    return res.status(400).json({
-      message: 'OTP has expired. Please register again.'
-    });
+    return res.status(400).json({ message: 'OTP has expired. Please register again.' });
   }
   if (otp.toString() !== pending.otp.toString()) {
-    return res.status(400).json({
-      message: 'Invalid OTP. Please check and try again.'
+    return res.status(400).json({ message: 'Invalid OTP. Please check and try again.' });
+  }
+
+  // OTP valid — strip OTP fields from user data
+  const { otp: _o, otpExpiry: _e, ...userData } = pending;
+
+  // ── FLOW 1: Staff / Alumni → Pending (admin must approve) ──────────────────
+  if (pending.role === 'staff' || pending.role === 'alumni') {
+    const newUser = await User.create({ ...userData, status: 'Pending' });
+    pendingRegistrations.delete(email.toLowerCase());
+
+    const roleLabel = pending.role === 'staff' ? 'Staff' : 'Alumni';
+    const icon      = pending.role === 'staff' ? '🏣' : '👤';
+
+    // Notify all admins of new pending registration
+    try {
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      if (admins.length > 0) {
+        const notifDocs = admins.map(a => ({
+          userId: a._id,
+          type: 'admin_approval_needed',
+          title: `New ${roleLabel} Registration Request: ${newUser.name}`,
+          description: `${newUser.email} • ${newUser.department || newUser.staffRole || ''} — Awaiting your approval.`,
+          icon,
+          relatedId: newUser._id
+        }));
+        await Notification.insertMany(notifDocs);
+      }
+    } catch (_) {}
+
+    return res.status(201).json({
+      success: true,
+      pendingApproval: true,
+      message: `Email verified! Your ${pending.role} registration is under review. An admin will activate your account shortly.`
     });
   }
 
-  // OTP valid — create the user
-  const {
-    otp: _o,
-    otpExpiry: _e,
-    ...userData
-  } = pending;
-  const user = await User.create({
-    ...userData,
-    status: 'Active'
-  });
+  // ── FLOW 1: Student / Admin → activate immediately ──────────────────────────
+  const user = await User.create({ ...userData, status: 'Active' });
   pendingRegistrations.delete(email.toLowerCase());
   const token = signToken(user._id);
 
@@ -361,7 +349,7 @@ router.post('/login', asyncHandler(async (req, res, next) => {
   }
   const user = await User.findOne({
     email: email.toLowerCase()
-  }).select('+password');
+  }).select('+password +tempPassword');
   if (!user) {
     return res.status(404).json({
       message: 'User not found with this email.'
@@ -386,18 +374,28 @@ router.post('/login', asyncHandler(async (req, res, next) => {
     }
   }
 
-  // Block Pending alumni from logging in
+  // Block Pending users from logging in EXCEPT if it is their first login (bulk-import)
   if (user.status === 'Pending') {
-    return res.status(403).json({
-      message: 'Your account is pending admin approval. You will receive an email once activated.',
-      pendingApproval: true
-    });
+    // If they have a temporary password and it exactly matches, allow them to proceed
+    if (user.tempPassword && password === user.tempPassword) {
+      // Allow them into the activation flow
+    } else {
+      // Either self-registered, or they put the wrong temporary password
+      return res.status(403).json({
+        message: 'Your account is pending admin approval. You will receive an email once activated.',
+        pendingApproval: true
+      });
+    }
   }
-  const isMatch = await user.comparePassword(password);
-  if (!isMatch) {
-    return res.status(401).json({
-      message: 'Incorrect password.'
-    });
+
+  // Validate password against hashed password for all active users
+  if (user.status !== 'Pending') {
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({
+        message: 'Incorrect password.'
+      });
+    }
   }
   const token = signToken(user._id);
   // Record last-login timestamp for analytics (fire-and-forget)
@@ -407,6 +405,35 @@ router.post('/login', asyncHandler(async (req, res, next) => {
 
   // Auto-connect to admin just in case it's a legacy user or missed
   ensureAdminConnection(user._id);
+  sendAuthResponse(res, 200, user, token);
+}));
+
+// ─── POST /api/auth/activate ──────────────────────────────────
+// Completes onboarding for bulk-imported users.
+// Forces password change and detail confirmation.
+router.post('/activate', protect, asyncHandler(async (req, res, next) => {
+  const { password, name, phone } = req.body;
+
+  if (!password || password.length < 6) {
+    return res.status(400).json({ message: 'A strong password of at least 6 characters is required.' });
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ message: 'User not found.' });
+
+  // Update fields
+  user.password = password; // will be hashed by pre-save hook
+  if (name) user.name = name;
+  if (phone) user.phone = phone;
+
+  user.needsPasswordChange = false;
+  user.tempPassword        = null; // Clear bulk-import temp password
+  user.status              = 'Active';
+
+  await user.save();
+
+  // Send fresh auth response
+  const token = signToken(user._id);
   sendAuthResponse(res, 200, user, token);
 }));
 

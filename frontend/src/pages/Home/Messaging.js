@@ -23,7 +23,7 @@ const Messaging = () => {
   // ── Pull shared socket + online users + connection status ──
   const { socket: contextSocket, onlineUsers, isConnected, reconnectAttempts } = useSocket();
   // ── Use MessageContext as single source for unread counts ───────────────────
-  const { unreadMap, markChatAsRead, incrementUnread, setActiveChatId } = useMessage();
+  const { unreadMap, markChatAsRead, setActiveChatId } = useMessage();
 
   const [chats,             setChats]             = useState([]);
   const [activeChat,        setActiveChat]         = useState(null);
@@ -213,20 +213,20 @@ const Messaging = () => {
       );
     };
 
-    socket.on('message_received', handleNewMessage);
+    socket.on('newMessage', handleNewMessage);
     socket.on('messages_read',    handleMessagesRead);
     socket.on('user_reading',     handleUserReading);
     socket.on('typing',           () => setIsTyping(true));
     socket.on('stop_typing',      () => setIsTyping(false));
 
     return () => {
-      socket.off('message_received', handleNewMessage);
+      socket.off('newMessage', handleNewMessage);
       socket.off('messages_read',    handleMessagesRead);
       socket.off('user_reading',     handleUserReading);
       socket.off('typing');
       socket.off('stop_typing');
     };
-  }, [user, contextSocket, markChatAsRead, incrementUnread]); // stable deps only
+  }, [user, contextSocket, markChatAsRead]); // stable deps only
 
   // ── Select a chat and load messages ──────────────────────────
   const selectChat = useCallback(async (chat) => {

@@ -22,28 +22,38 @@ const STEPS = [
 
 const STUDENT_COLS = ['Name','Email','Department','Year (Join)','Graduation Year','Roll Number','Phone','Gender'];
 const ALUMNI_COLS  = ['Name','Email','Department','Year (Pass-Out)','Company','Designation','Phone','Gender'];
+const STAFF_COLS   = ['Name','Email','Department','Staff Role','Phone','Gender'];
 
 /* ── Download template helper ────────────────────────────────── */
 const downloadTemplate = (type) => {
-  const cols = type === 'student' ? STUDENT_COLS : ALUMNI_COLS;
-  const sample = type === 'student'
-    ? [['Aarav Kumar','aarav.cse22@mamcet.com','CSE','2022','2026','22CSE001','+919876543210','Male'],
-       ['Priya Nair','priya.ece22@mamcet.com','ECE','2022','2026','22ECE002','+919876543211','Female']]
-    : [['Karthik Raj','karthik.cse18@gmail.com','CSE','2022','Zoho Corp','Software Engineer','+919123456789','Male'],
-       ['Divya Mehta','divya.ece18@gmail.com','ECE','2022','TCS','QA Engineer','+919234567890','Female']];
+  const cols = type === 'student' ? STUDENT_COLS : type === 'alumni' ? ALUMNI_COLS : STAFF_COLS;
+  const sample = {
+    student: [
+      ['Aarav Kumar','aarav.cse22@mamcet.com','CSE','2022','2026','22CSE001','+919876543210','Male'],
+      ['Priya Nair','priya.ece22@mamcet.com','ECE','2022','2026','22ECE002','+919876543211','Female'],
+    ],
+    alumni: [
+      ['Karthik Raj','karthik.cse18@gmail.com','CSE','2022','Zoho Corp','Software Engineer','+919123456789','Male'],
+      ['Divya Mehta','divya.ece18@gmail.com','ECE','2022','TCS','QA Engineer','+919234567890','Female'],
+    ],
+    staff: [
+      ['Dr. Ramesh Kumar','ramesh.principal@mamcet.com','Administration','Principal','+919988776655','Male'],
+      ['Prof. Sheela Devi','sheela.cse@mamcet.com','CSE','HOD','+919977665544','Female'],
+    ],
+  }[type];
 
   const ws = XLSX.utils.aoa_to_sheet([cols, ...sample]);
   ws['!cols'] = cols.map(() => ({ wch: 22 }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, type === 'student' ? 'Students' : 'Alumni');
+  XLSX.utils.book_append_sheet(wb, ws, type.charAt(0).toUpperCase() + type.slice(1) + 's');
   XLSX.writeFile(wb, `${type}_import_template.xlsx`);
 };
 
 /* ── Colour theme per type ───────────────────────────────────── */
 const theme = (type) => ({
-  accent: type === 'student' ? '#6366f1' : '#14b8a6',
-  bg:     type === 'student' ? 'rgba(99,102,241,0.08)'  : 'rgba(20,184,166,0.08)',
-  border: type === 'student' ? 'rgba(99,102,241,0.2)'   : 'rgba(20,184,166,0.2)',
+  accent: type === 'student' ? '#6366f1' : type === 'alumni' ? '#14b8a6' : '#f59e0b',
+  bg:     type === 'student' ? 'rgba(99,102,241,0.08)'  : type === 'alumni' ? 'rgba(20,184,166,0.08)'  : 'rgba(245,158,11,0.08)',
+  border: type === 'student' ? 'rgba(99,102,241,0.2)'   : type === 'alumni' ? 'rgba(20,184,166,0.2)'   : 'rgba(245,158,11,0.2)',
 });
 
 /* ══════════════════════════════════════════════════════════════
@@ -109,13 +119,18 @@ const StepConfigure = ({ type, setType, onNext }) => {
         {[
           {
             value:'student', icon:'🎒', label:'Students',
-            desc:'Active enrolled students. Sets role = student, status = Active.',
+            desc:'Active enrolled students. Sets role = student.',
             accent:'#6366f1', bg:'rgba(99,102,241,0.07)',
           },
           {
             value:'alumni', icon:'🎓', label:'Alumni',
-            desc:'Graduated alumni. Sets role = alumni, status = Pending (awaiting approval).',
+            desc:'Graduated alumni. Sets role = alumni.',
             accent:'#14b8a6', bg:'rgba(20,184,166,0.07)',
+          },
+          {
+            value:'staff', icon:'🏫', label:'Staff / Faculty',
+            desc:'Principals, HODs & Professors. Sets role = staff.',
+            accent:'#f59e0b', bg:'rgba(245,158,11,0.07)',
           },
         ].map(opt => (
           <div
@@ -151,10 +166,10 @@ const StepConfigure = ({ type, setType, onNext }) => {
         borderRadius:12, padding:'16px 20px', marginBottom:28, maxWidth:520,
       }}>
         <div style={{ fontSize:12, fontWeight:700, color:'#555', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.5px' }}>
-          Expected Columns — {type === 'student' ? 'Students' : 'Alumni'}
+          Expected Columns — {type === 'student' ? 'Students' : type === 'alumni' ? 'Alumni' : 'Staff'}
         </div>
         <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-          {(type==='student' ? STUDENT_COLS : ALUMNI_COLS).map((col, i) => (
+          {(type==='student' ? STUDENT_COLS : type==='alumni' ? ALUMNI_COLS : STAFF_COLS).map((col, i) => (
             <span key={col} style={{
               background: i < 2 ? '#6366f115' : '#f3f4f6',
               border:     i < 2 ? '1px solid #6366f140' : '1px solid #e8e8e8',
@@ -167,6 +182,9 @@ const StepConfigure = ({ type, setType, onNext }) => {
         </div>
         <div style={{ fontSize:11, color:'#aaa', marginTop:8 }}>
           * = required · Extra columns are ignored · Column names are case-insensitive
+        </div>
+        <div style={{ fontSize:11.5, color:'#059669', marginTop:8, fontWeight:600 }}>
+          📧 Login credentials will be emailed to every successfully imported user.
         </div>
       </div>
 
@@ -533,11 +551,13 @@ const StepResults = ({ type, result, onReset }) => {
       </div>
 
       {/* Stats grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:24 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:24 }}>
         {[
-          { label:'Created',  value:created,  color:'#059669', bg:'rgba(16,185,129,0.08)',  icon:'✅' },
-          { label:'Skipped',  value:skipped,  color:'#d97706', bg:'rgba(245,158,11,0.08)',  icon:'⏭️' },
-          { label:'Errors',   value:errors.length, color:'#dc2626', bg:'rgba(239,68,68,0.08)', icon:'❌' },
+          { label:'Created',      value:created,          color:'#059669', bg:'rgba(16,185,129,0.08)',  icon:'✅' },
+          { label:'Skipped',      value:skipped,          color:'#d97706', bg:'rgba(245,158,11,0.08)',  icon:'⏭️' },
+          { label:'Errors',       value:errors.length,    color:'#dc2626', bg:'rgba(239,68,68,0.08)',   icon:'❌' },
+          { label:'Emails Sent',  value:result.emailStats?.sent ?? '—',
+                                                          color:'#6366f1', bg:'rgba(99,102,241,0.08)',  icon:'📧' },
         ].map(s => (
           <div key={s.label} style={{
             background:s.bg, borderRadius:12, padding:'18px 16px', textAlign:'center',
@@ -583,11 +603,11 @@ const StepResults = ({ type, result, onReset }) => {
           <FiRefreshCw size={14} /> Import More
         </button>
         <a
-          href={type==='student' ? '/admin/students' : '/admin/alumni'}
+          href={type==='student' ? '/admin/students' : type==='alumni' ? '/admin/alumni' : '/admin/approvals'}
           className="am-btn am-btn-ghost"
           style={{ textDecoration:'none' }}
         >
-          <FiEye size={14} /> View {type==='student' ? 'Students' : 'Alumni'}
+          <FiEye size={14} /> View {type==='student' ? 'Students' : type==='alumni' ? 'Alumni' : 'Staff Approvals'}
         </a>
       </div>
     </div>
@@ -737,10 +757,10 @@ const BulkImportPage = () => {
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16 }}>
             {[
-              { step:'1', icon:'⚙️', title:'Configure',   desc:'Choose record type — student or alumni.' },
+                         { step:'1', icon:'⚙️', title:'Configure',   desc:'Choose record type — student, alumni, or staff.' },
               { step:'2', icon:'📤', title:'Upload',       desc:'Drop your .xlsx or .csv file.' },
               { step:'3', icon:'👁️', title:'Preview',      desc:'Validate field errors before committing.' },
-              { step:'4', icon:'✅', title:'Import',       desc:'Records created instantly in the database.' },
+              { step:'4', icon:'✅', title:'Import',       desc:'Accounts created. Login credentials emailed to each user.' },
             ].map(s => (
               <div key={s.step} style={{ textAlign:'center', padding:'4px 0' }}>
                 <div style={{ fontSize:28, marginBottom:8 }}>{s.icon}</div>

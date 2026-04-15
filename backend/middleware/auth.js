@@ -20,6 +20,15 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: 'Token is no longer valid.' });
     }
 
+    // Task 3: No access to platform until activation complete.
+    // If user is pending activation, block all requests EXCEPT to the activation route itself.
+    if (user.status === 'Pending' && req.originalUrl !== '/api/auth/activate') {
+      return res.status(403).json({
+        message: 'Platform access locked until activation is complete.',
+        requiresActivation: true
+      });
+    }
+
     req.user = user;
     next();
   } catch (err) {

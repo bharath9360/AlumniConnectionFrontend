@@ -16,30 +16,21 @@ router.get('/analytics', protect, authorize('admin'), asyncHandler(async (req, r
   const SEVEN_DAYS_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   // ── KPI Counts — all run in parallel for performance ─────────
-  const [totalStudents, totalAlumni, activeUsers, pendingAlumni, pendingJobs, pendingEvents, totalPosts] = await Promise.all([User.countDocuments({
-    role: 'student'
-  }), User.countDocuments({
-    role: 'alumni'
-  }),
-  // Active = logged in within last 7 days  OR  Active status (legacy users without lastLogin)
-  User.countDocuments({
-    $or: [{
-      lastLogin: {
-        $gte: SEVEN_DAYS_AGO
-      }
-    }, {
-      lastLogin: null,
-      status: 'Active'
-    }]
-  }), User.countDocuments({
-    role: 'alumni',
-    status: 'Pending'
-  }), Job.countDocuments({
-    status: 'Pending'
-  }), Event.countDocuments({
-    status: 'Pending'
-  }), Post.countDocuments()]);
-  const pendingApprovals = pendingAlumni + pendingJobs + pendingEvents;
+  const [totalStudents, totalAlumni, activeUsers, pendingAlumni, pendingJobs, pendingEvents, totalPosts, totalStaff, pendingStaff] = await Promise.all([
+    User.countDocuments({ role: 'student', status: 'Active' }), 
+    User.countDocuments({ role: 'alumni', status: 'Active' }),
+    // Active = logged in within last 7 days  OR  Active status (legacy users without lastLogin)
+    User.countDocuments({
+      $or: [{ lastLogin: { $gte: SEVEN_DAYS_AGO } }, { lastLogin: null, status: 'Active' }]
+    }), 
+    User.countDocuments({ role: 'alumni', status: 'Pending' }), 
+    Job.countDocuments({ status: 'Pending' }), 
+    Event.countDocuments({ status: 'Pending' }), 
+    Post.countDocuments(),
+    User.countDocuments({ role: 'staff', status: 'Active' }),
+    User.countDocuments({ role: 'staff', status: 'Pending' })
+  ]);
+  const pendingApprovals = pendingAlumni + pendingJobs + pendingEvents + pendingStaff;
 
   // ── Department-wise distribution (top 8) ────────────────────
   const deptAgg = await User.aggregate([{
@@ -47,6 +38,7 @@ router.get('/analytics', protect, authorize('admin'), asyncHandler(async (req, r
       role: {
         $in: ['alumni', 'student']
       },
+      status: 'Active',
       department: {
         $exists: true,
         $ne: ''
@@ -75,6 +67,7 @@ router.get('/analytics', protect, authorize('admin'), asyncHandler(async (req, r
   const yearAgg = await User.aggregate([{
     $match: {
       role: 'alumni',
+      status: 'Active',
       batch: {
         $exists: true,
         $ne: ''
@@ -135,6 +128,7 @@ router.get('/analytics', protect, authorize('admin'), asyncHandler(async (req, r
       kpis: {
         totalStudents,
         totalAlumni,
+        totalStaff,
         activeUsers,
         pendingApprovals,
         totalPosts
