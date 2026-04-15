@@ -703,46 +703,60 @@ router.put('/reject-alumni/:userId', protect, authorize('admin'), asyncHandler(a
 }));
 
 // ─── GET /api/admin/pending-alumni ───────────────────────────
+// Returns ONLY self-registered alumni awaiting approval.
+// Bulk-imported users (needsPasswordChange: true) are excluded — they
+// self-activate via the first-login wizard and do NOT need admin approval.
 router.get('/pending-alumni', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
   const pendingAlumni = await User.find({
     role: 'alumni',
-    status: 'Pending'
-  }).select('-password -secretKey -otp -otpExpiry').sort({
-    createdAt: -1
-  });
-  res.json({
-    success: true,
-    data: pendingAlumni
-  });
+    status: 'Pending',
+    $or: [
+      { needsPasswordChange: { $exists: false } },
+      { needsPasswordChange: false },
+    ]
+  }).select('-password -secretKey -otp -otpExpiry').sort({ createdAt: -1 });
+  res.json({ success: true, data: pendingAlumni });
 }));
 
 // ─── PUT /api/admin/activate/:userId ─────────────────────────
+// EMAIL RULE:
+//   • Self-registered users (alumni/staff who went through the OTP flow)
+//     → receive the "approval" email (their first email from us after activation).
+//   • Bulk-imported users (have tempPassword set at import time)
+//     → already received their credentials email during import.
+//     → DO NOT send another email here to avoid confusion / duplicates.
 router.put('/activate/:userId', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
-  const user = await User.findById(req.params.userId);
-  if (!user) return res.status(404).json({
-    message: 'User not found.'
-  });
-  if (user.status === 'Active') return res.status(400).json({
-    message: 'Account already active.'
-  });
+  const user = await User.findById(req.params.userId).select('+tempPassword');
+  if (!user) return res.status(404).json({ message: 'User not found.' });
+  if (user.status === 'Active') return res.status(400).json({ message: 'Account already active.' });
+
   user.status = 'Active';
   await user.save();
 
-  // Notify the alumni their account was approved — with real-time socket push
+  // ── In-app notification (real-time socket push) ──────────────
   const notif = await Notification.create({
     userId: user._id,
-    type: 'account_activated',
-    title: '🎉 Your account has been approved!',
+    type:   'account_activated',
+    title:  '🎉 Your account has been approved!',
     description: 'Welcome to MAMCET Alumni Connect! You can now log in and explore.',
     icon: '🎉'
   });
   const io = req.app.get('io');
   if (io) io.to(user._id.toString()).emit('notification_received', notif.toObject());
 
-  // Send approval email
-  try {
-    await sendApprovalEmail(user.email, user.name);
-  } catch (_) {}
+  // ── Email: only for SELF-REGISTERED users ───────────────────
+  // Bulk-imported users already got their credentials email at import time.
+  // tempPassword is set during bulk import and cleared only after activation wizard.
+  // If tempPassword is still present → bulk user → skip approval email.
+  const isBulkImported = !!user.tempPassword;
+  if (!isBulkImported) {
+    try {
+      await sendApprovalEmail(user.email, user.name);
+    } catch (emailErr) {
+      console.error(`[Activate] Approval email failed for ${user.email}:`, emailErr.message);
+    }
+  }
+
   res.json({
     success: true,
     message: `${user.name} has been activated.`
@@ -772,25 +786,50 @@ router.delete('/reject/:userId', protect, authorize('admin'), asyncHandler(async
 }));
 
 // ─── GET /api/admin/stats ─────────────────────────────────────
+// Only counts ACTIVATED (status === 'Active') users.
+// Pending and Rejected users are excluded from all totals.
 router.get('/stats', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
-  const Job = require('../models/Job');
+  const Job   = require('../models/Job');
   const Event = require('../models/Event');
-  const [totalUsers, pendingAlumni, pendingJobs, pendingEvents, totalPosts] = await Promise.all([User.countDocuments(), User.countDocuments({
-    role: 'alumni',
-    status: 'Pending'
-  }), Job.countDocuments({
-    status: 'Pending'
-  }), Event.countDocuments({
-    status: 'Pending'
-  }), require('../models/Post').countDocuments()]);
+  const Post  = require('../models/Post');
+
+  const [
+    activeStudents,
+    activeAlumni,
+    activeStaff,
+    pendingAlumni,
+    pendingStaff,
+    pendingJobs,
+    pendingEvents,
+    totalPosts,
+  ] = await Promise.all([
+    // ── Active counts (only fully activated users) ────────────
+    User.countDocuments({ role: 'student', status: 'Active' }),
+    User.countDocuments({ role: 'alumni',  status: 'Active' }),
+    User.countDocuments({ role: 'staff',   status: 'Active' }),
+    // ── Pending counts (for approval badges) ─────────────────
+    User.countDocuments({ role: 'alumni', status: 'Pending' }),
+    User.countDocuments({ role: 'staff',  status: 'Pending' }),
+    Job.countDocuments({ status: 'Pending' }),
+    Event.countDocuments({ status: 'Pending' }),
+    Post.countDocuments(),
+  ]);
+
+  // Total active users = students + alumni + staff (excludes pending/rejected)
+  const totalUsers = activeStudents + activeAlumni + activeStaff;
+
   res.json({
     success: true,
     data: {
-      totalUsers,
+      totalUsers,       // active only
+      activeStudents,
+      activeAlumni,
+      activeStaff,
       pendingAlumni,
+      pendingStaff,
       pendingJobs,
       pendingEvents,
-      totalPosts
+      totalPosts,
     }
   });
 }));
@@ -1298,15 +1337,58 @@ router.put('/system-config', protect, authorize('admin'), (req, res) => {
 
 // ─── GET /api/admin/pending-staff ────────────────────────────
 // Returns all staff whose status is still Pending (awaiting admin approval)
+// Returns ONLY self-registered staff awaiting admin approval.
+// Bulk-imported staff (needsPasswordChange: true) are excluded — they
+// self-activate via the first-login wizard and do NOT need admin approval.
 router.get('/pending-staff', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
   const pendingStaff = await User.find({
     role: 'staff',
-    status: 'Pending'
+    status: 'Pending',
+    $or: [
+      { needsPasswordChange: { $exists: false } },
+      { needsPasswordChange: false },
+    ]
   })
     .select('-password -secretKey -otp -otpExpiry')
     .sort({ createdAt: -1 });
 
   res.json({ success: true, data: pendingStaff });
+}));
+
+// ─── GET /api/admin/imported-users ──────────────────────────
+// Bulk-imported users who have NOT yet completed the activation wizard.
+// These are Pending + needsPasswordChange: true (set during bulk import).
+// They self-activate — admin cannot approve/reject them here, only monitor.
+// Query params: role (student|alumni|staff|all), page, limit
+router.get('/imported-users', protect, authorize('admin'), asyncHandler(async (req, res, next) => {
+  const { role = 'all', page = 1, limit = 20 } = req.query;
+
+  const query = {
+    status: 'Pending',
+    needsPasswordChange: true,
+  };
+  if (role !== 'all') query.role = role;
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const [users, total] = await Promise.all([
+    User.find(query)
+      .select('-password -secretKey -otp -otpExpiry')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit)),
+    User.countDocuments(query),
+  ]);
+
+  res.json({
+    success: true,
+    data: users,
+    pagination: {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+    },
+  });
 }));
 
 // ─── POST /api/admin/approve-staff ───────────────────────────
@@ -1335,8 +1417,16 @@ router.post('/approve-staff', protect, authorize('admin'), asyncHandler(async (r
     const io = req.app.get('io');
     if (io) io.to(staffUser._id.toString()).emit('notification_received', notif.toObject());
 
-    // Send approval email (fire-and-forget)
-    try { await sendApprovalEmail(staffUser.email, staffUser.name); } catch (_) {}
+    // ── Email: only for SELF-REGISTERED staff ─────────────────
+    // Bulk-imported staff already received credentials email at import time.
+    // tempPassword is present on bulk users until they complete the activation wizard.
+    const staffUserWithPass = await User.findById(staffUser._id).select('+tempPassword');
+    const isBulkImportedStaff = !!(staffUserWithPass?.tempPassword);
+    if (!isBulkImportedStaff) {
+      try { await sendApprovalEmail(staffUser.email, staffUser.name); } catch (emailErr) {
+        console.error(`[ApproveStaff] Email failed for ${staffUser.email}:`, emailErr.message);
+      }
+    }
 
     return res.json({
       success: true,

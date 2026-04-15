@@ -81,39 +81,30 @@ router.get('/students', asyncHandler(async (req, res, next) => {
 //  - Active vs Inactive users (pie chart)
 //  - Total posts / month
 router.get('/analytics', asyncHandler(async (req, res, next) => {
-  // 1. Students per department
+  // 1. Active students + alumni per department (excludes Pending/Rejected)
   const deptStats = await User.aggregate([{
     $match: {
-      role: {
-        $in: ['student', 'alumni']
-      }
+      role:   { $in: ['student', 'alumni'] },
+      status: 'Active'                       // ← active only
     }
   }, {
     $group: {
       _id: '$department',
-      count: {
-        $sum: 1
-      }
+      count: { $sum: 1 }
     }
   }, {
-    $sort: {
-      count: -1
-    }
+    $sort: { count: -1 }
   }, {
     $limit: 12
   }]);
 
-  // 2. Active vs Inactive
+  // 2. Active vs Pending (Inactive = Pending — awaiting activation)
   const activeCount = await User.countDocuments({
-    role: {
-      $in: ['student', 'alumni']
-    },
+    role: { $in: ['student', 'alumni'] },
     status: 'Active'
   });
-  const inactiveCount = await User.countDocuments({
-    role: {
-      $in: ['student', 'alumni']
-    },
+  const pendingCount = await User.countDocuments({
+    role: { $in: ['student', 'alumni'] },
     status: 'Pending'
   });
 
@@ -178,14 +169,10 @@ router.get('/analytics', asyncHandler(async (req, res, next) => {
     }
   }]);
 
-  // 5. Summary totals
-  const totalStudents = await User.countDocuments({
-    role: 'student'
-  });
-  const totalAlumni = await User.countDocuments({
-    role: 'alumni'
-  });
-  const totalPosts = await Post.countDocuments();
+  // 5. Summary totals — active users only
+  const totalStudents = await User.countDocuments({ role: 'student', status: 'Active' });
+  const totalAlumni   = await User.countDocuments({ role: 'alumni',  status: 'Active' });
+  const totalPosts    = await Post.countDocuments();
   const MONTH_NAMES = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const formatMonthly = arr => arr.map(d => ({
     month: `${MONTH_NAMES[d._id.month]} ${d._id.year}`,
@@ -198,14 +185,14 @@ router.get('/analytics', asyncHandler(async (req, res, next) => {
         dept: d._id || 'Unknown',
         count: d.count
       })),
-      activeUsers: activeCount,
-      inactiveUsers: inactiveCount,
+      activeUsers:  activeCount,
+      pendingUsers: pendingCount,  // awaiting activation (excluded from totals)
       postsPerMonth: formatMonthly(postsPerMonth),
-      userGrowth: formatMonthly(userGrowth),
+      userGrowth:    formatMonthly(userGrowth),
       totals: {
-        students: totalStudents,
-        alumni: totalAlumni,
-        posts: totalPosts
+        students: totalStudents,  // active only
+        alumni:   totalAlumni,    // active only
+        posts:    totalPosts
       }
     }
   });

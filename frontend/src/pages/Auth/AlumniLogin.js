@@ -23,9 +23,14 @@ const AlumniLogin = () => {
       const res = await authService.login(email, password, 'alumni');
       const { user, token } = res.data;
       login(user, token);
-      if (user.status !== 'Pending') {
+      // Bulk-imported user: tempPassword matched → needsPasswordChange=true.
+      // Navigate to dashboard so ActivationModal (globally mounted) can intercept.
+      if (user.needsPasswordChange) {
+        navigate(`/alumni/home/${user._id || user.id}`);
+      } else if (user.status !== 'Pending') {
         navigate(`/alumni/home/${user._id || user.id}`);
       }
+      // else: self-registered Pending user → stay on page, show pendingApproval banner
     } catch (err) {
       const data = err.response?.data;
       if (data?.pendingApproval) {

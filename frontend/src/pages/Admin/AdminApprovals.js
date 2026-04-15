@@ -5,10 +5,10 @@ import { ClipLoader } from 'react-spinners';
 import {
   FiCheck, FiX, FiUser, FiBriefcase, FiCalendar,
   FiRefreshCw, FiAlertTriangle, FiInfo, FiMail,
-  FiMapPin, FiTag, FiUsers, FiShield,
+  FiMapPin, FiTag, FiUsers, FiShield, FiDownload,
 } from 'react-icons/fi';
 
-/* ── Inline toast (matches all other admin panels) ──────────── */
+/* ── Inline toast ───────────────────────────────────────────── */
 let _tid = 0;
 const useToast = () => {
   const [toasts, set] = useState([]);
@@ -36,14 +36,12 @@ const Empty = ({ icon, msg }) => (
 /* ── Action buttons ─────────────────────────────────────────── */
 const ActionBtn = ({ onClick, disabled, variant, children }) => {
   const styles = {
-    approve: { bg: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)', hover: '#059669' },
-    reject:  { bg: 'rgba(239,68,68,0.08)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.15)', hover: '#dc2626' },
+    approve: { bg: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' },
+    reject:  { bg: 'rgba(239,68,68,0.08)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.15)' },
   };
   const s = styles[variant];
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
+    <button onClick={onClick} disabled={disabled}
       style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 9, background: s.bg, color: s.color, border: s.border, fontSize: 12.5, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, transition: 'all 0.15s', whiteSpace: 'nowrap' }}
     >
       {children}
@@ -51,28 +49,33 @@ const ActionBtn = ({ onClick, disabled, variant, children }) => {
   );
 };
 
-/* ── Alumni Card ────────────────────────────────────────────── */
+/* ── Shared user info row ───────────────────────────────────── */
+const UserInfo = ({ u }) => (
+  <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ fontWeight: 800, fontSize: 14, color: '#1a1a2e', marginBottom: 3 }}>
+      <Link to={`/profile/${u._id}`} style={{ color: '#1a1a2e', textDecoration: 'none' }}>{u.name}</Link>
+    </div>
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12, color: '#888' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FiMail size={11} />{u.email}</span>
+      {u.department && <span>🏛 {u.department}</span>}
+      {u.batch      && <span>📅 Batch {u.batch}</span>}
+      {u.role       && <span style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', borderRadius: 20, padding: '1px 8px', fontWeight: 700, textTransform: 'capitalize' }}>{u.role}</span>}
+    </div>
+    {u.company && <div style={{ fontSize: 11.5, color: '#aaa', marginTop: 2 }}>@ {u.company}{u.designation ? ` · ${u.designation}` : ''}</div>}
+  </div>
+);
+
+/* ── Alumni Card (approval) ─────────────────────────────────── */
 const AlumniCard = ({ u, actionId, onApprove, onReject }) => (
   <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #f0f0f0', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14, opacity: actionId === u._id ? 0.65 : 1, transition: 'opacity 0.2s', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
     <div style={{ width: 46, height: 46, borderRadius: '50%', background: ac(u.name || ''), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 17, flexShrink: 0, overflow: 'hidden' }}>
       {u.profilePic ? <img src={u.profilePic} alt={u.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (u.name || '?')[0].toUpperCase()}
     </div>
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontWeight: 800, fontSize: 14, color: '#1a1a2e', marginBottom: 3 }}>
-        <Link to={`/profile/${u._id}`} style={{ color: '#1a1a2e', textDecoration: 'none' }}>{u.name}</Link>
-      </div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12, color: '#888' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FiMail size={11} />{u.email}</span>
-        {u.department && <span>🏛 {u.department}</span>}
-        {u.batch && <span>📅 Batch {u.batch}</span>}
-        {u.presentStatus && <span>💼 {u.presentStatus}</span>}
-      </div>
-      {u.company && <div style={{ fontSize: 11.5, color: '#aaa', marginTop: 2 }}>@ {u.company}{u.designation ? ` · ${u.designation}` : ''}</div>}
-    </div>
+    <UserInfo u={u} />
+    {u.presentStatus && <span style={{ fontSize: 11.5, color: '#888' }}>💼 {u.presentStatus}</span>}
     <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
       <ActionBtn onClick={onApprove} disabled={actionId === u._id} variant="approve">
-        {actionId === u._id ? <ClipLoader size={12} color="#059669" /> : <FiCheck size={13} />}
-        Approve
+        {actionId === u._id ? <ClipLoader size={12} color="#059669" /> : <FiCheck size={13} />} Approve
       </ActionBtn>
       <ActionBtn onClick={onReject} disabled={actionId === u._id} variant="reject">
         <FiX size={13} /> Reject
@@ -81,7 +84,7 @@ const AlumniCard = ({ u, actionId, onApprove, onReject }) => (
   </div>
 );
 
-/* ── Staff Card ─────────────────────────────────────────────── */
+/* ── Staff Card (approval) ──────────────────────────────────── */
 const StaffCard = ({ u, actionId, onApprove, onReject }) => (
   <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #f0f0f0', padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14, opacity: actionId === u._id ? 0.65 : 1, transition: 'opacity 0.2s', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
     <div style={{ width: 46, height: 46, borderRadius: '50%', background: ac(u.name || ''), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 17, flexShrink: 0, overflow: 'hidden' }}>
@@ -97,17 +100,36 @@ const StaffCard = ({ u, actionId, onApprove, onReject }) => (
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12, color: '#888' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FiMail size={11} />{u.email}</span>
         {u.department && <span>🏛 {u.department}</span>}
-        {u.createdAt && <span>📅 Registered {new Date(u.createdAt).toLocaleDateString()}</span>}
+        {u.createdAt  && <span>📅 Registered {new Date(u.createdAt).toLocaleDateString()}</span>}
       </div>
     </div>
     <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
       <ActionBtn onClick={onApprove} disabled={actionId === u._id} variant="approve">
-        {actionId === u._id ? <ClipLoader size={12} color="#059669" /> : <FiCheck size={13} />}
-        Approve
+        {actionId === u._id ? <ClipLoader size={12} color="#059669" /> : <FiCheck size={13} />} Approve
       </ActionBtn>
       <ActionBtn onClick={onReject} disabled={actionId === u._id} variant="reject">
         <FiX size={13} /> Reject
       </ActionBtn>
+    </div>
+  </div>
+);
+
+/* ── Imported User Card (read-only) ─────────────────────────── */
+const ImportedCard = ({ u }) => (
+  <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #f0f0f0', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+    <div style={{ width: 44, height: 44, borderRadius: '50%', background: ac(u.name || ''), display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 16, flexShrink: 0 }}>
+      {(u.name || '?')[0].toUpperCase()}
+    </div>
+    <UserInfo u={u} />
+    <div style={{ flexShrink: 0, textAlign: 'right' }}>
+      <div style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', borderRadius: 20, padding: '3px 10px', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap' }}>
+        ⏳ Awaiting First Login
+      </div>
+      {u.createdAt && (
+        <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>
+          Imported {new Date(u.createdAt).toLocaleDateString()}
+        </div>
+      )}
     </div>
   </div>
 );
@@ -119,10 +141,10 @@ const JobCard = ({ j, actionId, onApprove, onReject }) => (
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 800, fontSize: 14.5, color: '#1a1a2e', marginBottom: 4 }}>{j.title}</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12, color: '#888', marginBottom: 6 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>🏢 {j.company}</span>
+          <span>🏢 {j.company}</span>
           {j.location && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FiMapPin size={11} />{j.location}</span>}
-          {j.type && <span style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', borderRadius: 6, padding: '1px 7px', fontWeight: 700, textTransform: 'capitalize' }}>{j.type}</span>}
-          {j.salary && <span>💰 {j.salary}</span>}
+          {j.type     && <span style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', borderRadius: 6, padding: '1px 7px', fontWeight: 700, textTransform: 'capitalize' }}>{j.type}</span>}
+          {j.salary   && <span>💰 {j.salary}</span>}
         </div>
         {j.description && <div style={{ fontSize: 12.5, color: '#666', lineHeight: 1.5 }}>{j.description.slice(0, 160)}{j.description.length > 160 ? '…' : ''}</div>}
         <div style={{ marginTop: 8, fontSize: 11.5, color: '#aaa' }}>
@@ -150,7 +172,7 @@ const EventCard = ({ e, actionId, onApprove, onReject }) => (
         <div style={{ fontWeight: 800, fontSize: 14.5, color: '#1a1a2e', marginBottom: 4 }}>{e.title}</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12, color: '#888', marginBottom: 6 }}>
           <span>📅 {e.date}</span>
-          {e.venue && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FiMapPin size={11} />{e.venue}</span>}
+          {e.venue    && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FiMapPin size={11} />{e.venue}</span>}
           {e.category && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FiTag size={11} />{e.category}</span>}
           {e.registeredBy?.length > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><FiUsers size={11} />{e.registeredBy.length} registered</span>}
         </div>
@@ -181,6 +203,9 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
   const [pendingJobs,   setPendingJobs]   = useState([]);
   const [pendingEvents, setPendingEvents] = useState([]);
   const [pendingStaff,  setPendingStaff]  = useState([]);
+  const [importedUsers, setImportedUsers] = useState([]);
+  const [importedTotal, setImportedTotal] = useState(0);
+  const [importRoleFilter, setImportRoleFilter] = useState('all');
   const [loading,       setLoading]       = useState(true);
   const [actionId,      setActionId]      = useState(null);
   const { toasts, add: toast } = useToast();
@@ -188,25 +213,43 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, j, e, s] = await Promise.all([
+      const [a, j, e, s, imp] = await Promise.all([
         adminService.getPendingAlumni(),
         jobService.getPendingJobs().catch(() => ({ data: { data: [] } })),
         eventService.getPendingEvents().catch(() => ({ data: { data: [] } })),
         adminService.getPendingStaff().catch(() => ({ data: { data: [] } })),
+        adminService.getImportedUsers({ role: 'all', limit: 50 }).catch(() => ({ data: { data: [], pagination: { total: 0 } } })),
       ]);
       setPendingAlumni(a.data?.data || a.data || []);
       setPendingJobs(j.data?.data   || j.data || []);
       setPendingEvents(e.data?.data || e.data || []);
       setPendingStaff(s.data?.data  || s.data || []);
-    } catch (err) {
+      setImportedUsers(imp.data?.data || []);
+      setImportedTotal(imp.data?.pagination?.total || 0);
+    } catch {
       toast('Failed to load pending approvals.', 'error');
     } finally { setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reload imported users when role filter changes
+  const fetchImported = useCallback(async (role) => {
+    try {
+      const res = await adminService.getImportedUsers({ role, limit: 50 });
+      setImportedUsers(res.data?.data || []);
+      setImportedTotal(res.data?.pagination?.total || 0);
+    } catch { toast('Failed to reload imported users.', 'error'); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  /* Alumni actions */
+  const handleRoleFilter = (role) => {
+    setImportRoleFilter(role);
+    fetchImported(role);
+  };
+
+  /* ── Alumni actions ──────────────────────────────────────── */
   const handleActivate = async (userId) => {
     setActionId(userId);
     try {
@@ -224,12 +267,11 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
       await adminService.rejectUser(userId);
       setPendingAlumni(prev => prev.filter(u => u._id !== userId));
       toast('Application rejected.', 'success');
-    } catch (err) {
-      toast('Failed to reject.', 'error');
-    } finally { setActionId(null); }
+    } catch { toast('Failed to reject.', 'error'); }
+    finally { setActionId(null); }
   };
 
-  /* Staff actions */
+  /* ── Staff actions ───────────────────────────────────────── */
   const handleApproveStaff = async (userId) => {
     setActionId(userId);
     try {
@@ -244,21 +286,20 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
   const handleRejectStaff = async (userId) => {
     setActionId(userId);
     try {
-      await adminService.rejectStaff(userId);
+      await adminService.rejectPendingStaff(userId);
       setPendingStaff(prev => prev.filter(u => u._id !== userId));
       toast('Staff registration rejected.', 'success');
-    } catch (err) {
-      toast('Failed to reject staff.', 'error');
-    } finally { setActionId(null); }
+    } catch { toast('Failed to reject staff.', 'error'); }
+    finally { setActionId(null); }
   };
 
-  /* Job actions */
+  /* ── Job actions ─────────────────────────────────────────── */
   const handleApproveJob = async (jobId) => {
     setActionId(jobId);
     try {
       await jobService.approveJob(jobId);
       setPendingJobs(prev => prev.filter(j => j._id !== jobId));
-      toast('✅ Job approved and published! Students notified.', 'success');
+      toast('✅ Job approved and published!', 'success');
     } catch { toast('Failed to approve job.', 'error'); }
     finally { setActionId(null); }
   };
@@ -273,13 +314,13 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
     finally { setActionId(null); }
   };
 
-  /* Event actions */
+  /* ── Event actions ───────────────────────────────────────── */
   const handleApproveEvent = async (eventId) => {
     setActionId(eventId);
     try {
       await eventService.approveEvent(eventId);
       setPendingEvents(prev => prev.filter(e => e._id !== eventId));
-      toast('✅ Event approved! Students notified.', 'success');
+      toast('✅ Event approved!', 'success');
     } catch { toast('Failed to approve event.', 'error'); }
     finally { setActionId(null); }
   };
@@ -294,13 +335,14 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
     finally { setActionId(null); }
   };
 
-  const totalPending = pendingAlumni.length + pendingJobs.length + pendingEvents.length + pendingStaff.length;
+  const approvalPending = pendingAlumni.length + pendingJobs.length + pendingEvents.length + pendingStaff.length;
 
   const TABS = [
-    { key: 'alumni',  label: 'Alumni',  icon: FiUser,      count: pendingAlumni.length, color: '#c84022' },
-    { key: 'staff',   label: 'Staff',   icon: FiShield,    count: pendingStaff.length,  color: '#6366f1' },
-    { key: 'jobs',    label: 'Jobs',    icon: FiBriefcase, count: pendingJobs.length,   color: '#f59e0b' },
-    { key: 'events',  label: 'Events',  icon: FiCalendar,  count: pendingEvents.length, color: '#10b981' },
+    { key: 'alumni',   label: 'Alumni',   icon: FiUser,       count: pendingAlumni.length, color: '#c84022',  desc: 'Self-registered alumni awaiting approval' },
+    { key: 'staff',    label: 'Staff',    icon: FiShield,     count: pendingStaff.length,  color: '#6366f1',  desc: 'Self-registered staff awaiting approval' },
+    { key: 'jobs',     label: 'Jobs',     icon: FiBriefcase,  count: pendingJobs.length,   color: '#f59e0b',  desc: 'Job postings pending review' },
+    { key: 'events',   label: 'Events',   icon: FiCalendar,   count: pendingEvents.length, color: '#10b981',  desc: 'Events pending review' },
+    { key: 'imported', label: 'Imported', icon: FiDownload,   count: importedTotal,        color: '#8b5cf6',  desc: 'Bulk-imported users awaiting first login' },
   ];
 
   return (
@@ -310,10 +352,10 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
         <div>
           <div className="ap-section-title">Approvals</div>
           <div className="ap-section-sub">
-            Review and approve pending alumni registrations, job postings, and events.
-            {totalPending > 0 && (
+            Review self-registered users, job postings, and events.
+            {approvalPending > 0 && (
               <span style={{ marginLeft: 8, background: '#c84022', color: '#fff', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
-                {totalPending} pending
+                {approvalPending} need action
               </span>
             )}
           </div>
@@ -323,23 +365,36 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
         </button>
       </div>
 
+      {/* ── Info banner for Imported tab ─ */}
+      {activeTab === 'imported' && (
+        <div style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <FiInfo size={15} />
+          <span>
+            <strong>Bulk-imported users</strong> activate themselves on first login — no admin approval needed.
+            This is a <strong>read-only monitoring view</strong>.
+          </span>
+        </div>
+      )}
+
       {/* ── Tab bar ─────────────────────── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, background: '#fff', borderRadius: 14, padding: 6, border: '1.5px solid #f0f0f0', width: 'fit-content', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
         {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 10, border: 'none', background: activeTab === t.key ? t.color : 'transparent', color: activeTab === t.key ? '#fff' : '#666', fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', position: 'relative' }}
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 10, border: activeTab === t.key ? 'none' : '1.5px solid #f0f0f0', background: activeTab === t.key ? t.color : '#fff', color: activeTab === t.key ? '#fff' : '#666', fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', position: 'relative', boxShadow: activeTab === t.key ? `0 3px 12px ${t.color}44` : '0 1px 4px rgba(0,0,0,0.04)' }}
           >
-            <t.icon size={14} />
-            {t.label}
+            <t.icon size={14} /> {t.label}
             {t.count > 0 && (
-              <span style={{ background: activeTab === t.key ? 'rgba(255,255,255,0.3)' : t.color, color: '#fff', borderRadius: 20, padding: '1px 7px', fontSize: 10.5, fontWeight: 700, minWidth: 18, textAlign: 'center' }}>
+              <span style={{ background: activeTab === t.key ? 'rgba(255,255,255,0.28)' : t.color, color: '#fff', borderRadius: 20, padding: '1px 7px', fontSize: 10.5, fontWeight: 700, minWidth: 18, textAlign: 'center' }}>
                 {t.count}
               </span>
             )}
           </button>
         ))}
+      </div>
+
+      {/* ── Tab description ─────────────── */}
+      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14, marginLeft: 2 }}>
+        {TABS.find(t => t.key === activeTab)?.desc}
       </div>
 
       {/* ── Content ─────────────────────── */}
@@ -349,10 +404,11 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* ALUMNI */}
+
+          {/* ALUMNI (self-registered only) */}
           {activeTab === 'alumni' && (
             pendingAlumni.length === 0
-              ? <Empty icon="👤" msg="No pending alumni registrations." />
+              ? <Empty icon="👤" msg="No self-registered alumni awaiting approval." />
               : pendingAlumni.map(u => (
                   <AlumniCard key={u._id} u={u} actionId={actionId}
                     onApprove={() => handleActivate(u._id)}
@@ -361,10 +417,10 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
                 ))
           )}
 
-          {/* STAFF */}
+          {/* STAFF (self-registered only) */}
           {activeTab === 'staff' && (
             pendingStaff.length === 0
-              ? <Empty icon="🏫" msg="No pending staff registration requests." />
+              ? <Empty icon="🏫" msg="No self-registered staff awaiting approval." />
               : pendingStaff.map(u => (
                   <StaffCard key={u._id} u={u} actionId={actionId}
                     onApprove={() => handleApproveStaff(u._id)}
@@ -396,6 +452,31 @@ const AdminApprovals = ({ defaultTab = 'alumni' }) => {
                   />
                 ))
           )}
+
+          {/* IMPORTED — read-only */}
+          {activeTab === 'imported' && (
+            <>
+              {/* Role filter */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                {['all', 'student', 'alumni', 'staff'].map(r => (
+                  <button key={r} onClick={() => handleRoleFilter(r)}
+                    style={{ padding: '5px 14px', borderRadius: 20, border: '1.5px solid', borderColor: importRoleFilter === r ? '#8b5cf6' : '#e5e7eb', background: importRoleFilter === r ? '#8b5cf6' : '#fff', color: importRoleFilter === r ? '#fff' : '#666', fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}
+                  >
+                    {r === 'all' ? 'All Roles' : r}
+                  </button>
+                ))}
+                <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aaa', alignSelf: 'center' }}>
+                  {importedTotal} user{importedTotal !== 1 ? 's' : ''} pending first login
+                </span>
+              </div>
+
+              {importedUsers.length === 0
+                ? <Empty icon="📥" msg="All imported users have completed activation." />
+                : importedUsers.map(u => <ImportedCard key={u._id} u={u} />)
+              }
+            </>
+          )}
+
         </div>
       )}
 

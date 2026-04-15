@@ -234,6 +234,12 @@ export const adminService = {
   // System Config
   getSystemConfig:    ()             => api.get('/admin/system-config'),
   updateSystemConfig: (data)         => api.put('/admin/system-config', data),
+
+  // Imported (bulk) users — read-only monitoring view
+  getImportedUsers: (params)         => api.get('/admin/imported-users', { params }),
+
+  // Quick-add alumni (from AdminHome modal)
+  addAlumni: (data)                  => api.post('/admin/alumni', data),
 };
 
 // ─── Landing Page CMS Service ─────────────────────────────────
