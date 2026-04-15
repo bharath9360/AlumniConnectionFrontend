@@ -154,8 +154,6 @@ router.post('/register', asyncHandler(async (req, res, next) => {
   }
 
   // ── ALUMNI: OTP flow → Pending approval (admin must activate) ──
-  // Same pattern as Staff: collect data, generate OTP, put in pendingRegistrations map.
-  // Account is NOT created until OTP is verified.
   if (role === 'alumni') {
     const otp    = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = Date.now() + 10 * 60 * 1000;
@@ -190,7 +188,7 @@ router.post('/register', asyncHandler(async (req, res, next) => {
       role: 'staff',
       department,
       designation,
-      staffRole: staffRole || designation, // Principal / HOD / Professor
+      staffRole: staffRole || designation,
       otp,
       otpExpiry: expiry
     });
@@ -204,7 +202,11 @@ router.post('/register', asyncHandler(async (req, res, next) => {
 
   // ── ADMIN: Validate secret key before OTP ──
   if (role === 'admin') {
-    const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY || 'MAMCET_ADMIN_2026';
+    const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY;
+    if (!ADMIN_SECRET) {
+      console.error('[Auth] ADMIN_SECRET_KEY is not set in environment variables.');
+      return res.status(500).json({ message: 'Server misconfiguration. Contact support.' });
+    }
     if (secretKey !== ADMIN_SECRET) {
       return res.status(403).json({
         message: 'Invalid admin secret key.'
@@ -366,7 +368,11 @@ router.post('/login', asyncHandler(async (req, res, next) => {
   // ── Admin secret key enforcement ──────────────────────────
   // If the account is admin, the secret key MUST match.
   if (user.role === 'admin') {
-    const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY || 'MAMCET_ADMIN_2026';
+    const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY;
+    if (!ADMIN_SECRET) {
+      console.error('[Auth/Login] ADMIN_SECRET_KEY is not set in environment variables.');
+      return res.status(500).json({ message: 'Server misconfiguration. Contact support.' });
+    }
     if (!secretKey || secretKey !== ADMIN_SECRET) {
       return res.status(403).json({
         message: 'Invalid admin secret key. Access denied.'

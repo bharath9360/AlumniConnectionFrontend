@@ -19,7 +19,11 @@ const run = async () => {
 
     // ── Create seed users ──────────────────────────────────────
     await User.deleteMany({});
-    const rawPassword = 'alumni@123';
+    // Seed password from env — set SEED_PASSWORD in .env before running
+    const rawPassword = process.env.SEED_PASSWORD;
+    if (!rawPassword) {
+      throw new Error('SEED_PASSWORD is not set in .env. Aborting to prevent weak credentials.');
+    }
 
     const alumniUser = await User.create({
       name: 'Bharath K',
@@ -170,9 +174,9 @@ const run = async () => {
     console.log('\n🎉 Database seeding complete!');
     console.log('─────────────────────────────────────────');
     console.log('Test Credentials:');
-    console.log('  Alumni  → bharath@mamcet.com / alumni@123');
-    console.log('  Admin   → admin@mamcet.com   / alumni@123');
-    console.log('  Student → student@mamcet.com / alumni@123');
+    console.log('  Alumni  → bharath@mamcet.com  / [see SEED_PASSWORD in .env]');
+    console.log('  Admin   → admin@mamcet.com    / [see SEED_PASSWORD in .env]');
+    console.log('  Student → student@mamcet.com  / [see SEED_PASSWORD in .env]');
     console.log('─────────────────────────────────────────');
     process.exit(0);
   } catch (err) {
