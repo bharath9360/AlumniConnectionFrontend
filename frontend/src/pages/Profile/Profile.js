@@ -13,6 +13,9 @@ import {
   FaArrowLeft, FaCamera, FaPencilAlt, FaPlus,
   FaBuilding, FaIdBadge, FaTimes, FaThumbsUp, FaCommentAlt
 } from 'react-icons/fa';
+import {
+  FiSettings, FiLogOut, FiKey, FiUser, FiChevronRight, FiShield
+} from 'react-icons/fi';
 
 // ─── URL resolver helper ──────────────────────────────────────
 const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
@@ -137,7 +140,7 @@ const Section = ({ title, onEdit, onAdd, children, custom = 0 }) => (
 const Profile = () => {
   const { id }           = useParams();
   const navigate         = useNavigate();
-  const { user: me, updateUser } = useAuth();
+  const { user: me, updateUser, logout } = useAuth();
 
   // ── Core state ──────────────────────────────────────────────
   const [profile, setProfile]            = useState(null);
@@ -165,6 +168,10 @@ const Profile = () => {
   const [isSkillsOpen, setIsSkillsOpen]   = useState(false);
   const [skillsInput, setSkillsInput]     = useState('');
   const [saving, setSaving]               = useState(false);
+
+  // ── Settings dropdown state ──────────────────────────────────
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef(null);
 
   // ── User posts state ─────────────────────────────────────────
   const POST_LIMIT = 1;
@@ -249,6 +256,18 @@ const Profile = () => {
     if (id) fetchActivity();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, me?._id]);
+
+  // ── Close settings dropdown on outside click ─────────────────
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handler = (e) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [settingsOpen]);
 
   // ── Upload handlers ──────────────────────────────────────────
   const handleProfilePicUpload = async (e) => {
@@ -496,6 +515,119 @@ const Profile = () => {
 
               {/* —— Info row below banner —— */}
               <div className="px-4 pb-4 position-relative">
+
+                {/* ⚙️ Settings icon — own profile only */}
+                {isOwnProfile && (
+                  <div
+                    ref={settingsRef}
+                    style={{ position: 'absolute', top: 14, right: 16, zIndex: 20 }}
+                  >
+                    {/* Trigger button */}
+                    <button
+                      id="profile-settings-btn"
+                      onClick={() => setSettingsOpen(o => !o)}
+                      aria-label="Account Settings"
+                      title="Account Settings"
+                      style={{
+                        width: 38, height: 38, borderRadius: '50%',
+                        border: '1.5px solid #e9ecef',
+                        background: settingsOpen ? '#c84022' : '#fff',
+                        color: settingsOpen ? '#fff' : '#555',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                        transition: 'all 0.18s',
+                      }}
+                    >
+                      <FiSettings size={16} />
+                    </button>
+
+                    {/* Dropdown panel */}
+                    <AnimatePresence>
+                      {settingsOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                          transition={{ duration: 0.16 }}
+                          style={{
+                            position: 'absolute', top: 46, right: 0,
+                            width: 230,
+                            background: '#fff',
+                            borderRadius: 14,
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+                            border: '1px solid #f0f0f0',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {/* User info */}
+                          <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid #f5f5f5' }}>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {profile?.name}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: '#888', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {profile?.email}
+                            </div>
+                            <span style={{
+                              display: 'inline-block', marginTop: 6,
+                              background: 'rgba(200,64,34,0.09)', color: '#c84022',
+                              borderRadius: 20, padding: '2px 10px',
+                              fontSize: 11, fontWeight: 700, textTransform: 'capitalize'
+                            }}>
+                              {profile?.role}
+                            </span>
+                          </div>
+
+                          {/* Menu items */}
+                          {[
+                            { icon: <FiUser size={14} />, label: 'My Account', path: '/account' },
+                            { icon: <FiKey size={14} />, label: 'Change Password', path: '/change-password' },
+                            { icon: <FiShield size={14} />, label: 'Privacy Settings', path: '/settings/privacy' },
+                          ].map((item) => (
+                            <button
+                              key={item.path}
+                              onClick={() => { navigate(item.path); setSettingsOpen(false); }}
+                              style={{
+                                width: '100%', padding: '11px 16px',
+                                display: 'flex', alignItems: 'center', gap: 10,
+                                background: 'none', border: 'none',
+                                fontSize: 13.5, color: '#333', fontWeight: 500,
+                                cursor: 'pointer', textAlign: 'left',
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                            >
+                              <span style={{ color: '#c84022', display: 'flex' }}>{item.icon}</span>
+                              {item.label}
+                              <FiChevronRight size={12} style={{ marginLeft: 'auto', color: '#ccc' }} />
+                            </button>
+                          ))}
+
+                          {/* Divider */}
+                          <div style={{ borderTop: '1px solid #f5f5f5', margin: '4px 0' }} />
+
+                          {/* Sign Out */}
+                          <button
+                            id="profile-logout-btn"
+                            onClick={() => { setSettingsOpen(false); logout(); navigate('/login'); }}
+                            style={{
+                              width: '100%', padding: '11px 16px 14px',
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              background: 'none', border: 'none',
+                              fontSize: 13.5, color: '#e53e3e', fontWeight: 600,
+                              cursor: 'pointer', textAlign: 'left',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                          >
+                            <FiLogOut size={14} />
+                            Sign Out
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
 
                 {/* Avatar */}
                 <div
