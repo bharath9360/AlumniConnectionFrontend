@@ -92,6 +92,7 @@ import './styles/Global.css';
 import './styles/Dashboard.css';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import NavigationSync from './components/common/NavigationSync';
+import PopupNotificationSystem from './components/common/PopupNotification';
 
 // ─── Route redirect helpers ────────────────────────────────────
 // /alumni/profile/:userId or /admin/profile/:userId → /profile/:userId
@@ -123,6 +124,7 @@ function App() {
             <Router>
               <ActivationModal />
               <NavigationSync />
+              <PopupNotificationSystem />
               <Toaster
                 position="top-right"
                 toastOptions={{
