@@ -36,6 +36,8 @@ import ActivationModal from './components/auth/ActivationModal';
 import Profile from './pages/Profile/Profile';
 import ProfilePosts from './pages/Profile/ProfilePosts';
 import ProfileActivity from './pages/Profile/ProfileActivity';
+import ChangePasswordPage from './pages/Profile/ChangePasswordPage';
+import AccountPage from './pages/Profile/AccountPage';
 
 // Role-Specific Dashboards
 import AlumniDashboard from './pages/Alumni/AlumniDashboard';
@@ -251,6 +253,9 @@ function App() {
                               <Route path="/messaging" element={<Messaging />} />
                               <Route path="/notifications" element={<Notification />} />
                               <Route path="/mentorship" element={<Mentorship />} />
+                              {/* ── Account Settings routes ── */}
+                              <Route path="/account" element={<AccountPage />} />
+                              <Route path="/change-password" element={<ChangePasswordPage />} />
                             </Route>
 
                             {/* ── 404 Fallback ──────────────────────── */}

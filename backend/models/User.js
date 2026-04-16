@@ -105,7 +105,10 @@ const userSchema = new mongoose.Schema({
   otpExpiry: { type: Date, select: false },
 
   // Admin credentials
-  secretKey: { type: String, select: false }
+  secretKey: { type: String, select: false },
+
+  // Blocked users list
+  blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }, {
   timestamps: true
 });

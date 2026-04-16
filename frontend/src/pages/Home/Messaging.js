@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { chatService, connectionService, mentorshipService } from '../../services/api';
+import { chatService, connectionService, mentorshipService, userService } from '../../services/api';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { useMessage } from '../../context/MessageContext';
@@ -31,7 +31,6 @@ const Messaging = () => {
   const [loading,           setLoading]            = useState(true);
   const [msgInput,          setMsgInput]           = useState('');
   const [search,            setSearch]             = useState('');
-  const [callingChat,       setCallingChat]        = useState(null);
   const [mobileView,        setMobileView]         = useState('list'); // 'list' | 'chat'
   const [isComposing,       setIsComposing]        = useState(false);
   const [searchResults,     setSearchResults]      = useState([]);
@@ -41,9 +40,10 @@ const Messaging = () => {
   const [isSendingRequest,  setIsSendingRequest]   = useState(false);
 
   // ── Pagination state ─────────────────────────────────────────
-  const [page,          setPage]          = useState(1);
-  const [hasMore,       setHasMore]       = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [page,              setPage]             = useState(1);
+  const [hasMore,           setHasMore]          = useState(false);
+  const [isLoadingMore,     setIsLoadingMore]     = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false); // per-chat skeleton
 
   const location        = useLocation();
   const socketRef       = useRef(null);
@@ -245,6 +245,7 @@ const Messaging = () => {
     setPage(1);
     setHasMore(false);
     setShowProfilePanel(false);
+    setIsLoadingMessages(true);  // ← show skeleton
 
     try {
       const { data } = await chatService.fetchMessages(chat._id, 1, 30);
@@ -254,6 +255,8 @@ const Messaging = () => {
       setPage(1);
     } catch (err) {
       console.error('Failed to load messages:', err);
+    } finally {
+      setIsLoadingMessages(false); // ← hide skeleton regardless
     }
 
     if (socketRef.current) {
@@ -326,10 +329,10 @@ const Messaging = () => {
   }, [search, isComposing]);
 
   // ── Send message ──────────────────────────────────────────────
-  const handleSend = async () => {
-    if (!msgInput.trim() || !activeChat) return;
-    const text = msgInput.trim();
-    setMsgInput('');
+  const handleSend = async (quickText) => {
+    const text = (quickText || msgInput).trim();
+    if (!text || !activeChat) return;
+    if (!quickText) setMsgInput('');
     if (socketRef.current) socketRef.current.emit('stop_typing', activeChat._id);
 
     try {
@@ -399,6 +402,46 @@ const Messaging = () => {
       await connectionService.sendRequest(activeChat.otherUserId);
     } catch { /* silent */ }
     finally { setIsSendingRequest(false); }
+  };
+
+  // ── View profile of active chat user ─────────────────────────
+  const handleViewProfile = () => {
+    if (activeChat?.otherUserId) navigate(`/profile/${activeChat.otherUserId}`);
+  };
+
+  // ── Clear chat ────────────────────────────────────────────────
+  const handleClearChat = async () => {
+    if (!activeChat) return;
+    const ok = window.confirm(
+      `Clear all messages with ${activeChat.userName}? This cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      await chatService.clearChat(activeChat._id);
+      setMessages([]);
+      setChats(prev => prev.map(c =>
+        c._id === activeChat._id ? { ...c, lastMessage: null } : c
+      ));
+      toast.success('Chat cleared.');
+    } catch {
+      toast.error('Failed to clear chat.');
+    }
+  };
+
+  // ── Block user ────────────────────────────────────────────────
+  const handleBlockUser = async () => {
+    if (!activeChat?.otherUserId) return;
+    const ok = window.confirm(
+      `Block ${activeChat.userName}? They won't be able to message you.`
+    );
+    if (!ok) return;
+    try {
+      await userService.blockUser(activeChat.otherUserId);
+      setBlockedChats(prev => ({ ...prev, [activeChat._id]: true }));
+      toast.success(`${activeChat.userName} has been blocked.`);
+    } catch {
+      toast.error('Failed to block user. Please try again.');
+    }
   };
 
   // ── Filtered chat list ────────────────────────────────────────
@@ -543,16 +586,43 @@ const Messaging = () => {
                   if (isMobile) { navigate(`/profile/${activeChat.otherUserId}`); }
                   else          { setShowProfilePanel(p => !p); }
                 }}
-                onClearChat={() => {}}
-                onDeleteChat={() => {}}
-                onVoiceCall={setCallingChat}
+                onClearChat={handleClearChat}
+                onBlockUser={handleBlockUser}
+                onViewProfile={handleViewProfile}
               />
 
-              {messages.length === 0 && !isLoadingMore ? (
-                <div className="msg-messages">
-                  <MessagesSkeleton rows={6} />
+              {isLoadingMessages ? (
+                /* ── Skeleton while fetching messages ── */
+                <div className="msg-messages" style={{ animation: 'fadeIn 0.2s ease' }}>
+                  <MessagesSkeleton rows={7} />
+                </div>
+              ) : messages.length === 0 ? (
+                /* ── Genuine empty chat state ── */
+                <div className="msg-messages d-flex flex-column align-items-center justify-content-center" style={{ animation: 'fadeIn 0.3s ease' }}>
+                  <div style={{
+                    width: 72, height: 72, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #fff0ed 0%, #fde8e8 100%)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 16, boxShadow: '0 4px 16px rgba(200,64,34,0.12)'
+                  }}>
+                    <i className="far fa-comment-dots" style={{ fontSize: '1.8rem', color: '#c84022' }} />
+                  </div>
+                  <h6 className="fw-bold text-dark mb-1" style={{ fontSize: 15 }}>Start your conversation 👋</h6>
+                  <p className="text-muted mb-4" style={{ fontSize: 13, textAlign: 'center', maxWidth: 220 }}>
+                    Say hi to <strong>{activeChat.userName?.split(' ')[0]}</strong> and begin chatting.
+                  </p>
+                  {!isBlockedLocally && (
+                    <button
+                      className="btn rounded-pill px-4 fw-bold d-flex align-items-center gap-2"
+                      style={{ background: '#c84022', color: '#fff', border: 'none', fontSize: 13, height: 38 }}
+                      onClick={() => handleSend('Hi! 👋')}
+                    >
+                      <i className="fas fa-paper-plane" /> Send Hi 👋
+                    </button>
+                  )}
                 </div>
               ) : (
+                /* ── Normal message list ── */
                 <ChatWindow.Messages
                   messages={messages}
                   currentUserId={user._id}
@@ -591,13 +661,6 @@ const Messaging = () => {
 
       </div>
 
-      {/* ─── Voice Call Modal ─── */}
-      {callingChat && (
-        <ChatWindow.CallModal
-          chat={callingChat}
-          onEndCall={() => setCallingChat(null)}
-        />
-      )}
     </div>
   );
 };

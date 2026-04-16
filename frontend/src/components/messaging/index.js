@@ -219,19 +219,52 @@ export const ChatWindow = ({ children }) => (
   <div className="msg-window">{children}</div>
 );
 
-ChatWindow.Header = function ChatWindowHeader({ chat, onBack, onProfileClick, onClearChat, onDeleteChat, onVoiceCall }) {
+ChatWindow.Header = function ChatWindowHeader({ chat, onBack, onProfileClick, onClearChat, onBlockUser, onViewProfile }) {
   const [showMenu, setShowMenu] = useState(false);
+  const [muted,    setMuted]    = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
+    if (!showMenu) return;
+    const handler = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMenu]);
 
   const badge = getRoleBadge(chat.userRole, chat.isGroupChat);
+
+  const menuItems = [
+    {
+      icon: 'fa-user',
+      label: 'View Profile',
+      show: !chat.isGroupChat,
+      danger: false,
+      action: () => { onViewProfile && onViewProfile(); setShowMenu(false); },
+    },
+    {
+      icon: muted ? 'fa-bell' : 'fa-bell-slash',
+      label: muted ? 'Unmute Notifications' : 'Mute Notifications',
+      show: true,
+      danger: false,
+      action: () => { setMuted(m => !m); setShowMenu(false); },
+    },
+    {
+      icon: 'fa-eraser',
+      label: 'Clear Chat',
+      show: true,
+      danger: false,
+      action: () => { onClearChat && onClearChat(); setShowMenu(false); },
+    },
+    {
+      icon: 'fa-ban',
+      label: 'Block User',
+      show: !chat.isGroupChat,
+      danger: true,
+      action: () => { onBlockUser && onBlockUser(); setShowMenu(false); },
+    },
+  ];
 
   return (
     <div className="msg-window__header">
@@ -266,30 +299,37 @@ ChatWindow.Header = function ChatWindowHeader({ chat, onBack, onProfileClick, on
         </div>
       </div>
 
+      {/* 3-dots menu */}
       <div className="msg-window__header-right" ref={menuRef} style={{ position: 'relative' }}>
-        <button className="msg-icon-btn" title="Voice call" onClick={() => onVoiceCall && onVoiceCall(chat)}>
-          <i className="fas fa-phone-alt" />
-        </button>
-        <button className="msg-icon-btn" title="More options" onClick={(e) => { e.stopPropagation(); setShowMenu(p => !p); }}>
-          <i className="fas fa-ellipsis-h" />
+        <button
+          id="chat-more-options-btn"
+          className="msg-icon-btn"
+          title="More options"
+          onClick={(e) => { e.stopPropagation(); setShowMenu(p => !p); }}
+          aria-label="Chat options"
+          style={{ background: showMenu ? 'rgba(200,64,34,0.08)' : 'none', color: showMenu ? '#c84022' : undefined }}
+        >
+          <i className="fas fa-ellipsis-v" />
         </button>
 
         {showMenu && (
-          <div className="msg-dropdown">
-            <button
-              className="msg-dropdown__item"
-              onClick={() => { onClearChat && onClearChat(); setShowMenu(false); }}
-            >
-              <i className="fas fa-eraser text-muted" style={{ width: 16 }} />
-              Clear Chat
-            </button>
-            <button
-              className="msg-dropdown__item msg-dropdown__item--danger"
-              onClick={() => { onDeleteChat && onDeleteChat(); setShowMenu(false); }}
-            >
-              <i className="fas fa-trash-alt" style={{ width: 16 }} />
-              Delete Conversation
-            </button>
+          <div
+            className="msg-dropdown"
+            style={{
+              right: 0, left: 'auto', minWidth: 200,
+              animation: 'msgDropIn 0.15s ease',
+            }}
+          >
+            {menuItems.filter(item => item.show).map((item, i) => (
+              <button
+                key={i}
+                className={`msg-dropdown__item ${item.danger ? 'msg-dropdown__item--danger' : ''}`}
+                onClick={item.action}
+              >
+                <i className={`fas ${item.icon}`} style={{ width: 18, fontSize: 13 }} />
+                {item.label}
+              </button>
+            ))}
           </div>
         )}
       </div>

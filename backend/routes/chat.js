@@ -440,4 +440,24 @@ router.put('/:chatId/read', protect, asyncHandler(async (req, res, next) => {
 }));
 
 // ─── (Moved up) GET /api/chat/unread-count is defined BEFORE /:chatId routes above
+
+// ─── DELETE /api/chat/:chatId/clear — Delete all messages in a chat ───────────
+router.delete('/:chatId/clear', protect, validateObjectId('chatId'), asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const myId = req.user._id;
+
+  const chat = await Chat.findById(chatId);
+  if (!chat) return res.status(404).json({ message: 'Chat not found.' });
+
+  const isParticipant = chat.participants.some(p => p.toString() === myId.toString());
+  if (!isParticipant && req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Not authorized.' });
+  }
+
+  await Message.deleteMany({ chatId });
+  await Chat.findByIdAndUpdate(chatId, { $unset: { lastMessage: 1 }, updatedAt: new Date() });
+
+  res.json({ success: true, message: 'Chat cleared.' });
+}));
+
 module.exports = router;

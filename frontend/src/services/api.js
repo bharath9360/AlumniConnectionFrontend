@@ -109,7 +109,11 @@ export const userService = {
   searchUsers: (params) => api.get('/users/search', { params }),
 
   // Fetch any user's public profile
-  getById: (userId) => api.get(`/users/${userId}`)
+  getById: (userId) => api.get(`/users/${userId}`),
+
+  // Block / unblock a user
+  blockUser:   (userId) => api.post(`/users/block/${userId}`),
+  unblockUser: (userId) => api.post(`/users/unblock/${userId}`),
 };
 
 // ─── Post / Feed Service ──────────────────────────────────────
@@ -176,6 +180,7 @@ export const chatService = {
   getUnreadCounts: ()            => api.get('/chat/unread-count'),
   getUnreadMessages: ()          => api.get('/chat/unread'),
   markChatRead:  (chatId)        => api.put(`/chat/${chatId}/read`),
+  clearChat:     (chatId)        => api.delete(`/chat/${chatId}/clear`),
 };
 
 // ─── Connections Service ──────────────────────────────────────

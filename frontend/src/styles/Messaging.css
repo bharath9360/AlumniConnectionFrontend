@@ -22,6 +22,11 @@
   --shadow-card:    0 2px 12px rgba(0,0,0,0.09);
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Root viewport ─────────────────────────────────────────── */
 .msg-viewport {
   display: flex;
@@ -845,6 +850,13 @@
 
 .msg-dropdown__item:hover { background: var(--msg-bg); }
 .msg-dropdown__item--danger { color: #dc3545; }
+.msg-dropdown__item--danger:hover { background: #fff5f5; color: #c0392b; }
+
+/* Alias so inline style animation name also works */
+@keyframes msgDropIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
 
 /* ============================================================
    RIGHT PANEL — Profile Preview

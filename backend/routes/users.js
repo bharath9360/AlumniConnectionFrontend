@@ -186,4 +186,24 @@ router.get('/:id', protect, asyncHandler(async (req, res, next) => {
     data: user
   });
 }));
+
+// ─── POST /api/users/block/:userId — Block a user ─────────────
+router.post('/block/:userId', protect, asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (userId === req.user._id.toString()) {
+    return res.status(400).json({ message: 'You cannot block yourself.' });
+  }
+  const target = await User.findById(userId);
+  if (!target) return res.status(404).json({ message: 'User not found.' });
+  await User.findByIdAndUpdate(req.user._id, { $addToSet: { blockedUsers: userId } });
+  res.json({ success: true, message: `${target.name} has been blocked.` });
+}));
+
+// ─── POST /api/users/unblock/:userId — Unblock a user ─────────
+router.post('/unblock/:userId', protect, asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  await User.findByIdAndUpdate(req.user._id, { $pull: { blockedUsers: userId } });
+  res.json({ success: true, message: 'User unblocked.' });
+}));
+
 module.exports = router;
