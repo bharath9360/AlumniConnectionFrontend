@@ -41,13 +41,23 @@ export const ChatListSkeleton = ({ rows = 6 }) => (
 );
 
 // ─── Chat messages skeleton ───────────────────────────────────────────────────
+// Deterministic widths so the skeleton doesn't flicker/reshape on every render
+const BUBBLE_WIDTHS = [52, 70, 42, 65, 38, 58, 75, 45, 60, 50];
+const BUBBLE_SIDES  = [false, false, true, false, false, true, false, true, false, false]; // true=mine
+
 export const MessagesSkeleton = ({ rows = 8 }) => (
-  <div className="d-flex flex-column gap-3 px-4 py-3">
-    {Array.from({ length: rows }).map((_, i) => {
-      const isMine = i % 3 === 0;
+  <div className="d-flex flex-column gap-3 px-3 py-4">
+    {Array.from({ length: Math.min(rows, BUBBLE_WIDTHS.length) }).map((_, i) => {
+      const isMine = BUBBLE_SIDES[i];
+      const w = `${BUBBLE_WIDTHS[i]}%`;
+      const h = i % 3 === 0 ? 52 : 38;
       return (
-        <div key={i} className={`d-flex ${isMine ? 'justify-content-end' : 'justify-content-start'}`}>
-          <Box w={`${40 + Math.random() * 30}%`} h={38} mb={0} radius={16} />
+        <div key={i} className={`d-flex align-items-end gap-2 ${isMine ? 'justify-content-end' : 'justify-content-start'}`}>
+          {/* Avatar circle for "theirs" side */}
+          {!isMine && <Box w={32} h={32} mb={0} radius={50} style={{ flexShrink: 0 }} />}
+          <Box w={w} h={h} mb={0} radius={16}
+            style={isMine ? { borderRadius: '16px 16px 4px 16px' } : { borderRadius: '16px 16px 16px 4px' }}
+          />
         </div>
       );
     })}
