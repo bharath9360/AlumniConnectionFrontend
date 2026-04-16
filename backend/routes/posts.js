@@ -219,6 +219,24 @@ router.get('/activity/:userId', optionalAuth, asyncHandler(async (req, res, next
   });
 }));
 
+// ─── GET /api/posts/:id — Single post by ID ───────────────────
+router.get('/:id', optionalAuth, asyncHandler(async (req, res, next) => {
+  const post = await Post.findById(req.params.id)
+    .populate('userId', 'name profilePic role designation');
+  if (!post || post.isHidden) {
+    return res.status(404).json({ message: 'Post not found.' });
+  }
+  const authUserId = req.user?._id;
+  const obj = post.toClientObject(authUserId);
+  if (post.userId && typeof post.userId === 'object') {
+    obj.userName = post.userId.name;
+    obj.userPic  = post.userId.profilePic || '';
+    obj.userRole = post.userId.designation || post.userId.role || '';
+    obj.authorId = post.userId._id.toString();
+  }
+  res.json({ success: true, data: obj });
+}));
+
 // ─── PUT /api/posts/:id — Edit post content (author only) ────
 router.put('/:id', protect, asyncHandler(async (req, res, next) => {
   const post = await Post.findById(req.params.id);

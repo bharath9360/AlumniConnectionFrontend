@@ -119,6 +119,7 @@ export const userService = {
 // ─── Post / Feed Service ──────────────────────────────────────
 export const postService = {
   getFeed:          (page, limit)              => api.get('/posts', { params: { page, limit } }),
+  getPost:          (postId)                   => api.get(`/posts/${postId}`),
   getUserPosts:     (userId, limit)           => api.get(`/posts/user/${userId}`, { params: limit ? { limit } : {} }),
   getUserActivity:  (userId, limit)           => api.get(`/posts/activity/${userId}`, { params: limit ? { limit } : {} }),
   createPost:       (formData)                => api.post('/posts', formData),

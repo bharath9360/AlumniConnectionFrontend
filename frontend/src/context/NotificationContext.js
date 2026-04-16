@@ -4,6 +4,7 @@ import React, {
 } from 'react';
 import { useAuth } from './AuthContext';
 import { notificationService } from '../services/api';
+import { pushPopup } from '../components/common/PopupNotification';
 
 /* ── Context ────────────────────────────────────────────────── */
 const NotificationContext = createContext(null);
@@ -60,6 +61,14 @@ export const NotificationProvider = ({ children, socketRef }) => {
     setNotifications(prev => {
       if (prev.some(n => n._id === notif._id)) return prev; // dedupe
       return [notif, ...prev];
+    });
+    // ── Trigger WhatsApp-style popup ──
+    pushPopup({
+      type:  notif.type || 'default',
+      title: notif.title || 'New Notification',
+      body:  notif.description || notif.message || '',
+      pic:   notif.senderPic || notif.pic || '',
+      notifId: notif._id,
     });
   }, []);
 
