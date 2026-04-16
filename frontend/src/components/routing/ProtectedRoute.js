@@ -27,6 +27,14 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
         return <Navigate to="/login" replace />;
     }
 
+    // ── Block self-registered pending users (no temp password = not bulk-imported)
+    // Bulk-imported pending users (needsPasswordChange=true) are handled by ActivationModal overlay
+    // so we let them through here — the overlay covers the entire screen.
+    if (user.status === 'Pending' && !user.needsPasswordChange) {
+        // Self-registered user awaiting admin approval — no access to protected pages
+        return <Navigate to="/login" replace state={{ pendingApproval: true }} />;
+    }
+
     // Role check
     if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
         if (userRole === 'admin')   return <Navigate to={`/admin/home/${user._id || user.id}`} replace />;
@@ -39,4 +47,3 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
 };
 
 export default ProtectedRoute;
-

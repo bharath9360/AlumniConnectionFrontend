@@ -53,7 +53,7 @@ const ActivationModal = () => {
       });
 
       if (res.data.success) {
-        toast.success('Account activated successfully!');
+        toast.success('🎉 Account activated! A confirmation email has been sent to you.', { duration: 5000 });
         // Update local auth state with fresh data (status Active, needsPasswordChange false)
         login(res.data.user, res.data.token);
         
@@ -114,7 +114,7 @@ const ActivationModal = () => {
               </h2>
               <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.6 }}>
                 {step === 1 
-                  ? 'Your account was created with a temporary password. Please set a strong one to secure your data.' 
+                  ? (<>Your account (<strong style={{ color: '#c84022' }}>{user?.email}</strong>) was created with a temporary password. Set a strong new password to secure it.</>) 
                   : 'Almost there! Please verify that your contact information is correct.'}
               </p>
             </div>

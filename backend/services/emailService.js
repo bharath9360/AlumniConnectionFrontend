@@ -4,6 +4,7 @@ const { sendWithNodemailer } = require('./nodemailerService');
 const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || "resend";
 
 const sendEmail = async (to, subject, html) => {
+  console.log(`[EmailService] Sending via ${EMAIL_PROVIDER} → ${to} | Subject: ${subject}`);
   if (EMAIL_PROVIDER === "resend") {
     try {
       return await sendWithResend(to, subject, html);
@@ -178,12 +179,85 @@ const sendCredentialsEmail = async (email, name, rawPass, role = 'student') => {
     </div>
   `;
 
-  await sendEmail(
-    email,
-    '🎓 Your Alumni Connect Account is Created — Login Credentials Inside',
-    html
-  );
+  console.log(`[sendCredentialsEmail] Sending credentials to ${email} (role: ${role})`);
+  try {
+    await sendEmail(
+      email,
+      '🎓 Your Alumni Connect Account is Created — Login Credentials Inside',
+      html
+    );
+    console.log(`[sendCredentialsEmail] ✅ Sent to ${email}`);
+  } catch (err) {
+    console.error(`[sendCredentialsEmail] ❌ FAILED for ${email}:`, err.message);
+    throw err; // re-throw so caller can track emailStats.failed
+  }
 };
 
-module.exports = { sendEmail, sendOTPEmail, sendApprovalEmail, sendBroadcastEmail, sendCredentialsEmail };
+/**
+ * Send a confirmation email after a bulk-imported user activates their account.
+ * This is the SECOND and final email in the onboarding flow.
+ * @param {string} email - recipient email
+ * @param {string} name  - recipient name
+ * @param {string} role  - 'student' | 'alumni' | 'staff'
+ */
+const sendActivationSuccessEmail = async (email, name, role = 'student') => {
+  const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const dashboardPaths = {
+    student: `/student/home`,
+    alumni:  `/alumni/home`,
+    staff:   `/staff/dashboard`,
+  };
+  const dashboardUrl = `${FRONTEND}${dashboardPaths[role] || '/'}`;
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#16a34a,#22c55e);padding:28px;text-align:center">
+        <h2 style="color:#fff;margin:0;font-size:22px">🎉 Account Activated!</h2>
+        <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px">Welcome to MAMCET Alumni Connect</p>
+      </div>
+
+      <div style="padding:32px">
+        <p style="font-size:15px;color:#1a1a2e;margin:0 0 8px">Hello <strong>${name}</strong>,</p>
+        <p style="font-size:14px;color:#555;margin:0 0 24px;line-height:1.6">
+          Your <strong>MAMCET Alumni Connect</strong> account has been <strong style="color:#16a34a">successfully activated</strong>!
+          You now have full access to the platform.
+        </p>
+
+        <!-- What you can do now -->
+        <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:20px 24px;margin-bottom:24px">
+          <div style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">
+            You Now Have Access To
+          </div>
+          <ul style="margin:0;padding-left:18px;font-size:13.5px;color:#374151;line-height:2">
+            <li>Connect with fellow alumni &amp; students</li>
+            <li>Explore job &amp; internship opportunities</li>
+            <li>Discover and register for events</li>
+            <li>Join mentorship programmes</li>
+            <li>Share posts &amp; updates</li>
+          </ul>
+        </div>
+
+        <a href="${dashboardUrl}"
+           style="display:inline-block;background:#16a34a;color:#fff;padding:13px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.3px">
+          Go to Dashboard →
+        </a>
+      </div>
+
+      <div style="background:#f8f8f8;padding:16px;text-align:center;font-size:11px;color:#aaa;border-top:1px solid #eee">
+        This is an auto-generated message from the MAMCET Admin team. Do not reply to this email.
+      </div>
+    </div>
+  `;
+
+  console.log(`[sendActivationSuccessEmail] Sending activation-success email to ${email}`);
+  try {
+    await sendEmail(email, '✅ Your MAMCET Alumni Connect Account is Now Active!', html);
+    console.log(`[sendActivationSuccessEmail] ✅ Sent to ${email}`);
+  } catch (err) {
+    console.error(`[sendActivationSuccessEmail] ❌ FAILED for ${email}:`, err.message);
+    // We do NOT re-throw — activation already succeeded; email failure is non-blocking
+  }
+};
+
+module.exports = { sendEmail, sendOTPEmail, sendApprovalEmail, sendBroadcastEmail, sendCredentialsEmail, sendActivationSuccessEmail };
 

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -14,7 +14,15 @@ const StudentLogin = () => {
   const [error, setError]             = useState('');
   const [pendingApproval, setPendingApproval] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+
+  // Show pending banner if redirected back from ProtectedRoute
+  useEffect(() => {
+    if (location.state?.pendingApproval) {
+      setPendingApproval(true);
+    }
+  }, [location.state]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
